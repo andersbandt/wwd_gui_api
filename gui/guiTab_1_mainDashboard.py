@@ -11,9 +11,7 @@ import matplotlib.pyplot as plt  # import matplotlib library
 from drawnow import *
 
 # import user defined modules
-from gui import gui_helper
-from common import SerialReader
-from common.SerialReader import SerialReader
+from gui import gui_helper as guih
 from afe import afe_analysis
 
 
@@ -44,7 +42,7 @@ class tabMainDashboard:
         self.initTabContent()
 
     def initTabContent(self):
-        print("Initializing tab 1 content")
+        print("Initializing tab 1 main dashboard")
         self.init_fr_prompt()
         self.init_fr_data_record()
 
@@ -62,7 +60,7 @@ class tabMainDashboard:
             com_ports = [port.device for port in list_ports.comports()]
             # ports_var.set(com_ports)
             # set up user inputs for statement (year and month)
-            self.com_dropdown = gui_helper.generate_drop_down(
+            self.com_dropdown = guih.generate_drop_down(
                 self.fr_add_data,
                 [port.device for port in list_ports.comports()]
             )
@@ -110,9 +108,9 @@ class tabMainDashboard:
         print("Analyzing file")
         afe_data = processor.load_csv(self.basefilepath + "/data/" + filename)
         if afe_data is None:
-            gui_helper.alert_user("Something wrong with data!",
+            guih.alert_user("Something wrong with data!",
                                   "Couldn't load data, something wrong",
-                                  kind="error")
+                            kind="error")
             return False
         afe_stats = afe_analysis.analyze_afe(afe_data)
         # output_frame = tk.Frame(self.master)

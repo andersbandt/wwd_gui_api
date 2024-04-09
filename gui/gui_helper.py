@@ -29,36 +29,6 @@ def generate_drop_down(frame, options):
     return drop, clicked_opt
 
 
-def init_fr_prompt(frame, clear_act):
-    # set up text box for user communication
-    Label(frame, text="Console Output").grid(row=0, column=0, pady=3)
-    clear_button = tk.Button(frame, text="Clear console", command=clear_act, bg="black", fg="white")
-    clear_button.grid(row=0, column=1, pady=3)
-    prompt = Text(frame,
-                  height=25, width=110,
-                  bg="black", fg="white",
-                  borderwidth=10)
-    prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
-    return prompt
-
-
-# gui_print: prints a message both on the Python terminal and a Tkinter frame
-# NOTE: used to pass in Frame where prompt was placed, removed it
-def gui_print(prompt, message):
-    # NOTE: removed arg support
-    # for arg in args:
-    #     message += str(arg)
-    message = ">>>" + message
-    print(message)
-    prompt.insert(INSERT, (message + "\n"))
-    prompt.see("end")  # auto-scroll to the end
-    return True
-
-
-def gui_clear(prompt):
-    # end_index = prompt.index("end")
-    prompt.delete("1.0", "end")  # basically line index from
-
 
 ##############################################################################
 ####      PROMPT/ALERT FUNCTIONS           ###################################

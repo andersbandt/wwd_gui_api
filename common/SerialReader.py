@@ -1,89 +1,82 @@
+"""
+@file     SerialReader.py
+@author   Anders Bandt
+@date     March 2024
+@brief    read data from serial (COM) port
+"""
 
 # import needed modules
 from datetime import datetime
-import pandas as pd
-import csv
-import pandas.errors
 import serial
 from drawnow import *
 
 # import user created modules
-from common import Serial
+from common import SerialGeneral
+from common import logger
 
 
-class SerialReader(Serial.Serial):
-    def __init__(self, port):
-        # initialize serial connection
-        self.serObj = serial.Serial(port, 115200)
+class SerialReader(SerialGeneral.SerialGeneral):
+    def __init__(self, port, baudrate, log=True):
+        super().__init__(port, baudrate)
 
-        # set up some variables
-        self.afe_adc = []
-        self.plot_cnt = 0
-
-
-# TODO: make this more modular with parameters
-    def init_data_process(self, basefilepath, parameters, filename_ext=None):
-        # configure .csv output file
-        prefix = basefilepath + "data"  # store in base filepath with "data_" as file prefix
-        extension = "csv"
-        current_datetime = datetime.now()
-        formatted_datetime = current_datetime.strftime("%Y%m%d_%H%M%S")
-        if filename_ext is None:
-            filename = f"{prefix}_{formatted_datetime}.{extension}"
+        if log:
+            # logger.init_log("USB_LOG", f"log/{filename}.log")
+            self.logfilename = logger.init_text("log/", "\n\n\n===================================\n"
+                                                        "=======INFO: USB LOG START=========\n"
+                                                        "===================================\n")
         else:
-            filename = f"{prefix}_{formatted_datetime}_{filename_ext}.{extension}"
-
-        self.open_csv(filename, parameters)
-
-        # while loop that loops forever
-        while True:
-            # while self.serObj.inWaiting() == 0: # Wait here until there is data
-            #     pass
-            data_array = self.get_data(printmode=True)
-            if data_array is not None:
-                print(data_array)
-                self.append_csv(filename, data_array)
+            self.logfilename = None
 
 
-# TODO: compare this to the one its overriding in Serial parent class
+    def init_data_process(self, basefilepath, parameters, filename_ext=None):
+        filename = logger.init_csv(basefilepath, parameters, filename_ext)
+        status = True
+        while status:
+            try:
+                data_array = self.get_data("data", printmode=False)
+                if data_array is not None:
+                    print(data_array)
+                    logger.append_csv(filename, data_array)
+            except Exception:
+                status = False
+        return
+
+    # TODO: compare this to the one its overriding in Serial parent class
     def get_data(self, data_mode, printmode=False):
-        serStrDatp = self.serObj.read_until()
+        # serStrDatp = self.serObj.read_until()
+        bytes_to_read = self.serObj.inWaiting()
+        serStrDatp = self.serObj.read(bytes_to_read)
+
         try:
             serStrDat = serStrDatp.decode('utf-8').strip().strip('\n')
         except UnicodeDecodeError as e:
             # serStrDat = serStrDatp.hex()
             raise e
-        # serStrDat = self.serObj.read(1).decode('utf-8')
+
+        # set timestamp and print mode
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        # dataArray = serStrDat.decode(errors='ignore').strip().strip('\n')
         if printmode:
             print(serStrDat)
-        if data_mode == "data":
+
+        # VARIABLE RETURN BASED ON @data_mode
+        if data_mode == "timestamp":
+            serStrDat = "\n" + timestamp + " --->   " + serStrDat
+            logger.append_text(self.logfilename, serStrDat)
+        elif data_mode == "data":
             if "DATA," in serStrDat:
                 data_array = serStrDat.split(',')
                 data_array.append(timestamp)
-                return data_array
-        elif data_mode == "raw":
-            return serStrDat
+                # TODO: how can I log to .csv file right here?
         else:
             raise Exception("ERROR: undefined data mode for SerialReader")
-            return False
+
+        return serStrDat
 
 
     def close(self):
         print("Stopping serial data processing")
         plt.close()
         self.serObj.close()
-
-    def open_csv(self, filename, headers):
-        with open(filename, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(headers)
-
-    def append_csv(self, filename, row_data):
-        with open(filename, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows([row_data])
 
     # Create a function that makes our desired plot
     def makeFig(self):
@@ -110,6 +103,3 @@ class SerialReader(Serial.Serial):
             drawnow(self.makeFig)
             # self.makeFig() # GPT suggested not using drawnow() but I haven't gotten this to work
             plt.pause(.00000001)
-
-
-

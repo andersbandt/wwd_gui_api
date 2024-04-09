@@ -1,9 +1,17 @@
+"""
+@file     gui_driver.opy
+@author   Anders Bandt
+@date     April 2024
+@brief    critical GUI code to launch Tkinter notebook
+"""
+
+
 
 # import needed packages
 import tkinter as tk
 from tkinter import ttk
-
 import sv_ttk
+import os
 
 # import tab classes
 from gui import guiTab_1_mainDashboard
@@ -14,8 +22,8 @@ from gui import guiTab_5_USB
 
 
 class MainApplication:
-    def __init__(self, window, *args, **kwargs):
-        self.nb = ttk.Notebook(window)
+    def __init__(self, window, height, width):
+        self.nb = ttk.Notebook(window, height=height, width=width)
 
         self.tab1 = None
         self.tab2 = None
@@ -23,7 +31,8 @@ class MainApplication:
         self.tab4 = None
         self.tab5 = None
 
-        self.basefilepath = "C:/Users/ander/OneDrive/Code/python/WWD/imu_analysis/"
+        # self.basefilepath = "C:/Users/ander/OneDrive/Code/python/WWD/wwd_gui_api/"
+        self.basefilepath = os.getcwd()
 
         self.setTabs()
 
@@ -58,12 +67,9 @@ def main():
     # setup window
     window = tk.Tk()
 
-    window.title("AFE analyyzer")
-    window.geometry('1250x900')
+    window.title("WWD GUI API")
+    window.geometry('1350x950')
 
-    # set the theme
-    # window.tk.call("source", 'Finance_GUI/themes/azure.tcl')
-    # window.tk.call("set_theme", "dark")
 
     sv_ttk.set_theme("dark")
 
@@ -80,7 +86,7 @@ def main():
     # style.map("TNotebook", background=[("selected", "red")])
 
     # place main app
-    MainApplication(window)
+    MainApplication(window, 1800, 1800)
 
     # run application
     window.mainloop()

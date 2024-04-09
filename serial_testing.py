@@ -1,21 +1,35 @@
-from time import sleep
-
-from common.Serial import Serial
-from common import xds110_api
 
 
-# ser_obj = Serial("COM13", 115200)
+from common import subprocessor
+from common import plotter
 
-result = xds110_api.xds110_jtag_reset()
-print(result)
+basefilepath = "C:/Users/ander/Downloads/"
+filename = "test2.csv"
+filepath = basefilepath + filename
 
-while True:
-    pass
-    # print("... heartbeat ...")
-    # if ser_obj.serObj.inWaiting() > 0: # Wait here until there is data
-    # ser_obj.get_data(printmode=True)
-    # ser_obj.send_data("DADA")
-    # sleep(1)
+
+pd_frame = subprocessor.load_csv(filepath, columns=['timestamp', 'ms'])
+time_series = subprocessor.create_datetime(pd_frame["timestamp"])
+
+
+time_diff = []
+
+offset = time_series[0].timestamp()
+print(f"Time offset is: {offset}")
+
+i = 0
+for mcu_time in pd_frame['ms']:
+    time_diff.append(mcu_time/1000 - time_series[i].timestamp() + offset)
+    i += 1
+
+
+plotter.time_plot(time_series, time_diff)
+
+
+
+
+
+print("I'm fucking done!!!")
 
 
 

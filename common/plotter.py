@@ -4,6 +4,15 @@
 import matplotlib.pyplot as plt
 
 
+
+
+def time_plot(x_series, y_axis):
+    plt.plot(x_series, y_axis)
+    plt.grid(True)
+    plt.show()
+
+
+
 def graph_afe(x_series, afe_d, vertical_lines=None, title=None):
     # f = plt.figure()
     plt.figure(figsize=(12, 6))

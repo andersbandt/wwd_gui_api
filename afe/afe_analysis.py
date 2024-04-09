@@ -230,7 +230,7 @@ def calculate_statistics(data):
 ###   Time stuff       #############
 ####################################
 
-datetime_format = "%Y-%m-%d %H:%M:%S.%f" # need to add an extra space at the end because of my printout?
+
 
 def analyze_time(afe_d):
     start_str = afe_d['timestamp'].iloc[0]
@@ -253,12 +253,7 @@ def analyze_time(afe_d):
     }
 
 
-def create_datetime(timestamp_array):
-    datetime_arr = []
-    for timestamp_str in timestamp_array:
-        tmp = datetime.strptime(timestamp_str, datetime_format)
-        datetime_arr.append(tmp)
-    return datetime_arr
+
 
 
 ####################################

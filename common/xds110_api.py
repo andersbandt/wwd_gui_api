@@ -1,3 +1,10 @@
+"""
+@file     guiTab_5_USB.py
+@author   Anders Bandt
+@date     March 2024
+@brief    control device through serial (COM) port
+"""
+
 
 # import needed modules
 import subprocess

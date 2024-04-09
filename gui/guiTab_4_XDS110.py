@@ -1,9 +1,17 @@
-import subprocess
+"""
+@file     guiTab_5_USB.py
+@author   Anders Bandt
+@date     March 2024
+@brief    control device through serial (COM) port
+"""
+
+
 # import needed packages
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
 import threading
+import subprocess
 from serial.tools import list_ports
 import os
 
@@ -11,7 +19,8 @@ import os
 from common import xds110_api as xds110
 from common import subprocessor as subp
 from common.subprocessor import CommandPacket
-from gui import gui_helper
+from gui import gui_helper as guih
+from gui import gui_class as guic
 
 
 class tabXDS110:
@@ -28,7 +37,7 @@ class tabXDS110:
 
         self.fr_prompt = tk.Frame(self.frame, bg="gray")
         self.fr_prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-        self.prompt = None
+        self.prompt = guic.Prompt(self.fr_prompt, "XDS110 Comms", "black", height=25, width=140)
 
         # init frames within tab
         self.fr_xds110 = tk.Frame(self.frame, bg="#00bcd4")
@@ -53,16 +62,9 @@ class tabXDS110:
 
     def initTabContent(self):
         print("Initializing tab XDS110 content")
-        self.init_fr_prompt()
         self.init_fr_xds110()
         self.init_fr_target()
         self.init_fr_firmware()
-
-    def init_fr_prompt(self):
-        # set up text box for user communication
-        Label(self.fr_prompt, text="Console Output").grid(row=0, column=0, pady=5)
-        self.prompt = Text(self.fr_prompt, padx=10, pady=10, height=25, width=110)
-        self.prompt.grid(row=1, column=0, padx=5, pady=10)
 
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
@@ -85,7 +87,7 @@ class tabXDS110:
                                    command=lambda: threading.Thread(target=self.toggle_target).start(),
                                    bg="orange", fg="black", height=2, width=15)
         btn_toggle_target.grid(row=2, column=2, padx=15, pady=22)
-        self.toggle_drop = gui_helper.generate_drop_down(
+        self.toggle_drop = guih.generate_drop_down(
             self.fr_target,
             ["toggle", "assert", "deassert"]
         )
@@ -104,7 +106,7 @@ class tabXDS110:
                                     command=lambda: threading.Thread(target=self.flash_firmware).start(),
                                     bg="green", fg="white", height=2, width=20)
         btn_flash_firmware.grid(row=2, column=2, padx=15, pady=22)
-        self.targetConfig_drop = gui_helper.generate_drop_down(
+        self.targetConfig_drop = guih.generate_drop_down(
             fr_method,
             ["target_power", "probe_power"]
         )
@@ -119,10 +121,10 @@ class tabXDS110:
         error_flag = 0
 
         [xds110_status, packet] = xds110.get_xds110_status()
-        gui_helper.gui_print(self.prompt, packet.get_string())
+        self.prompt.print(packet.get_string())
 
         if error_flag:
-            gui_helper.gui_print(self.prompt, "Something went wrong checking XDS110 status")
+            self.prompt.print("Something went wrong checking XDS110 status")
 
         my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         if xds110_status:
@@ -140,7 +142,7 @@ class tabXDS110:
 
         # get target status
         packet = xds110.get_jtag_integrity()
-        gui_helper.gui_print(self.prompt, packet.get_string())
+        self.prompt.print(packet.get_string())
 
         my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         if packet.result:
@@ -153,10 +155,8 @@ class tabXDS110:
     def toggle_target(self):
         action = self.toggle_drop[1].get()
         status = xds110.toggle_target(action)
-        # gui_helper.gui_print(self.frame, self.prompt, result)
+        # guih.gui_print(self.frame, self.prompt, result)
 
-
-# TODO: this doesn't properly report if there is a build error (STDERROR will contain the error output)
     def build_firmware(self):
         my_oval = self.canvas3.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         self.canvas3.itemconfig(my_oval, fill="yellow")
@@ -165,31 +165,40 @@ class tabXDS110:
         packet = subp.execute_Popen(
             exec_path,
             command_path,
-            ["-k",
-             "-j",
-             "8",
+            ["-k", # Keep going when some targets can't be made
+             "-j", # allow N jobs at once
+             "8", # 8 jobs
              "all",
-             "-O"])
-        gui_helper.gui_print(self.prompt, packet.get_string())
-        self.canvas3.itemconfig(my_oval, fill="green")
+             "-O"]) # Synchronize output of parallel jobs by TYPE (might not be setup right)
+        self.prompt.print(packet.get_string())
+
+        if len(packet.stderr) < 2:
+            self.canvas3.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+            return True
+        else:
+            self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            return False
 
     def flash_firmware(self):
         print("... executing loadti to flash firmware ...")
         my_oval = self.canvas4.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+
         # BUILD FIRMWARE
         self.build_firmware()
 
         # PERFORM TARGET CHECK
-        target_status = self.check_target()
-        if not target_status:
-            gui_helper.alert_user("Can't flash firmware!", "Target connection is not valid", "error")
+        flash_option = self.targetConfig_drop[1].get()
+        if flash_option == "target_power":
+            target_status = self.check_target()
+            if not target_status:
+                guih.alert_user("Can't flash firmware!", "Target/probe connection is not valid", "error")
 
         # FLASH FIRMWARE
         self.canvas4.itemconfig(my_oval, fill="yellow")
-        [firmware_status, packet] = xds110.flash_firmware(self.targetConfig_drop[1].get())
-        gui_helper.gui_print(self.prompt, packet.get_string(
-
-        ))
+        [firmware_status, packet] = xds110.flash_firmware(
+            flash_option
+        )
+        self.prompt.print(packet.get_string())
 
         if firmware_status:
             self.canvas4.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN

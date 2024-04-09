@@ -1,7 +1,17 @@
+"""
+@file     guiTab_5_USB.py
+@author   Anders Bandt
+@date     March 2024
+@brief    control device through serial (COM) port
+"""
+
+
 # import needed modules
 import subprocess
 import os
+import pandas as pd
 from time import sleep
+from datetime import datetime
 
 
 class CommandPacket:
@@ -53,7 +63,11 @@ def execute_Popen(exec_path, base_command, flags):
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
+    #     process.wait(timeout=10)
     # Check if the command was successful
+    #     if process.poll() is None:
+    #         process.terminate()
+    #         print("Command terminated after 10 seconds")
     packet = CommandPacket(
         stdout.decode(),
         stderr.decode(),
@@ -63,59 +77,35 @@ def execute_Popen(exec_path, base_command, flags):
     return packet
 
 
-# def execute_command(base_command, flags):
-#     executable_path = os.path.join(base_command)
-#     command = [executable_path] + flags
-#     print(command)
-#     result = None
-#     try:
-#         result = subprocess.run(command,
-#                                 stdout=subprocess.PIPE,
-#                                 stderr=subprocess.PIPE,
-#                                 timeout=60)
-#     except subprocess.TimeoutExpired:
-#         print("Command timed out after 60 seconds.")
-
-# try:
-#     process = subprocess.Popen(command,
-#                                stdout=subprocess.PIPE,
-#                                stderr=subprocess.PIPE)
-#     process.wait(timeout=10)
-#     if process.poll() is None:
-#         process.terminate()
-#         print("Command terminated after 10 seconds")
-# except subprocess.TimeoutExpired:
-#     print("Command timed out after 10 seconds.")
-
-# # Check if the command was successful
-# print(result.stdout.decode())
-# if result.returncode == 0:
-#     print("COMMAND EXECUTED SUCCESSFULLY")
-#     print(result.stderr.decode())
-#     return result.stdout.decode()
-# else:
-#     print("ERROR WITH COMMAND")
-#     print(result.stderr.decode())
-#     return False
-
-
 ##############################################################
 ################   DATA and .csv FUNCS   #####################
 ##############################################################
 
 ### data loading functions
-
 def load_csv(filepath, columns=['timestamp', 'fifo', 'data']):
     print(f"Attempting to open a .csv using columns: \n\t{columns}")
     try:
         # Load data from CSV file
         df = pd.read_csv(filepath)
-    except pandas.errors.EmptyDataError:
+    except pd.errors.EmptyDataError:
         print("Pandas says data is empty! No columns to parse from file")
         return None
     # # Extract columns
     pandas_data = df[columns]
-    if len(pandas_data['timestamp'].tolist()) == 0:
+    if len(pandas_data[columns[0]].tolist()) == 0:
         print("File seems to be .csv but there is no data!")
         return None
     return pandas_data
+
+
+datetime_format = "%Y-%m-%d %H:%M:%S.%f" # need to add an extra space at the end because of my printout?
+
+
+def create_datetime(timestamp_array):
+    datetime_arr = []
+    for timestamp_str in timestamp_array:
+        tmp = datetime.strptime(timestamp_str, datetime_format)
+        datetime_arr.append(tmp)
+    return datetime_arr
+
+

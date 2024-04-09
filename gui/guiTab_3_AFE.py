@@ -23,7 +23,7 @@ class tabAFE:
         self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
-        self.data_folder = "afe_data/"
+        self.data_folder = "/afe_data/"
 
         # print welcome text
         l1 = ttk.Label(self.frame, text="AFE control and analysis", style="BW.TLabel",

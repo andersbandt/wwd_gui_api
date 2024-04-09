@@ -13,7 +13,7 @@ from drawnow import *
 # import user defined modules
 from common import SerialReader
 from common.SerialReader import SerialReader
-from gui import gui_helper
+from gui import gui_helper as guih
 from imu import imu_analysis
 
 
@@ -23,7 +23,7 @@ class tabIMU:
         self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
-        self.data_folder = "imu_data/"
+        self.data_folder = "/imu_data"
 
         # print welcome text
         l1 = ttk.Label(self.frame, text="IMU Control Center", style="BW.TLabel",
@@ -64,7 +64,7 @@ class tabIMU:
             com_ports = [port.device for port in list_ports.comports()]
             # ports_var.set(com_ports)
             # set up user inputs for statement (year and month)
-            self.com_dropdown = gui_helper.generate_drop_down(
+            self.com_dropdown = guih.generate_drop_down(
                 self.fr_add_data,
                 [port.device for port in list_ports.comports()]
             )

@@ -1,24 +1,30 @@
+
+# import needed modules
 import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from pprint import pprint
+import pandas as pd
 
-
+# import user defined modules
 from data import data_helper as datah
 
 
 
 def generateA(var1_arr, var2_arr):
-    # sqrt_var_arr = np.sqrt(var_arr)
     A = np.column_stack((
+        # var1_arr ** 2,
         var1_arr,
-        var2_arr,
+        # np.sqrt(var1_arr),
+        # var2_arr ** 2,
+        # var2_arr,
         np.ones_like(var1_arr)
     ))
     # A_float = np.vectorize(datah.convert_to_float)(A)
-    A_float = np.array([[datah.convert_to_float(val) for val in row] for row in A])
-    A = A_float[~np.isnan(A_float).any(axis=1)]
-    return A
+    # A_float = np.array([[datah.convert_to_float(val) for val in row] for row in A])
+    # A = A_float[~np.isnan(A_float).any(axis=1)] # removes nan values but leaves mismatch with truth values
+    A_np = np.array(A)
+    return A_np
 
 
 # GenerateResidual: Generates a residual along with some statistics
@@ -34,6 +40,10 @@ def generate_residual(calculated, truth):
     # fullscale_error = (max_res - min_res) * max(inputs) / 100  # compute full scale error
     # print(f"Fullscale error: {fullscale_error} %")
     # TODO: add a dictionary to track stats
+
+    # scale residual
+    # scaled_res = datah.scale_array(residual, -1, 1)
+
     return [residual, euclidean_norm]
 
 

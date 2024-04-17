@@ -1,8 +1,8 @@
 """
-@file     guiTab_5_USB.py
+@file     xds110_api.py
 @author   Anders Bandt
 @date     March 2024
-@brief    control device through serial (COM) port
+@brief    control the XDS110
 """
 
 

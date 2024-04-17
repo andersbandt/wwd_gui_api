@@ -23,22 +23,34 @@ from data import data_helper as datah
 from common import logger
 
 
-def clean_data(df, column):
+# TODO: another cleaning method I realized is my erroneous data has two entries for the same timestamp
+def clean_data(df, column, column2=None):
+    print("INFO: Cleaning data ....")
+    print(f"\tdata starting with row count: {df.shape[0]}")
     # drop out nAn values
     df = df.replace('', np.nan)
     df = df.dropna()
 
     # Filter out data points that fall below the lower threshold or above the upper threshold
+    # NOTE: the .shift() command moves towards the end of the series by default
     df = df[df[column] >= df[column].shift(1)]
     df = df[df[column] >= df[column].shift(1)]
-    filtered_df = df[df[column] >= df[column].shift(1)]
+    df = df[df[column] >= df[column].shift(1)]
+
+    print(f"\tfilter on column '{column}' yields row count: {df.shape[0]}")
+
+    temp_shift = 10 # max shift between temp samples allowed
+    if column2:
+        df = df[df[column2] - df[column2].shift(1) <= temp_shift]
+        df = df[df[column2] - df[column2].shift(1) <= temp_shift]
+        print(f"\tfilter on column '{column2}' yields row count: {df.shape[0]}")
 
     # reset the starting value to be at 0
-    min_value = filtered_df[column].min()
-    result = filtered_df[column] - min_value
-    filtered_df["column"] = result
+    min_value = df[column].min()
+    result = df[column] - min_value
+    df[column] = result
 
-    return filtered_df
+    return df
 
 
 # def clean_data(df, interest_column):
@@ -76,7 +88,6 @@ def get_filtered_data(data_arr, interest_column):
     # data_arr_f = np.delete(data_arr, filtered_indices, axis=0)
     data_arr_f = data_arr.drop(filtered_indices)
 
-
     return data_arr_f
 
 
@@ -93,6 +104,36 @@ def create_time_offset(mcu_time_arr, real_time):
 
     return time_diff
 
+
+
+def verify_data(ver_file, columns):
+    #####################################
+    ### VERIFICATION SECTION  ###########
+    #####################################
+    df_ver = datah.load_csv_pandas(ver_file, columns=columns)
+    df_ver = datah.df_float(df_ver, "temp")
+    df_ver = clean_data(df_ver, "ms")
+    ver_dtime = time_analysis.create_datetime(df_ver["timestamp"])
+    ver_dtsec = [date.timestamp() for date in ver_dtime]
+    ver_toff = np.array(
+        create_time_offset(
+            np.array(df_ver["ms"]),
+            ver_dtsec)
+    )
+    holdout = least_squares.generateA(df_ver["ms"], df_ver["temp"])
+    print(f"\n\nVerification data is of numpy type: {holdout.dtype}\n\tand type: {type(holdout)}")
+    print(f"Coefficients w are of numpy type: {w.dtype}\n\tand type: {type(w)}")
+    # y_holdout = holdout @ w
+    y_holdout = np.dot(holdout, w)
+
+    ver_time_offset = ver_toff.reshape(-1, 1)
+    [res, ver_e_norm] = least_squares.generate_residual(y_holdout, ver_time_offset)
+    print(f"Euclidean norm of this verification data is: {ver_e_norm}")  # display 2 norm of the residual
+    print("\n\nGenerating verification plots...\n")
+    plotter.time_plot(ver_dtime, ver_time_offset, "Datetime", "Verification time offset (ms)", color="red")
+    plotter.time_plot(ver_dtime, res, "Datetime", "Verification residual (ms)", color="red")
+    plotter.time_plot(ver_dtime, df_ver["temp"], "Datetime", "Verification temp", color="orange")
+    return df_ver
 
 
 if __name__ == "__main__":
@@ -112,37 +153,41 @@ if __name__ == "__main__":
     # get filepath
     basefilepath = "C:/Users/ander/OneDrive/Code/python/WWD/wwd_gui_api/data/clock_data/"
     pre_temp_file = ["_20240409__215040_clock_test_.csv",
-                  "_20240409__215558_clock_test_.csv",
-                  "_20240409__215645_clock_test_.csv",
-                  "_20240409__220025_clock_test_.csv",
-                  "_20240411__195755_clock_test_.csv",
-                  "_20240415__210006_clock_test_.csv",
-                  "_20240416__110848_clock_test_.csv",
-                   "_20240415__223453_clock_test_.csv"]
+                     "_20240409__215558_clock_test_.csv",
+                     "_20240409__215645_clock_test_.csv",
+                     "_20240409__220025_clock_test_.csv",
+                     "_20240411__195755_clock_test_.csv",
+                     "_20240415__210006_clock_test_.csv",
+                     "_20240416__110848_clock_test_.csv",
+                     "_20240415__223453_clock_test_.csv"]
 
     train_folder = basefilepath
     train_file = os.listdir(train_folder)
-    ver_file = ["_20240416__203234_clock_test_.csv"]
-
+    # ver_file = basefilepath + "_20240416__202039_clock_test_.csv"
+    # ver_file = basefilepath + "_20240416__203234_clock_test_.csv"
+    # ver_file = basefilepath + "_20240416__225652_clock_test_.csv"
+    # ver_file = basefilepath + "_20240417__103744_clock_test_.csv"
+    ver_file = basefilepath + "_20240417__171147_clock_test_.csv"
 
     filtered_data_arr = pd.DataFrame()
     time_offset = []
     # LOAD IN AND FORMAT TRAIN DATA
     for file in train_file:
         if ".csv" in file:
-            data_frame = datah.load_csv_pandas(basefilepath + file, ["timestamp", "ms", "temp"])
-            # filtered_data_arr = get_filtered_data(data_frame, "ms")
-            df_tmp = clean_data(data_frame, "ms")
-            # df_tmp = get_filtered_data(df_tmp, "ms")
-            dt_tmp = time_analysis.create_datetime(df_tmp["timestamp"])
-            dt_seconds = [date.timestamp() for date in dt_tmp]
-            time_offset.extend(
-                create_time_offset(
-                    np.array(df_tmp["ms"]),
-                    dt_seconds)
-            )
-            # filtered_data_arr = pd.concat(filtered_data_arr, df_tmp)
-            filtered_data_arr = filtered_data_arr.append(df_tmp)
+            if file not in ver_file:
+                df_tmp = datah.load_csv_pandas(basefilepath + file, ["timestamp", "ms", "temp"])
+                df_tmp = datah.df_float(df_tmp, "temp")
+                df_tmp = clean_data(df_tmp, "ms", "temp")
+                # df_tmp = get_filtered_data(df_tmp, "ms")
+                dt_tmp = time_analysis.create_datetime(df_tmp["timestamp"])
+                dt_seconds = [date.timestamp() for date in dt_tmp]
+                time_offset.extend(
+                    create_time_offset(
+                        np.array(df_tmp["ms"]),
+                        dt_seconds)
+                )
+                # filtered_data_arr = pd.concat(filtered_data_arr, df_tmp)
+                filtered_data_arr = filtered_data_arr.append(df_tmp)
 
     datetime_f_arr = time_analysis.create_datetime(filtered_data_arr["timestamp"])
 
@@ -153,12 +198,13 @@ if __name__ == "__main__":
     pprint(A)
     print("### MATRIX A ABOVE ###")
     pprint(d)
-    print("### MATRIX d ABOVE ###")
-    print(f"\nComputing least squares with A matrix of shape: {A.shape}")
-    print(f"\tand d of shape: {d.shape}")
+    print("\n### MATRIX d ABOVE ###")
+    print(f"\nComputing least squares with A matrix of \nt[shape, {A.shape}]\nt[type, {A.dtype}]")
+    print(f"\tand d of \nt[shape, {d.shape}]\nt[type, {d.dtype}]")
 
     # RUN ANALYSIS
     w = least_squares.least_squares(A, d)
+    w = np.array(w)
     # w = least_squares.run_prxgd(A, d)
     y = A @ w  # apply A matrix to newly found coefficients
     # [residual, euclidean_norm] = least_squares.generate_residual(y, d)  # generate residual
@@ -172,39 +218,32 @@ if __name__ == "__main__":
 
     print(f"\tcoefs w are of shape: {w.shape}")
     print(f"\tshape of output y is: {y.shape}")
-    [residual, euclidean_norm] = least_squares.generate_residual(y, d)  # generate residual
+    [residual, e_norm] = least_squares.generate_residual(y, d)  # generate residual
     print(f"coefficients (w) found from data; computed output values (y) and formed residual")
     print(f"w: {w}")  # display coefficients
     # print(f"w2: {w2}")  # display coefficients
-    print(f"Euclidean norm of this training data is: {euclidean_norm}")  # display 2 norm of the residual
+    print(f"Euclidean norm of this training data is: {e_norm}")  # display 2 norm of the residual
 
     # print out a shit ton of plots
     # plotter.time_plot(datetime_f_arr, mcu_ms, "Datetime", "Raw mcu training time")
-    index = list(range(1, len(residual) + 1))
+    index = list(range(1, len(datetime_f_arr) + 1))
+    # scaled_temp = datah.scale_array(A[:, 2], -1, 1)
     plotter.time_plot(index, time_offset, "Datetime", "Training time offset (ms)")
     plotter.time_plot(index, residual, "Data Entry #", "Training residual (ms)")
+    plotter.time_plot(index, filtered_data_arr["temp"], "Data Entry #", "Training temp", color="purple")
 
-    # do some verification training
-    data_frame = datah.load_mul_csv_pandas(basefilepath, ver_file, ["timestamp", "ms", "temp"])
-    filtered_data_arr = clean_data(data_frame, "ms")
-    datetime_f_arr = time_analysis.create_datetime(filtered_data_arr["timestamp"])
-    dt_seconds = [date.timestamp() for date in datetime_f_arr]
-    time_offset = np.array(
-        create_time_offset(
-            np.array(filtered_data_arr["ms"]),
-            dt_seconds)
-    )
-    holdout = least_squares.generateA(filtered_data_arr["ms"], filtered_data_arr["temp"])
-    y_holdout = holdout @ w
-    # y_holdout2 = least_squares.generateA(y_holdout) @ w2
 
-    time_offset = time_offset.reshape(-1, 1)
-    [residual, e_norm] = least_squares.generate_residual(y_holdout, time_offset)
-    print(f"Euclidean norm of this verification data is: {euclidean_norm}")  # display 2 norm of the residual
-    print("\n\nGenerating verification plots...\n")
-    plotter.time_plot(datetime_f_arr, time_offset, "Datetime", "Verification time offset (ms)", color="red")
-    plotter.time_plot(datetime_f_arr, residual, "Datetime", "Verification residual (ms)", color="red")
+    ### PERFORM VERIFICAITON
+    verification_df = verify_data(ver_file, ["timestamp", "ms", "temp"])
 
+    time_dict = time_analysis.analyze_time(
+        time_analysis.create_datetime(
+            verification_df["timestamp"]
+        ))
+    pprint(time_dict)
+
+
+    # SHOW PLOTS
     print("Plot show!")
     plt.show()
 

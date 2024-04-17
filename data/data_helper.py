@@ -2,8 +2,33 @@
 
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 
+def scale_array(arr, low, high):
+    scaler = MinMaxScaler(feature_range=(low, high))
+    # Fit and transform the data
+    scaled_arr = scaler.fit_transform(arr)
+    # If you want to convert the scaled array back to a 1D array
+    scaled_arr = scaled_arr.flatten()
+    return scaled_arr
+
+
+def convert_to_int(value):
+    try:
+        # Try converting to float
+        return int(value)
+    except ValueError:
+        # If conversion fails (e.g., value is a string with '-'), handle accordingly
+        if isinstance(value, str) and value.startswith('-'):
+            if len(value[1:]) > 0: # empty value check
+                return -1*int(value[1:])  # Convert to negative float
+            else:
+                # return np.nan
+                return 0
+        else:
+            # return np.nan  # Convert to NaN for other cases
+            return 0
 
 
 def convert_to_float(value):
@@ -16,11 +41,26 @@ def convert_to_float(value):
             if len(value[1:]) > 0: # empty value check
                 return -float(value[1:])  # Convert to negative float
             else:
-                return np.nan
+                # return np.nan
+                return 0
         else:
-            return np.nan  # Convert to NaN for other cases
+            # return np.nan  # Convert to NaN for other cases
+            return 0
 
 
+
+# converts an array to a pandas Series full of float values
+def arr_float(arr):
+    arr_float = [convert_to_float(val) for val in arr]
+    arr_float = pd.Series(arr_float)
+    return arr_float
+
+
+def df_float(df, column):
+    error_style = "raise"
+    # error_style = "coerce"
+    df[column] = pd.to_numeric(df[column], errors=error_style)
+    return df
 
 
 ##############################################################
@@ -33,8 +73,8 @@ def load_csv_pandas(filepath, columns=None):
     # DEFAULT COLUMNS (only for AFE)
     if columns is None:
         columns = ['timestamp', 'fifo', 'data']
-    print(f"Attempting to open a .csv using columns: \n\t{columns}")
-    print(f"\tusing path --> {filepath}")
+    print(f"\nINFO: Attempting to open a .csv using columns: \n\t{columns}")
+    print(f"\tusing path --> {filepath}\n")
 
     #  laod in data
     try:
@@ -45,6 +85,7 @@ def load_csv_pandas(filepath, columns=None):
         return None
     # # Extract columns
     pandas_data = df[columns]
+
     if len(pandas_data[columns[0]].tolist()) == 0:
         print("File seems to be .csv but there is no data!")
         return None
@@ -54,7 +95,7 @@ def load_csv_pandas(filepath, columns=None):
 def load_mul_csv_pandas(basefilepath, file_list, columns):
     filepath = basefilepath + file_list[0]
     train_file = file_list[1:]
-    data_frame = load_csv_pandas(filepath, columns=["timestamp", "ms"])
+    data_frame = load_csv_pandas(filepath, columns=columns)
     for file in train_file:
         filepath = basefilepath + file
         data_frame = data_frame.append(

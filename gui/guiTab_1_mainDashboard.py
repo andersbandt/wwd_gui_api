@@ -12,7 +12,7 @@ from drawnow import *
 
 # import user defined modules
 from gui import gui_helper as guih
-from afe import afe_analysis
+from analysis import afe_analysis
 
 
 class tabMainDashboard:

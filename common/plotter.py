@@ -1,15 +1,20 @@
 
 
-
 import matplotlib.pyplot as plt
+from drawnow import *
+
+import secrets
+import hashlib
 
 
-
-
-def time_plot(x_series, y_axis):
-    plt.plot(x_series, y_axis)
+def time_plot(x_series, y_axis, xlabel, ylabel, color=None):
+    plt.figure()
+    plt.plot(x_series, y_axis, color=color)
     plt.grid(True)
-    plt.show()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+
+    save_fig()
 
 
 
@@ -30,10 +35,43 @@ def graph_afe(x_series, afe_d, vertical_lines=None, title=None):
     else:
         plt.title('AFE ADC data')
     # plt.xlabel('Sample Number')
-    plt.xlabel("Time (s)")
-    plt.ylabel('ADC Code ?')
+
     plt.legend(['afe_ADC'])
 
     plt.tight_layout()
 
 
+def save_fig():
+    # TODO: random hashes affects .pdf order generation
+    random_string = secrets.token_hex(16)  # Generate 32 random hexadecimal characters (16 bytes)
+    hashed_value = hashlib.sha256(random_string.encode()).hexdigest()  # Hash the random string using SHA-256
+    hash_p = hashed_value[:5]  # Extract the first 5 characters of the hash to get a 5-digit hash
+    plt.savefig(f'tmp/{hash_p}.png')
+
+
+
+# Create a function that makes our desired plot
+def makeFig(self):
+    plt.title('Sensor data')  # Set the title
+    plt.grid(True)  # Set The grid
+    plt.ylabel('Axis Acceleration')  # Label the y axis
+    plt.plot(self.afe_adc, 'ro-', label='AFE data')  # Set the line plot
+
+def live_plot(self, data):
+    plt.ion()
+    update_frequency = 10
+
+    # Ensure that index is not out of range
+    if len(data) > 1:
+        adc = int(data[2])
+        self.afe_adc.append(adc)
+
+        # trim array
+        self.plot_cnt = self.plot_cnt + 1
+        if self.plot_cnt > 100:
+            self.afe_adc.pop(0)
+
+    if self.plot_cnt % update_frequency == 0:
+        drawnow(self.makeFig)
+        # self.makeFig() # GPT suggested not using drawnow() but I haven't gotten this to work
+        plt.pause(.00000001)

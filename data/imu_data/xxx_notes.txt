@@ -1,0 +1,2 @@
+01 - just initial try
+02 - flip LEFT, RIGHT, FORWARD, BACKWARD, rotate left, rotate right

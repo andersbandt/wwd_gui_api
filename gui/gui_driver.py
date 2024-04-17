@@ -31,7 +31,6 @@ class MainApplication:
         self.tab4 = None
         self.tab5 = None
 
-        # self.basefilepath = "C:/Users/ander/OneDrive/Code/python/WWD/wwd_gui_api/"
         self.basefilepath = os.getcwd()
 
         self.setTabs()

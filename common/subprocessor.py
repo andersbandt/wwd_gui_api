@@ -1,8 +1,8 @@
 """
-@file     guiTab_5_USB.py
+@file     subprocessor
 @author   Anders Bandt
 @date     March 2024
-@brief    control device through serial (COM) port
+@brief    handles OS commands
 """
 
 
@@ -11,7 +11,6 @@ import subprocess
 import os
 import pandas as pd
 from time import sleep
-from datetime import datetime
 
 
 class CommandPacket:
@@ -77,35 +76,8 @@ def execute_Popen(exec_path, base_command, flags):
     return packet
 
 
-##############################################################
-################   DATA and .csv FUNCS   #####################
-##############################################################
-
-### data loading functions
-def load_csv(filepath, columns=['timestamp', 'fifo', 'data']):
-    print(f"Attempting to open a .csv using columns: \n\t{columns}")
-    try:
-        # Load data from CSV file
-        df = pd.read_csv(filepath)
-    except pd.errors.EmptyDataError:
-        print("Pandas says data is empty! No columns to parse from file")
-        return None
-    # # Extract columns
-    pandas_data = df[columns]
-    if len(pandas_data[columns[0]].tolist()) == 0:
-        print("File seems to be .csv but there is no data!")
-        return None
-    return pandas_data
 
 
-datetime_format = "%Y-%m-%d %H:%M:%S.%f" # need to add an extra space at the end because of my printout?
 
-
-def create_datetime(timestamp_array):
-    datetime_arr = []
-    for timestamp_str in timestamp_array:
-        tmp = datetime.strptime(timestamp_str, datetime_format)
-        datetime_arr.append(tmp)
-    return datetime_arr
 
 

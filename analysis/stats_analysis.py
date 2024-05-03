@@ -1,9 +1,12 @@
 
 
-
-
+# import needed modules
+from pprint import pprint
 from scipy.stats import linregress
 
+
+# import user created modules
+from common import plotter
 
 
 ####################################
@@ -16,7 +19,7 @@ def calculate_statistics(x_arr, y_arr):
 
     # Calculate predicted values using the linear model
     predicted_values = slope * x_arr + intercept
-    pprint.pprint(predicted_values)
+    pprint(predicted_values)
 
     # Calculate residuals (difference between observed and predicted values)
     residuals = y_arr - predicted_values

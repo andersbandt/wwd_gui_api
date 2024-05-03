@@ -56,7 +56,6 @@ class tabUSB:
 
         # initialize tab content
         self.initTabContent()
-        threading.Thread(target=lambda: self.gui_refresh().start())
 
     def initTabContent(self):
         print("Initializing tab XDS110 content")
@@ -213,6 +212,7 @@ class tabUSB:
     def thread_print_display(self):
         print("Thread print!")
         self.prompt2.clear()
+        # threading.Thread(target=lambda: self.gui_refresh()).start()
         threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath, None, "raw")).start()
         threading.Thread(target=lambda: self.ser_obj.get_data(printmode=False)).start()
         return True

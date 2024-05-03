@@ -1,14 +1,11 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
 
+# import needed modules
 import pandas as pd
-import numpy as np
-
-import matplotlib.pyplot as plt
 import pandas.errors
+import numpy as np
+import matplotlib.pyplot as plt
+
 
 DATABASE_DIRECTORY = "C:/Users/ander/OneDrive/Projects/WWD/sys/imu_data_dir/"
 
@@ -99,4 +96,9 @@ def analyze_imu(file_path):
 
     plt.show()
 
+
+
+def conv_imu_flash(upper_byte, lower_byte):
+    imu_data = (upper_byte >> 8) + lower_byte
+    return imu_data
 

@@ -9,18 +9,44 @@
 # import needed modules
 import subprocess
 import os
+import platform
 
 # import user defined modules
 from common import subprocessor as subp
 
 
+# get operating system information
+os_name = platform.system()
+print(f"Operating system is currently: {os_name}")
 
-base_ccs = "C:/ti/ccs1200/ccs/ccs_base/" # for PC
-# base_ccs = "C:/ti/ccs1240/ccs/ccs_base/" # for laptop
+# set PATH information for XDS110 API
+if os_name == "Windows":
+    base_ccs = "C:/ti/ccs1200/ccs/" # for PC
+    # base_ccs = "C:/ti/ccs1240/ccs/ccs_base/" # for laptop
+    base_project_path = "C:/Users/ander/Documents/CCS/workspace_WWD/WWD_prog/"
+elif os_name == "Linux":
+    base_ccs = "/home/anders/ti/ccs1200/ccs/ccs_base/"
+    base_project_path = None
+else:
+    print("Undefined operating system to set for XDS110-API paths!!!")
+    raise BaseException
 
+# set common paths based on information above
+base_tools_path = base_ccs + "ccs_base/common/uscif/"
+base_script_path = base_ccs + "ccs_base/scripting/"
 
-base_tools_path = base_ccs + "common/uscif/"
-base_script_path = base_ccs + "scripting/"
+# set XDS110 API information
+if os_name == "Windows":
+    xds110_reset_cmd = "xds110/xds110reset.exe"
+    xds110_jtag_cmd = "dbgjtag.exe"
+    xds110_xds_cmd = "xds110/xdsdfu.exe"
+    gmake_cmd = base_ccs + "utils/bin/gmake.exe"
+elif os_name == "Linux":
+    xds110_reset_cmd = "xds110/xds110reset"
+    xds110_jtag_cmd = "dbgjtag"
+    xds110_xds_cmd = "xds110/xdsdfu"
+    gmake_cmd = base_ccs + "utils/bin/gmake"
+
 
 
 class XDS110Exception(Exception):
@@ -34,20 +60,20 @@ class XDS110Exception(Exception):
 def toggle_target(action):
     if action not in ["toggle", "assert", "deassert"]:
         return False
-    executable_path = os.path.join(base_tools_path, "xds110/xds110reset.exe")
+    executable_path = os.path.join(base_tools_path, xds110_reset_cmd)
     packet = subp.execute_command(executable_path, ["-a", action])
     return packet
 
 
 # @command ./dbgjtag -f @xds110 -S integrity
 def get_jtag_integrity():
-    executable_path = os.path.join(base_tools_path, "dbgjtag.exe")
+    executable_path = os.path.join(base_tools_path, xds110_jtag_cmd)
     packet = subp.execute_command(executable_path, ["-f", "@xds110", "-S", "integrity"])
     return packet
 
 
 def xds110_jtag_reset():
-    executable_path = os.path.join(base_tools_path, "dbgjtag.exe")
+    executable_path = os.path.join(base_tools_path, xds110_jtag_cmd)
     packet = subp.execute_command(executable_path, ["-f", "@xds110", "-r"])
     return packet
 
@@ -57,7 +83,7 @@ def xds110_reset():
 
 
 def get_xds110_status():
-    executable_path = os.path.join(base_tools_path, "xds110/xdsdfu.exe")
+    executable_path = os.path.join(base_tools_path, xds110_xds_cmd)
     packet = subp.execute_command(executable_path, ["-e"])
 
     # check if result contains search string
@@ -83,14 +109,14 @@ def flash_firmware(config_type):
         print(f"Trying config {config_type}")
         raise XDS110Exception("Bad target config type!")
 
-    base_path = "C:/Users/ander/Documents/CCS/workspace_WWD/WWD_prog"
+
     packet = subp.execute_command(
         base_script_path + "examples/loadti/loadti.bat",
         [
             "-a",
             "-c",
-            base_path + config_file,
-            base_path + "/Debug/WWD_prog.out"
+            base_project_path + config_file,
+            base_project_path + "/Debug/WWD_prog.out"
         ])
     error_words = [
         "Error code",

@@ -17,6 +17,7 @@ import os
 
 # import user defined modules
 from common import xds110_api as xds110
+from common.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
 from common.subprocessor import CommandPacket
 from gui import gui_helper as guih
@@ -160,11 +161,10 @@ class tabXDS110:
     def build_firmware(self):
         my_oval = self.canvas3.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         self.canvas3.itemconfig(my_oval, fill="yellow")
-        exec_path = "C:/Users/ander/Documents/CCS/workspace_WWD/WWD_prog/Debug"
-        command_path = "C:/ti/ccs1200/ccs/utils/bin/gmake.exe"
+        exec_path = base_project_path + "Debug/"
         packet = subp.execute_Popen(
             exec_path,
-            command_path,
+            gmake_cmd,
             ["-k", # Keep going when some targets can't be made
              "-j", # allow N jobs at once
              "8", # 8 jobs

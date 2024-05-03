@@ -11,6 +11,7 @@ from tkinter import *
 from tkinter import ttk
 import threading
 import serial
+import time
 from serial.tools import list_ports
 from datetime import datetime
 
@@ -208,11 +209,12 @@ class tabUSB:
                 # test mode
                 my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
                 self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            time.sleep(5)
 
     def thread_print_display(self):
         print("Thread print!")
         self.prompt2.clear()
-        # threading.Thread(target=lambda: self.gui_refresh()).start()
+        threading.Thread(target=lambda: self.gui_refresh()).start()
         threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath, None, "raw")).start()
         threading.Thread(target=lambda: self.ser_obj.get_data(printmode=False)).start()
         return True

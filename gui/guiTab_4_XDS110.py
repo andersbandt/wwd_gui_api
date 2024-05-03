@@ -153,10 +153,15 @@ class tabXDS110:
             self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             return False
 
+
     def toggle_target(self):
-        action = self.toggle_drop[1].get()
-        status = xds110.toggle_target(action)
-        # guih.gui_print(self.frame, self.prompt, result)
+        xds110_status = self.check_xds110()
+        if xds110_status:
+            action = self.toggle_drop[1].get()
+            status = xds110.toggle_target(action)
+            self.prompt.print(f"Toggle status: {status}")
+        else:
+            guih.alert_user("Can't toggle target!", "XDS110 connection is not valid", "error")
 
     def build_firmware(self):
         my_oval = self.canvas3.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1

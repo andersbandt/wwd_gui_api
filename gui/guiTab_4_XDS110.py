@@ -11,15 +11,11 @@ import tkinter as tk
 from tkinter import *
 from tkinter import ttk
 import threading
-import subprocess
-from serial.tools import list_ports
-import os
 
 # import user defined modules
 from common import xds110_api as xds110
 from common.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
-from common.subprocessor import CommandPacket
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -36,6 +32,7 @@ class tabXDS110:
                        font=("Arial", 16))
         l1.grid(column=0, row=0)
 
+        # set up prompt
         self.fr_prompt = tk.Frame(self.frame, bg="gray")
         self.fr_prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
         self.prompt = guic.Prompt(self.fr_prompt, "XDS110 Comms", "black", height=25, width=140)

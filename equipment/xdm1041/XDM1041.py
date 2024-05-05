@@ -29,8 +29,9 @@ import tkinter.messagebox as tkmb
 import tkinter.font as tkFont
 from collections import namedtuple
 
-from time import sleep,localtime,strftime,perf_counter_ns
-import math,argparse
+from time import sleep, localtime, strftime, perf_counter_ns
+import math
+import argparse
 
 class SCPI:
 	"""
@@ -429,8 +430,7 @@ class XDM1041_GUI():
 				
 		else:
 			self.window.destroy()
-			
-	
+
 	def DoRecSpd(self,event=None):
 		"""
 			changes the recording speed
@@ -467,8 +467,7 @@ class XDM1041_GUI():
 			self.buttonARec.config(relief='raised')
 		self.DoRec()
 		
-	
-	
+
 	def DoMan(self,event=None):
 		"""
 			does a single manual recording  
@@ -485,8 +484,6 @@ class XDM1041_GUI():
 			changes the unit for PT100
 		"""
 		self.PT100_Unit= self.PT100UnitVal.get()
-		
-		
 
 	def DoPT100(self,event=None):
 		"""
@@ -501,8 +498,7 @@ class XDM1041_GUI():
 				self.buttonPT100.config(relief='raised')
 		else:
 			tkmb.showinfo('info','switch to 500 Ohm RES mode with REL to compensate for wire res.')
-			
-				
+
 	def DoRec(self):
 		"""
 			starts or stops the recording and shows the 
@@ -550,8 +546,7 @@ class XDM1041_GUI():
 					self.RecName = ''
 					self.labelRNums.config(text= '')
 			self.labelRecFn.config(text= '{:24s}'.format(self.RecName))
-		
-			
+
 	def PollMiniBM(self,event=None):
 		"""
 			polls the meter every 1s. The time is adjusted to maintain accuracy

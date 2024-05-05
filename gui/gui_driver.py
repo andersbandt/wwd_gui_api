@@ -15,7 +15,7 @@ import os
 # import tab classes
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_IMU
-from gui import guiTab_3_AFE
+from gui import guiTab_3_DMM
 from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
 
@@ -39,13 +39,13 @@ class MainApplication:
         print("Creating tab nav bar and initializing tab content")
         self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.basefilepath)
         self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath)
-        self.tab3 = guiTab_3_AFE.tabAFE(self.nb, self.basefilepath)
+        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.basefilepath)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.basefilepath)
         self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.basefilepath)
 
         self.nb.add(self.tab1.frame, text="MAIN")
         self.nb.add(self.tab2.frame, text="IMU Analysis")
-        self.nb.add(self.tab3.frame, text="AFE Analysis")
+        self.nb.add(self.tab3.frame, text="DMM Control")
         self.nb.add(self.tab4.frame, text="XDS110 JTAG")
         self.nb.add(self.tab5.frame, text="USB COMM")
 

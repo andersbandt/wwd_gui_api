@@ -45,7 +45,7 @@ class tabIMU:
         self.initTabContent()
 
     def initTabContent(self):
-        print("Initializing tab 1 content")
+        print("Initializing tab 2 content")
         self.init_fr_prompt()
         self.init_fr_data_record()
         self.init_fr_analysis()

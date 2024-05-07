@@ -15,9 +15,6 @@ import tkinter.messagebox as tkmb
 import tkinter.font as tkFont
 
 # import needed packages
-import os
-from serial.tools import list_ports
-import serial
 from collections import namedtuple
 
 from time import sleep, localtime, strftime, perf_counter_ns
@@ -26,6 +23,8 @@ import math
 
 # import user defined modules
 from EEequipment import SCPI
+from EEequipment.xdm1041.xdm1041defs import XDM1041Mode, XDM1041Cmd
+from EEequipment.xdm1041.xdm1041main import XDM1041
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -39,6 +38,7 @@ class tabDMM:
 
 
         self.MiniBM = None # I think this is the DMM object?
+        self.dmm = None
 
         # set up prompt
         self.fr_prompt = tk.Frame(self.frame, bg="gray")
@@ -233,8 +233,12 @@ class tabDMM:
         # error_flag |= self.serial_init(serial_port)
 
 
-        self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
-        self.id = self.GetResponse('*IDN?')
+        # self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
+        # self.id = self.GetResponse('*IDN?')
+
+
+        self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
+        self.id = self.dmm.test_conn()
 
         self.prompt.print("Connected to DMM")
         self.prompt.print(f"Got id: {self.id}")

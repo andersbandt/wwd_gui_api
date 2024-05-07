@@ -1,3 +1,5 @@
+
+
 from xdm1041defs import XDM1041Mode, XDM1041Cmd
 import logging
 import serial
@@ -32,7 +34,7 @@ class XDM1041:
                 print("{}:{} ".format(key, value), end='')
             print('')
 
-    def __init__(self, mode: XDM1041Mode, rng: int = 0, serial_device="/dev/ttyUSB0"):
+    def __init__(self, serial_device, mode: XDM1041Mode, rng: int = 0):
 
         self.mode = mode
         self.logger = logging.getLogger(__name__)
@@ -97,6 +99,7 @@ class XDM1041:
         manuf_info = self.read_result()
         str_to_k = manuf_info.split(',')
         print(str_to_k)
+        return str_to_k
 
     def send_cmd(self, cmd: str):
         """

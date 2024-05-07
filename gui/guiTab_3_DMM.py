@@ -25,7 +25,7 @@ import math
 
 
 # import user defined modules
-from equipment import SCPI
+from EEequipment import SCPI
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -37,8 +37,8 @@ class tabDMM:
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
-        # TODO: this should be in a drop down (done this before in other tabs)
-        self.port = "COM3"
+
+        self.MiniBM = None # I think this is the DMM object?
 
         # set up prompt
         self.fr_prompt = tk.Frame(self.frame, bg="gray")
@@ -68,16 +68,20 @@ class tabDMM:
         #        (8)           (32)            (8)    = 48
         #         0              1              2
         #   0   label  <device name entry>    CONNECT
-        self.portframe = tk.Frame(self.frame)
-        self.labelPort = tk.Label(self.portframe, width=8, text='port:')
-        self.entryPort = tk.Entry(self.portframe, width=32)
-        self.buttonConn = tk.Button(self.portframe, width=8, text='Connect', bd=5, command=self.DoConnect)
-        self.entryPort.bind('<Return>', self.DoConnect)
-        self.entryPort.insert(0, self.port)
-        self.labelPort.grid(row=0, column=0, sticky='E')
-        self.entryPort.grid(row=0, column=1, sticky='W')
-        self.buttonConn.grid(row=0, column=2, sticky='W')
-        self.portframe.grid(row=0, column=0, columnspan=3)
+        # self.portframe = tk.Frame(self.frame)
+        # self.labelPort = tk.Label(self.portframe, width=8, text='port:')
+        # self.entryPort = tk.Entry(self.portframe, width=32)
+        # self.buttonConn = tk.Button(self.portframe, width=8, text='Connect', bd=5, command=self.DoConnect)
+        # self.entryPort.bind('<Return>', self.DoConnect)
+        # self.entryPort.insert(0, self.port)
+        # self.labelPort.grid(row=0, column=0, sticky='E')
+        # self.entryPort.grid(row=0, column=1, sticky='W')
+        # self.buttonConn.grid(row=0, column=2, sticky='W')
+        # self.portframe.grid(row=0, column=0, columnspan=3)
+
+        self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, None, bg="#00bcd4")
+        self.fr_port.initialize_fr()
+        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
         # row 1: id split into 2 columns
         #  (8)                  (40)               = 48
@@ -153,13 +157,17 @@ class tabDMM:
         #         0   1     2     3
         #   0   Aspd AREC  MREC   Man
         self.recframe = tk.Frame(self.frame)
-        self.RecSpdList = ('1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h')
+        # self.RecSpdList = ('1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h')
         self.RecSpdSec = (1, 2, 5, 10, 30, 60, 300, 600, 1800, 3600)
         self.RecSpd = 1
         self.RecNums = 0
-        self.RecSpdVal = tk.StringVar()
-        self.RecSpdVal.set(self.RecSpdList[0])
-        self.optRecSpd = tk.OptionMenu(self.recframe, self.RecSpdVal, *self.RecSpdList, command=self.DoRecSpd)
+        # self.RecSpdVal = tk.StringVar()
+        # self.RecSpdVal.set(self.RecSpdList[0])
+        # self.optRecSpd = tk.OptionMenu(self.recframe, self.RecSpdVal, *self.RecSpdList, command=self.DoRecSpd)
+
+
+        options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h']
+        self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(self.recframe, options)
 
         self.buttonARec = tk.Button(self.recframe, text='Auto Rec', bd=5, command=self.DoARec, width=7)
         self.buttonMRec = tk.Button(self.recframe, text='Man Rec', bd=5, command=self.DoMRec, width=8)
@@ -201,12 +209,10 @@ class tabDMM:
 
         self.MiniBM = None
         self.id = ''
-        self.entryPort.focus_set()
+        # self.entryPort.focus_set()
         self.PollCount = 0
         self.ProgStart = perf_counter_ns()
         self.PollMiniBM()
-        if self.RecName != '':
-            self.f.close()
 
 
     ##############################################################################
@@ -214,7 +220,7 @@ class tabDMM:
     ##############################################################################
 
 
-    def DoConnect(self, event=None):
+    def connect_serial(self, event=None):
         """
             given a port name, the function tries to connect.
 
@@ -222,27 +228,32 @@ class tabDMM:
             disconnect terminate the program
 
         """
-        port = self.entryPort.get()
-        if self.MiniBM == None:
+        error_flag = 0
+        port = self.fr_port.get_port()
+        # error_flag |= self.serial_init(serial_port)
 
-            try:
-                self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
 
-                self.id = self.GetResponse('*IDN?')
-                if self.id == '':
-                    self.MiniBM = None
-                    tkmb.showerror("device error", "device at " + port + " does not respond")
-                else:
-                    self.buttonConn.config(relief='sunken')
-                    self.labelId.config(text=self.id)
-            except:
-                tkmb.showerror("port error", "can't open " + port)
-                self.MiniBM = None
-                self.buttonConn.config(relief='raised')
-                self.labelId.config(text='')
+        self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
+        self.id = self.GetResponse('*IDN?')
 
+        self.prompt.print("Connected to DMM")
+        self.prompt.print(f"Got id: {self.id}")
+
+        if self.id == '' or len(self.id) < 3:
+            self.MiniBM = None
+            self.fr_port.set_status(False)
+            tkmb.showerror("Device error", "Device at " + port + " does not respon or is not correct config")
         else:
-            self.frame.destroy()
+            # self.buttonConn.config(relief='sunken')
+            self.labelId.config(text=self.id)
+            self.fr_port.set_status(True)
+
+            # except Exception as e:
+            #     raise(e)
+            #     tkmb.showerror("port error", "can't open " + port)
+            #     self.MiniBM = None
+            #     self.buttonConn.config(relief='raised')
+            #     self.labelId.config(text='')
 
     def GetResponse(self, Cmd, Numeric=False):
         """
@@ -566,7 +577,7 @@ class tabDMM:
                 raise
             if err:
                 tkmb.showerror("comms error", "lost connection ")
-                self.window.quit()
+                self.frame.quit()
             else:
                 if self.PT100_On:
                     if self.Range.upper() == '500 OHM':
@@ -611,6 +622,7 @@ class tabDMM:
                     self.labelRNums.config(text='{:8n}'.format(self.RecNums))
 
         elapsed = (perf_counter_ns() - self.ProgStart) // 1000000  # time in ms since start
-        time2sleep = 1000 - (elapsed % 1000)
+        # time2sleep = 1000 - (elapsed % 1000)
+        time2sleep = 5*1000
         self.frame.after(time2sleep, self.PollMiniBM)
 

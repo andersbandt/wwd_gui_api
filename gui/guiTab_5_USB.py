@@ -29,9 +29,9 @@ class tabUSB:
         self.basefilepath = basefilepath
 
         # print welcome text
-        l1 = ttk.Label(self.frame, text="XDS110 and target control", style="BW.TLabel",
+        l1 = ttk.Label(self.frame, text="USB (COM) connection", style="BW.TLabel",
                        font=("Arial", 16))
-        l1.grid(column=0, row=0)
+        l1.grid(row=0, column=0, columnspan=2)
 
         self.fr_prompt1 = tk.Frame(self.frame, bg="gray")
         self.fr_prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
@@ -41,17 +41,18 @@ class tabUSB:
         self.prompt2 = guic.Prompt(self.fr_prompt2, "Serial output", "black", height=30, width=100)
 
         # init frames within tab
-        self.fr_serial = tk.Frame(self.frame, bg="#00bcd4")
-        self.fr_serial.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, None, bg="#00bcd4")
+        self.fr_port.initialize_fr()
+        self.fr_port.grid(row=1, column=0, padx=30, pady=12)
+
+        # init state frame
         self.fr_state = tk.Frame(self.frame, bg="#00bcd4")
         self.fr_state.grid(row=2, column=0, padx=30, pady=12)
-
-        # add some other variables
-        self.canvas1 = tk.Canvas(self.fr_serial, width=50, height=50)  # create a Canvas widget
         self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
-        self.com_drop = None  # fr_serial
         self.test_drop = None  # fr_state
         self.output_file_name = None  # fr_state
+
+        # serial Object
         self.ser_obj = None
         self.ser_status = False
 
@@ -60,48 +61,7 @@ class tabUSB:
 
     def initTabContent(self):
         print("Initializing tab XDS110 content")
-        self.init_fr_serial()
         self.init_fr_state()
-
-    def init_fr_serial(self):
-        # COM port selection
-        def refresh_ports():
-            com_ports = [port.device for port in list_ports.comports()]
-            # ports_var.set(com_ports)
-            # set up user inputs for statement (year and month)
-            self.com_drop = guih.generate_drop_down(
-                self.fr_serial,
-                [port.device for port in list_ports.comports()]
-            )
-            self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
-
-        # Button to refresh the list of COM ports
-        refresh_button = tk.Button(self.fr_serial, text="Refresh Ports",
-                                   command=refresh_ports,
-                                   bg="green", fg="white")
-        refresh_button.grid(row=1, column=2, columnspan=1, pady=1)
-
-        # Initial port list
-        refresh_ports()
-
-        # place CONNECT button and STATUS indicator
-        self.canvas1.grid(row=4, column=2, padx=15, pady=3)
-        # Button to refresh the list of COM ports
-        # TARGET - BUTTON/STATUS
-        btn_connect_serial = Button(self.fr_serial, text="Connect to COM",
-                                    command=self.connect_serial,
-                                    bg="green", fg="white", height=1, width=15)
-        btn_connect_serial.grid(row=2, column=1, padx=15, pady=1)
-        btn_disconnect_serial = Button(self.fr_serial, text="Disconnect COM",
-                                       command=self.serial_close,
-                                       bg="orange", fg="black", height=1, width=15)
-        btn_disconnect_serial.grid(row=3, column=1, padx=15, pady=3)
-
-        # SERIAL - PROCESS CONTROL
-        btn_stop_process = Button(self.fr_serial, text="No action",
-                                  command=None,
-                                  bg="purple", fg="white", height=2, width=15)
-        btn_stop_process.grid(row=5, column=1, padx=15, pady=3)
 
     def init_fr_state(self):
         # TARGET - BUTTON/STATUS
@@ -141,7 +101,7 @@ class tabUSB:
 
     def connect_serial(self):
         error_flag = 0
-        serial_port = self.com_drop[1].get()
+        serial_port = self.fr_port.get_port()
         error_flag |= self.serial_init(serial_port)
 
         if self.ser_status:
@@ -149,11 +109,7 @@ class tabUSB:
             # threading.Thread(target=self.thread_print_display).start()
             threading.Timer(1.0, self.thread_print_display).start()
 
-        my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        if self.ser_status:
-            self.canvas1.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
-        else:
-            self.canvas1.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+        self.fr_port.set_status(self.ser_status)
 
     def activate_test_mode(self):
         command = "DAGA"
@@ -202,9 +158,7 @@ class tabUSB:
     def gui_refresh(self):
         while True:
             if self.ser_obj.serStatus is False:
-                # serial connection
-                my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-                self.canvas1.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                self.fr_port.set_status(False)
 
                 # test mode
                 my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1

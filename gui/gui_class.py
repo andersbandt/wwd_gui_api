@@ -1,5 +1,13 @@
+
+# import modules
 import tkinter as tk
+from tkinter import *
 from tkinter import Text, INSERT, Label
+from serial.tools import list_ports
+
+
+# import user created modules
+from gui import gui_helper as guih
 
 
 class Prompt:
@@ -34,4 +42,61 @@ class Prompt:
 
     def clear(self):
         self.prompt.delete("1.0", "end")  # basically line index from
+
+
+# TODO: add entry box for baud rate
+class SerialConnFrame(tk.Frame):
+    def __init__(self, master, connect_command, close_command, bg=None):
+        self.master = master
+        super().__init__(self.master, bg=bg)
+        self.canvas1 = tk.Canvas(self, width=50, height=50)  # create a Canvas widget
+        self.status_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+        self.connect_serial = connect_command
+        self.disconnect_serial = close_command
+        self.com_drop = None
+
+
+    def initialize_fr(self):
+        # Button to refresh the list of COM ports
+        refresh_button = tk.Button(self, text="Refresh Ports",
+                                   command=self.refresh_ports,
+                                   bg="green", fg="white")
+        refresh_button.grid(row=1, column=2, columnspan=1, pady=1)
+
+        # Initial port list
+        self.refresh_ports()
+
+        # place CONNECT button and STATUS indicator
+        self.canvas1.grid(row=4, column=2, padx=15, pady=3)
+        # Button to refresh the list of COM ports
+        # TARGET - BUTTON/STATUS
+        btn_connect_serial = Button(self, text="Connect to COM",
+                                    command=self.connect_serial,
+                                    bg="green", fg="white", height=1, width=15)
+        btn_connect_serial.grid(row=2, column=1, padx=15, pady=1)
+        btn_disconnect_serial = Button(self, text="Disconnect COM",
+                                       command=self.disconnect_serial,
+                                       bg="orange", fg="black", height=1, width=15)
+        btn_disconnect_serial.grid(row=3, column=1, padx=15, pady=3)
+
+    def refresh_ports(self):
+        com_ports = [port.device for port in list_ports.comports()]
+        # ports_var.set(com_ports)
+        # set up user inputs for statement (year and month)
+
+        # TODO: is regenerating this each time really the best refresh method?
+        self.com_drop = guih.generate_drop_down(
+            self,
+            [port.device for port in list_ports.comports()]
+        )
+        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
+
+    def get_port(self):
+        return self.com_drop[1].get()
+
+    def set_status(self, status):
+        if status:
+            self.canvas1.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
+        else:
+            self.canvas1.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
 

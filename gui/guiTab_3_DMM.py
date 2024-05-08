@@ -16,7 +16,6 @@ import tkinter.font as tkFont
 
 # import needed packages
 from collections import namedtuple
-
 from time import sleep, localtime, strftime, perf_counter_ns
 import math
 
@@ -30,8 +29,9 @@ from gui import gui_class as guic
 
 
 class tabDMM:
-    def __init__(self, master, basefilepath):
+    def __init__(self, master, class_controller, basefilepath):
         self.master = master
+        self.cc = class_controller
         self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
@@ -39,6 +39,8 @@ class tabDMM:
 
         self.MiniBM = None # I think this is the DMM object?
         self.dmm = None
+        self.record_speed = 1
+        self.ser_status = False
 
         # set up prompt
         self.fr_prompt = tk.Frame(self.frame, bg="gray")
@@ -49,11 +51,6 @@ class tabDMM:
         self.initTabContent()
 
     def initTabContent(self):
-        print("Initializing tab 3 (DMM) content")
-        self.init_fr_dmm()
-
-
-    def init_fr_dmm(self):
         # the overall structure is aranged in 6 rows
         #  row	use
         #    0  port
@@ -63,26 +60,29 @@ class tabDMM:
         #    4  values
         #    5  recording control
         #    6  options
+        print("Initializing tab 3 (DMM) content")
+        self.init_fr_port()
+        self.init_fr_info()
+        self.init_fr_rec()
+        self.init_fr_PT100()
 
-        # row 0: port split into 3 columns
-        #        (8)           (32)            (8)    = 48
-        #         0              1              2
-        #   0   label  <device name entry>    CONNECT
-        # self.portframe = tk.Frame(self.frame)
-        # self.labelPort = tk.Label(self.portframe, width=8, text='port:')
-        # self.entryPort = tk.Entry(self.portframe, width=32)
-        # self.buttonConn = tk.Button(self.portframe, width=8, text='Connect', bd=5, command=self.DoConnect)
-        # self.entryPort.bind('<Return>', self.DoConnect)
-        # self.entryPort.insert(0, self.port)
-        # self.labelPort.grid(row=0, column=0, sticky='E')
-        # self.entryPort.grid(row=0, column=1, sticky='W')
-        # self.buttonConn.grid(row=0, column=2, sticky='W')
-        # self.portframe.grid(row=0, column=0, columnspan=3)
+        # remaining intitalisation and start of main loop
+        # self.entryPort.focus_set()
+        self.PollCount = 0
+        self.ProgStart = perf_counter_ns()
+        self.PollMiniBM()
 
-        self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, None, bg="#00bcd4")
+
+    def init_fr_port(self):
+        self.fr_port = guic.SerialConnFrame(self.frame,
+                                            self.connect_serial,
+                                            self.serial_close,
+                                            bg="#00bcd4")
         self.fr_port.initialize_fr()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
+
+    def init_fr_info(self):
         # row 1: id split into 2 columns
         #  (8)                  (40)               = 48
         #   0                     1
@@ -151,113 +151,50 @@ class tabDMM:
         self.Meas2 = 0
         self.Auto = ''
 
-        # row 5: rec control split into 4 columns
-        #
-        #       (10) (12)  (12)  (14)                   = 48
-        #         0   1     2     3
-        #   0   Aspd AREC  MREC   Man
-        self.recframe = tk.Frame(self.frame)
-        # self.RecSpdList = ('1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h')
-        self.RecSpdSec = (1, 2, 5, 10, 30, 60, 300, 600, 1800, 3600)
-        self.RecSpd = 1
-        self.RecNums = 0
-        # self.RecSpdVal = tk.StringVar()
-        # self.RecSpdVal.set(self.RecSpdList[0])
-        # self.optRecSpd = tk.OptionMenu(self.recframe, self.RecSpdVal, *self.RecSpdList, command=self.DoRecSpd)
 
+    def init_fr_rec(self):
+        self.recframe = tk.Frame(self.frame, bg="gray")
+        self.recframe.grid(row=5, column=0, columnspan=4, pady=10, padx=10)
 
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(self.recframe, options)
 
-        self.buttonARec = tk.Button(self.recframe, text='Auto Rec', bd=5, command=self.DoARec, width=7)
-        self.buttonMRec = tk.Button(self.recframe, text='Man Rec', bd=5, command=self.DoMRec, width=8)
-        self.buttonMan = tk.Button(self.recframe, text='RECORD THIS', bd=5, command=self.DoMan, width=12)
+        self.btn_record = tk.Button(self.recframe, text='RECORD THIS', bd=5, command=self.record_DMM, width=12)
 
         self.optRecSpd.grid(row=0, column=0, sticky='W')
-        self.buttonARec.grid(row=0, column=1, sticky='W')
-        self.buttonMRec.grid(row=0, column=2, sticky='W')
-        self.buttonMan.grid(row=0, column=3, sticky='W')
-        self.recframe.grid(row=5, column=0, columnspan=4)
+        self.btn_record.grid(row=0, column=3, sticky='W')
 
-        self.MRec_On = False
-        self.Man_On = False
-        self.ARec_On = False
 
-        # row 6 options
-        #
-        #        (8)      (10)   (10)   (10)   (10)        = 48
-        #         0        1      2      3       4
-        #   0   PT100Unit PT100
-        self.optframe = tk.Frame(self.frame)
 
-        self.PT100UnitList = ('C', 'F', 'K')
-        self.PT100UnitVal = tk.StringVar()
-        self.PT100UnitVal.set(self.PT100UnitList[0])
-        self.optPT100Unit = tk.OptionMenu(self.optframe, self.PT100UnitVal, *self.PT100UnitList,
-                                          command=self.DoPT100Unit)
-        self.buttonPT100 = tk.Button(self.optframe, text='PT100', bd=5, command=self.DoPT100, width=5)
+    def init_fr_PT100(self):
+            # row 6 options
+            #
+            #        (8)      (10)   (10)   (10)   (10)        = 48
+            #         0        1      2      3       4
+            #   0   PT100Unit PT100
+            self.optframe = tk.Frame(self.frame)
 
-        self.optPT100Unit.grid(row=0, column=0, sticky='W')
-        self.buttonPT100.grid(row=0, column=1, sticky='W')
+            self.PT100UnitList = ('C', 'F', 'K')
+            self.PT100UnitVal = tk.StringVar()
+            self.PT100UnitVal.set(self.PT100UnitList[0])
+            self.optPT100Unit = tk.OptionMenu(self.optframe, self.PT100UnitVal, *self.PT100UnitList,
+                                              command=self.DoPT100Unit)
+            self.buttonPT100 = tk.Button(self.optframe, text='PT100', bd=5, command=self.DoPT100, width=5)
 
-        self.optframe.grid(row=6, column=0, columnspan=2)
+            self.optPT100Unit.grid(row=0, column=0, sticky='W')
+            self.buttonPT100.grid(row=0, column=1, sticky='W')
 
-        self.PT100_On = False
-        self.PT100_Unit = self.PT100UnitList[0]
+            self.optframe.grid(row=6, column=0, columnspan=2)
 
-        # remaining intitalisation and start of main loop
+            self.PT100_On = False
+            self.PT100_Unit = self.PT100UnitList[0]
 
-        self.MiniBM = None
-        self.id = ''
-        # self.entryPort.focus_set()
-        self.PollCount = 0
-        self.ProgStart = perf_counter_ns()
-        self.PollMiniBM()
+
 
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
-
-
-    def connect_serial(self, event=None):
-        """
-            given a port name, the function tries to connect.
-
-            Note that once it connects successfully. a subsequent
-            disconnect terminate the program
-
-        """
-        error_flag = 0
-        port = self.fr_port.get_port()
-        # error_flag |= self.serial_init(serial_port)
-
-
-        # self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
-        # self.id = self.GetResponse('*IDN?')
-
-
-        self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
-        self.id = self.dmm.test_conn()
-
-        self.prompt.print("Connected to DMM")
-        self.prompt.print(f"Got id: {self.id}")
-
-        if self.id == '' or len(self.id) < 3:
-            self.MiniBM = None
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respon or is not correct config")
-        else:
-            # self.buttonConn.config(relief='sunken')
-            self.labelId.config(text=self.id)
-            self.fr_port.set_status(True)
-
-            # except Exception as e:
-            #     raise(e)
-            #     tkmb.showerror("port error", "can't open " + port)
-            #     self.MiniBM = None
-            #     self.buttonConn.config(relief='raised')
-            #     self.labelId.config(text='')
 
     def GetResponse(self, Cmd, Numeric=False):
         """
@@ -306,6 +243,8 @@ class tabDMM:
         # print(Cmd+str(Res))
         return Res
 
+
+# TODO: this function is dogshit. Needs usage evaluated or a ChatGPT improvement. And to get out of here
     def PrettyFloat(self, v):
         """
             A crude but functional formatter that shows floating
@@ -393,48 +332,9 @@ class tabDMM:
         """
             changes the recording speed
         """
+        RecSpdSec = (1, 2, 5, 10, 30, 60, 300, 600, 1800, 3600)
         idx = self.RecSpdList.index(self.RecSpdVal.get())
-        self.RecSpd = self.RecSpdSec[idx]
-
-    def DoMRec(self, event=None):
-        """
-            Turns the manual rec mode on or off.
-        """
-        self.MRec_On = not self.MRec_On
-        if self.MRec_On:
-            self.buttonMRec.config(relief='sunken')
-            self.ARec_On = False
-            self.buttonARec.config(relief='raised')
-            self.buttonMan.focus_set()
-        else:
-            self.buttonMRec.config(relief='raised')
-            self.entryPort.focus_set()
-        self.DoRec()
-
-    def DoARec(self, event=None):
-        """
-            Turns the auto rec mode on or off.
-        """
-        self.ARec_On = not self.ARec_On
-        if self.ARec_On:
-            self.buttonARec.config(relief='sunken')
-            self.MRec_On = False
-            self.buttonMRec.config(relief='raised')
-            self.entryPort.focus_set()
-        else:
-            self.buttonARec.config(relief='raised')
-        self.DoRec()
-
-    def DoMan(self, event=None):
-        """
-            does a single manual recording
-        """
-        if self.MRec_On:
-            self.Man_On = not self.Man_On
-            if self.Man_On:
-                self.buttonMan.config(relief='sunken')
-            else:
-                self.buttonMan.config(relief='raised')
+        self.record_speed = RecSpdSec[idx]
 
 
     def DoPT100Unit(self, event=None):
@@ -459,26 +359,19 @@ class tabDMM:
             tkmb.showinfo('info', 'switch to 500 Ohm RES mode with REL to compensate for wire res.')
 
 
-    def DoRec(self):
+    def record_DMM(self):
         """
             starts or stops the recording and shows the
             recording filename while recording is on.
         """
+        self.prompt.print("Starting DMM record ...")
 
         def StartNewFile():
-            if self.ARec_On:
-                self.RecName = 'AREC'
-            else:
-                self.RecName = 'MREC'
-
-            self.RecName = self.RecName + '_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
+            self.RecName = 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
 
             try:
                 self.f = open(self.RecName, 'w')
-                if self.ARec_On:
-                    self.f.write('Time[S],')
-                else:
-                    self.f.write('Count,')
+                self.f.write('Time[S],')
                 self.f.write('Range,Func1,Meas1,Func2,Meas2\n')
                 self.PollCount = 0
                 self.RecNums = 0
@@ -490,14 +383,13 @@ class tabDMM:
                 self.buttonMRec.config(relief='raised')
                 self.buttonARec.config(relief='raised')
                 self.ARec_On = False
-                self.MRec_On = False
             return
 
-        if self.MiniBM != None:
+        if self.ser_status:
             if self.RecName == '':
                 StartNewFile()
             else:
-                if self.ARec_On or self.MRec_On:
+                if self.ARec_On:
                     self.f.close()
                     StartNewFile()
                 else:
@@ -505,6 +397,9 @@ class tabDMM:
                     self.RecName = ''
                     self.labelRNums.config(text='')
             self.labelRecFn.config(text='{:24s}'.format(self.RecName))
+        else:
+            guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
+            self.prompt.print("Error starting DMM record!")
 
 
     def PollMiniBM(self, event=None):
@@ -630,3 +525,56 @@ class tabDMM:
         time2sleep = 5*1000
         self.frame.after(time2sleep, self.PollMiniBM)
 
+
+    #################################
+    #### SERIAL (COM)  ##############
+    #################################
+
+
+    def connect_serial(self, event=None):
+        """
+            given a port name, the function tries to connect.
+
+            Note that once it connects successfully. a subsequent
+            disconnect terminate the program
+
+        """
+        error_flag = 0
+        port = self.fr_port.get_port()
+        # error_flag |= self.serial_init(serial_port)
+
+
+        # self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
+        # self.id = self.GetResponse('*IDN?')
+
+
+        self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
+        self.id = self.dmm.test_conn()
+
+        self.prompt.print("Connected to DMM")
+        self.prompt.print(f"Got id: {self.id}")
+
+        if self.id == '' or len(self.id) < 3:
+            self.MiniBM = None
+            self.ser_status = True
+            self.fr_port.set_status(self.ser_status)
+            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
+        else:
+            # self.buttonConn.config(relief='sunken')
+            self.cc.set_dmm(self.dmm)
+            self.labelId.config(text=self.id)
+            self.ser_status = False
+            self.fr_port.set_status(self.ser_status)
+
+            # except Exception as e:
+            #     raise(e)
+            #     tkmb.showerror("port error", "can't open " + port)
+            #     self.MiniBM = None
+            #     self.buttonConn.config(relief='raised')
+            #     self.labelId.config(text='')
+
+    def serial_close(self):
+        self.prompt.print(f"Serial close!")
+        self.dmm.disconnect()
+        self.ser_status = False
+        self.fr_port.set_status(self.ser_status)

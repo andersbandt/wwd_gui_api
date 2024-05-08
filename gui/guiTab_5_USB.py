@@ -22,8 +22,9 @@ from gui import gui_class as guic
 
 
 class tabUSB:
-    def __init__(self, master, basefilepath):
+    def __init__(self, master, class_controller, basefilepath):
         self.master = master
+        self.cc = class_controller
         self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
@@ -195,8 +196,7 @@ class tabUSB:
         self.prompt1.print(f"Serial close!")
         self.ser_obj.close()
         self.ser_status = False
-        my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.canvas1.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+        self.fr_port.set_status(self.ser_status)
 
     def start_process(self, data_subfolder, file_ext, parameters):
         self.stop_process()

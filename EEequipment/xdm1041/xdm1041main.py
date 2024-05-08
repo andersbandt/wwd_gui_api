@@ -1,9 +1,15 @@
 
 
-from xdm1041defs import XDM1041Mode, XDM1041Cmd
+
+# import modules
 import logging
 import serial
 import time
+
+
+# import user created modules
+from EEequipment.xdm1041.xdm1041defs import XDM1041Mode, XDM1041Cmd
+from EEequipment.xdm1041 import xdm1041helper
 
 
 class XDM1041:
@@ -56,8 +62,6 @@ class XDM1041:
         self.set_range(rng)
 
     def connect(self):
-        """
-        """
         if self.serial and self.serial.is_open is False:
             self.serial.open()
 
@@ -99,7 +103,7 @@ class XDM1041:
         manuf_info = self.read_result()
         str_to_k = manuf_info.split(',')
         print(str_to_k)
-        return str_to_k
+        return manuf_info
 
     def send_cmd(self, cmd: str):
         """
@@ -206,3 +210,11 @@ class XDM1041:
         result = self.read_result()
         result = float(result)
         return result
+
+
+    def read_voltage(self):
+        self.set_mode(XDM1041Mode.MODE_VOLTAGE_DC)
+        raw_str = self.read_val1_str()
+        voltage = xdm1041helper.parse_voltage_str(raw_st)
+        return voltage
+

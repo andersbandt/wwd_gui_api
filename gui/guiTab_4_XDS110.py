@@ -21,8 +21,9 @@ from gui import gui_class as guic
 
 
 class tabXDS110:
-    def __init__(self, master, basefilepath):
+    def __init__(self, master, class_controller, basefilepath):
         self.master = master
+        self.cc = class_controller
         self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
@@ -51,6 +52,7 @@ class tabXDS110:
         self.canvas3 = tk.Canvas(self.fr_firmware, width=50, height=50)  # fr_firmware
         self.canvas4 = tk.Canvas(self.fr_firmware, width=50, height=50)  # fr_firmware
         self.toggle_drop = None  # fr_target
+        self.lbl_target_v = None # fr_target
         self.targetConfig_drop = None  # fr_firmware
 
         self.ser_obj = None
@@ -79,6 +81,11 @@ class tabXDS110:
                                   bg="green", fg="white", height=2, width=15)
         btn_check_target.grid(row=1, column=2, padx=15, pady=22)
         self.canvas2.grid(row=1, column=3, padx=15, pady=22)
+
+        # TARGET VOLTAGE
+        self.lbl_target_v = Label(self.fr_target)
+        self.lbl_target_v.config(text="x.xx V")
+        self.lbl_target_v.grid(row=1, column=4, padx=15, pady=22)
 
         # TOGGLE
         btn_toggle_target = Button(self.fr_target, text="Toggle target",
@@ -133,19 +140,30 @@ class tabXDS110:
             return False
 
     def check_target(self):
+        target_status = True
+
+        # check through dmm
+        if self.cc.dmm is not None:
+            dmm_voltage = self.cc.dmm.read_voltage()
+            print(f"DMM got this for a measurement: {dmm_voltage}")
+            self.lbl_target_v.config(text=f"{dmm_voltage} V")
+
         # update status of xds110
         xds110_status = self.check_xds110()
         if not xds110_status:
-            return False
+            target_status = False
+        else:
+            # get target status
+            packet = xds110.get_jtag_integrity()
+            self.prompt.print(packet.get_string())
 
-        # get target status
-        packet = xds110.get_jtag_integrity()
-        self.prompt.print(packet.get_string())
 
+        # set status indicator
         my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        if packet.result:
-            self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
-            return True
+        if target_status:
+            if packet.result:
+                self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+                return True
         else:
             self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             return False
@@ -190,10 +208,15 @@ class tabXDS110:
 
         # PERFORM TARGET CHECK
         flash_option = self.targetConfig_drop[1].get()
+
+        # CHECK TARGET STATUS
         if flash_option == "target_power":
             target_status = self.check_target()
             if not target_status:
                 guih.alert_user("Can't flash firmware!", "Target/probe connection is not valid", "error")
+
+        # AUTO-DETECTING
+
 
         # FLASH FIRMWARE
         self.canvas4.itemconfig(my_oval, fill="yellow")

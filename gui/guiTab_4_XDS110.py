@@ -147,6 +147,8 @@ class tabXDS110:
             dmm_voltage = self.cc.dmm.read_voltage()
             print(f"DMM got this for a measurement: {dmm_voltage}")
             self.lbl_target_v.config(text=f"{dmm_voltage} V")
+            if dmm_voltage < 1.0:
+                target_status = False
 
         # update status of xds110
         xds110_status = self.check_xds110()
@@ -214,8 +216,6 @@ class tabXDS110:
             target_status = self.check_target()
             if not target_status:
                 guih.alert_user("Can't flash firmware!", "Target/probe connection is not valid", "error")
-
-        # AUTO-DETECTING
 
 
         # FLASH FIRMWARE

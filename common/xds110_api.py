@@ -108,7 +108,6 @@ def flash_firmware(config_type):
         print(f"Trying config {config_type}")
         raise XDS110Exception("Bad target config type!")
 
-
     packet = subp.execute_command(
         base_script_path + "examples/loadti/loadti.bat",
         [

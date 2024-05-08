@@ -6,7 +6,6 @@ import logging
 import serial
 import time
 
-
 # import user created modules
 from EEequipment.xdm1041.xdm1041defs import XDM1041Mode, XDM1041Cmd
 from EEequipment.xdm1041 import xdm1041helper
@@ -59,7 +58,8 @@ class XDM1041:
         self.logger.info("Serial port status:{}".format(self.serial.is_open))
 
         self.set_mode(mode)
-        self.set_range(rng)
+        # self.set_range(rng)
+        self.set_range(3)
 
     def connect(self):
         if self.serial and self.serial.is_open is False:
@@ -214,7 +214,9 @@ class XDM1041:
 
     def read_voltage(self):
         self.set_mode(XDM1041Mode.MODE_VOLTAGE_DC)
+        time.sleep(4) # sleep 2 seconds or else will read 00.000 mV
         raw_str = self.read_val1_str()
-        voltage = xdm1041helper.parse_voltage_str(raw_st)
+        print(f"DMM: raw_str: {raw_str}")
+        voltage = xdm1041helper.parse_voltage_str(raw_str)
         return voltage
 

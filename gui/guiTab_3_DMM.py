@@ -554,24 +554,20 @@ class tabDMM:
         self.prompt.print("Connected to DMM")
         self.prompt.print(f"Got id: {self.id}")
 
+        # BAD ID received
         if self.id == '' or len(self.id) < 3:
             self.MiniBM = None
-            self.ser_status = True
+            self.ser_status = False
             self.fr_port.set_status(self.ser_status)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
+        # GOOD ID received
         else:
             # self.buttonConn.config(relief='sunken')
             self.cc.set_dmm(self.dmm)
             self.labelId.config(text=self.id)
-            self.ser_status = False
+            self.ser_status = True
             self.fr_port.set_status(self.ser_status)
 
-            # except Exception as e:
-            #     raise(e)
-            #     tkmb.showerror("port error", "can't open " + port)
-            #     self.MiniBM = None
-            #     self.buttonConn.config(relief='raised')
-            #     self.labelId.config(text='')
 
     def serial_close(self):
         self.prompt.print(f"Serial close!")

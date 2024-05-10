@@ -25,7 +25,7 @@ if os_name == "Windows":
     base_ccs = "C:/ti/ccs1240/ccs/" # for laptop
     base_project_path = "C:/Users/ander/Documents/CCS/workspace_WWD/WWD_prog/"
 elif os_name == "Linux":
-    base_ccs = "/home/anders/ti/ccs1200/ccs/ccs_base/"
+    base_ccs = "/home/anders/ti/ccs1270/ccs/"
     base_project_path = None
 else:
     print("Undefined operating system to set for XDS110-API paths!!!")

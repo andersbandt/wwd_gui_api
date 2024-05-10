@@ -9,4 +9,5 @@ usb
 
 
 #added by anders
+sv_ttk
 tkinter

@@ -75,28 +75,37 @@ class tabXDS110:
         self.canvas1.grid(row=3, column=2, padx=15, pady=22)
 
     def init_fr_target(self):
+        # ROW 1 + 2
         # TARGET - BUTTON/STATUS
         btn_check_target = Button(self.fr_target, text="Target check",
                                   command=lambda: threading.Thread(target=self.check_target).start(),
                                   bg="green", fg="white", height=2, width=15)
-        btn_check_target.grid(row=1, column=2, padx=15, pady=22)
-        self.canvas2.grid(row=1, column=3, padx=15, pady=22)
+        btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
+        self.canvas2.grid(row=1, column=2, rowspan=2, padx=15, pady=22)
 
         # TARGET VOLTAGE
         self.lbl_target_v = Label(self.fr_target)
         self.lbl_target_v.config(text="x.xx V")
-        self.lbl_target_v.grid(row=1, column=4, padx=15, pady=22)
+        self.lbl_target_v.grid(row=1, column=3, padx=15, pady=22)
 
-        # TOGGLE
+        var_usedmm = tk.IntVar()
+        tk.Checkbutton(self.fr_target,
+                       text="Use DMM",
+                       variable=var_usedmm,
+                       onvalue=1,
+                       offvalue=0,
+                       command=None).grid(row=2, column=3)
+
+        # ROW 3
         btn_toggle_target = Button(self.fr_target, text="Toggle target",
                                    command=lambda: threading.Thread(target=self.toggle_target).start(),
                                    bg="orange", fg="black", height=2, width=15)
-        btn_toggle_target.grid(row=2, column=2, padx=15, pady=22)
+        btn_toggle_target.grid(row=3, column=2, padx=15, pady=22)
         self.toggle_drop = guih.generate_drop_down(
             self.fr_target,
             ["toggle", "assert", "deassert"]
         )
-        self.toggle_drop[0].grid(row=2, column=3, padx=15, pady=15)
+        self.toggle_drop[0].grid(row=3, column=3, padx=15, pady=15)
 
     def init_fr_firmware(self):
         fr_method = self.fr_firmware

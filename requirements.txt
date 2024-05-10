@@ -1,0 +1,8 @@
+pyserial
+matplotlib
+drawnow
+pandas
+numpy
+scipy
+fpdf
+usb

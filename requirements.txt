@@ -6,3 +6,7 @@ numpy
 scipy
 fpdf
 usb
+
+
+#added by anders
+tkinter

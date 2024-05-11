@@ -63,6 +63,13 @@ class SerialConnFrame(tk.Frame):
                                    bg="green", fg="white")
         refresh_button.grid(row=1, column=2, columnspan=1, pady=1)
 
+        # initialize port list
+        self.com_drop = guih.generate_drop_down(
+            self,
+            [port.device for port in list_ports.comports()]
+        )
+        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
+
         # Initial port list
         self.refresh_ports()
 
@@ -80,16 +87,14 @@ class SerialConnFrame(tk.Frame):
         btn_disconnect_serial.grid(row=3, column=1, padx=15, pady=3)
 
     def refresh_ports(self):
-        com_ports = [port.device for port in list_ports.comports()]
-        # ports_var.set(com_ports)
-        # set up user inputs for statement (year and month)
+        menu = self.com_drop[0]["menu"]
+        menu.delete(0, "end")
 
-        # TODO: is regenerating this each time really the best refresh method?
-        self.com_drop = guih.generate_drop_down(
-            self,
-            [port.device for port in list_ports.comports()]
-        )
-        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
+        # update port list
+        ports = [port.device for port in list_ports.comports()]
+        for string in ports:
+            menu.add_command(label=string,
+                             command=lambda value=string: self.com_drop[1].set(value))
 
     def get_port(self):
         return self.com_drop[1].get()

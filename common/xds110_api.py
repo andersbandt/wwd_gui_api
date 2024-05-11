@@ -7,7 +7,6 @@
 
 
 # import needed modules
-import subprocess
 import os
 import platform
 
@@ -19,6 +18,7 @@ from common import subprocessor as subp
 os_name = platform.system()
 print(f"Operating system is currently: {os_name}")
 
+# TODO: have all the below lines stored in some external configuration file.
 # set PATH information for XDS110 API
 if os_name == "Windows":
     # base_ccs = "C:/ti/ccs1200/ccs/" # for PC
@@ -26,7 +26,7 @@ if os_name == "Windows":
     base_project_path = "C:/Users/ander/Documents/CCS/workspace_WWD/WWD_prog/"
 elif os_name == "Linux":
     base_ccs = "/home/anders/ti/ccs1270/ccs/"
-    base_project_path = None
+    base_project_path = "/home/anders/Documents/CCS/workspace_WWD/WWD_prog/"
 else:
     print("Undefined operating system to set for XDS110-API paths!!!")
     raise BaseException
@@ -41,12 +41,13 @@ if os_name == "Windows":
     xds110_jtag_cmd = "dbgjtag.exe"
     xds110_xds_cmd = "xds110/xdsdfu.exe"
     gmake_cmd = base_ccs + "utils/bin/gmake.exe"
+    load_cmd = base_script_path + "examples/loadti/loadti.bat"
 elif os_name == "Linux":
     xds110_reset_cmd = "xds110/xds110reset"
     xds110_jtag_cmd = "dbgjtag"
     xds110_xds_cmd = "xds110/xdsdfu"
     gmake_cmd = base_ccs + "utils/bin/gmake"
-
+    load_cmd = base_script_path + "examples/loadti/loadti.sh"
 
 
 class XDS110Exception(Exception):
@@ -110,7 +111,7 @@ def flash_firmware(config_type):
         raise XDS110Exception("Bad target config type!")
 
     packet = subp.execute_command(
-        base_script_path + "examples/loadti/loadti.bat",
+        load_cmd,
         [
             "-a",
             "-c",

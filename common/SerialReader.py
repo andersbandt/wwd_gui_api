@@ -38,7 +38,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
                     serStrDat = ser_bytes.decode('utf-8').strip() # removed .strip() from this method
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                     self.r_buf.append([timestamp, serStrDat])
-            except serial.serialutil.SerialException as e:
+            except (serial.serialutil.SerialException, OSError) as e:  # (Windows, Linux)
                 self.serStatus = False
                 print(e)
                 # Log the exception if needed

@@ -3,11 +3,10 @@
 import tkinter as tk
 from tkinter import *
 from tkinter import Text, INSERT, Label
-from serial.tools import list_ports
-
 
 # import user created modules
 from gui import gui_helper as guih
+from common import serial_api
 
 
 class Prompt:
@@ -66,7 +65,7 @@ class SerialConnFrame(tk.Frame):
         # initialize port list
         self.com_drop = guih.generate_drop_down(
             self,
-            [port.device for port in list_ports.comports()]
+            serial_api.get_ports()
         )
         self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
 
@@ -91,7 +90,9 @@ class SerialConnFrame(tk.Frame):
         menu.delete(0, "end")
 
         # update port list
-        ports = [port.device for port in list_ports.comports()]
+        ports = serial_api.get_ports()
+
+        # add each port name to the drop down menu
         for string in ports:
             menu.add_command(label=string,
                              command=lambda value=string: self.com_drop[1].set(value))

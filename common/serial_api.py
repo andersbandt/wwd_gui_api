@@ -1,7 +1,40 @@
+
+
+# import needed modules
 import time
 import serial
-import serial.tools.list_ports
+from serial.tools import list_ports
+import glob
 
+
+
+def get_ports():
+    # METHOD 1: worked best on windows
+    ports = [port.device for port in list_ports.comports()]
+
+    # METHOD 2: trying to get Linux to work. Search for serial ports in /dev/
+    temp_ports = glob.glob('/dev/tty[A-Za-z]*') # NOTE: this method just prints a fuck ton of ports
+
+    ports = []
+    for a_port in temp_ports:
+
+        try:
+            s = serial.Serial(a_port)
+            s.close()
+            ports.append(a_port)
+        except serial.SerialException:
+            pass
+
+    # METHOD 3: output of "lsbusb" command
+    # testing. one last print
+    # devices = show_ports_linux()
+    # ports = []
+    # for device in devices:
+    #     ports.append(device["device"])
+    #
+    # ports = ["/dev/bus/usb/001/029"]
+
+    return ports
 
 
 def show_ports():
@@ -13,46 +46,21 @@ def show_ports():
         print(f"Device: {port.device}, Description: {port.description}")
 
 
+def show_ports_linux():
+    import re
+    import subprocess
+    device_re = re.compile(b"Bus\s+(?P<bus>\d+)\s+Device\s+(?P<device>\d+).+ID\s(?P<id>\w+:\w+)\s(?P<tag>.+)$", re.I)
+    df = subprocess.check_output("lsusb")
+    devices = []
+    for i in df.split(b'\n'):
+        if i:
+            info = device_re.match(i)
+            if info:
+                dinfo = info.groupdict()
+                dinfo['device'] = '/dev/bus/usb/%s/%s' % (dinfo.pop('bus'), dinfo.pop('device'))
+                devices.append(dinfo)
 
-# configure the serial connections (the parameters differs on the device you are connecting to)
-ser = serial.Serial(
-    port='COM7',
-    baudrate=9600,
-    parity=serial.PARITY_ODD,
-    stopbits=serial.STOPBITS_TWO,
-    bytesize=serial.SEVENBITS
-)
+    # print(devices)
+    return devices
 
 
-inp = 1
-
-msg = " "
-while 1:
-    msg = " "
-    while ser.inWaiting() > 0:
-        read = ser.read(1)
-        #print(read)
-        msg += read.decode("UTF-8")
-        print(msg)
-    # print(msg)
-
-    # OTHER METHOD LEVERAGING KEYBOARD INPUT???
-    # # get keyboard input
-    # inp = input(">> ")
-
-    #
-    # if inp == 'exit':
-    #     ser.close()
-    #     exit()
-    # else:
-    #     # send the character to the device
-    #     # (note that I happend a \r\n carriage return and line feed to the characters - this is requested by my device)
-    #     ser.write(inp + '\r\n')
-    #     out = ''
-    #     # let's wait one second before reading output (let's give device time to answer)
-    #     time.sleep(1)
-    #     while ser.inWaiting() > 0:
-    #         out += ser.read(1)
-    #
-    #     if out != '':
-    #         print(">>" + out)

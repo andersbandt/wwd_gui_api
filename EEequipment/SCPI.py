@@ -11,7 +11,7 @@ class SCPI:
     # _SIF: None # TODO: understand why I had to comment out this line
 
 
-    def __init__(self, port_dev=None, speed=9600, timeout=2):
+    def __init__(self, port_dev, speed, timeout=2):
         self._SIF = serial.Serial(
             port=port_dev,
             baudrate=speed,

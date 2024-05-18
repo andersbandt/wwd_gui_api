@@ -1,51 +1,98 @@
 
 
+#######################################################
+########## METHOD 1: pyhid_usb_relay      #############
+#######################################################
 
-
-# import user created modules
-from EEequipment import SCPI
-
-
-# 1. �����к�afEd5�豸�ĵ�һ·�̵���
-# CommandApp_USBRelay  afEd5 open 01
-# 2. �����к�afEd5�豸�����м̵���
-# CommandApp_USBRelay  afEd5 open 255
-# 3. �ر����к�afEd5�豸�ĵ�һ·�̵���
-# CommandApp_USBRelay  afEd5 close 01
-# 4. �ر����к�afEd5�豸�����м̵���
-# CommandApp_USBRelay  afEd5 close 255
-
-
-USB_RELAY_NUM_CHANNEL = 8
-
-
-usb_relay = SCPI.SCPI("COM3", 9600)
-
-def open_relay(index):
-    usb_relay.sendcmd(f"relay {index} on", getdata=True)
-
-
-def close_relay(index):
-    usb_relay.sendcmd(f"relay {index} off", getdata=True)
-
-
-def open_all_relay():
-    for i in range(0, USB_RELAY_NUM_CHANNEL):
-        open_relay(i)
-
-
-def close_all_relay():
-    for i in range(0, USB_RELAY_NUM_CHANNEL):
-        close_relay(i)
+# import modules
+# import pyhid_usb_relay
+#
+# try:
+#     relay = pyhid_usb_relay.find()
+# except pyhid_usb_relay.exceptions.DeviceNotFoundError as e:
+#     print("Can't find device!")
+#     raise(e)
+#
+#
+# print(bin(relay.state))
+# print("Toggling relay")
+#
+#
+# for i in range(1, 9):
+#     relay.toggle_state(i)
+#
+# print(bin(relay.state))
 
 
 
-# status bit: High --> Low 0000 0000 0000 0000 0000 0000 0000 0000, one bit indicate a relay status.
-# the lowest bit 0 indicate relay one status, 1 -- means open status, 0 -- means closed status.
-# bit 0/1/2/3/4/5/6/7/8 indicate relay 1/2/3/4/5/6/7/8 status
-# @returns: 0 -- success; 1 -- error
-def get_status_relay():
-    pass
+#######################################################
+########## METHOD 2:     mine!!!!         #############
+#######################################################
+
+import usb.core
+import usb.util
+
+
+from EEequipment.usbrelay import usbrelay_controller
+
+
+VENDOR_ID = 0x16C0
+PRODUCT_ID = 0x05DF
+
+
+def _get_backend():
+    import os
+
+    if os.name != "nt":
+        return None
+
+    import usb.backend.libusb1
+    import libusb
+    import pathlib
+
+    # Manually find the libusb DLL and create a backend using it. I don't know
+    # why Python can't find this on its own
+    libpath = next(pathlib.Path(libusb.__file__).parent.rglob("x64/libusb-1.0.dll"))
+    return usb.backend.libusb1.get_backend(find_library=lambda x: str(libpath))
+
+
+
+class match_relay(object):
+    def __call__(self, device):
+        manufacturer = usb.util.get_string(device, device.iManufacturer)
+        product = usb.util.get_string(device, device.iProduct)
+        if manufacturer != "www.dcttech.com":
+            return False
+
+        if not product.startswith("USBRelay"):
+            return False
+
+        return True
+
+
+
+# device = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+
+devices = usb.core.find(
+    backend=_get_backend(),
+    find_all=False,
+    idVendor=VENDOR_ID,
+    idProduct=PRODUCT_ID,
+    custom_match=match_relay(),
+)
+
+
+usb_relay = usbrelay_controller.USBRelayController(devices)
+
+
+print(usb_relay.state)
+
+for i in range(1, 9):
+    usb_relay.toggle_state(i)
+    # usb_relay.set_state(i, 1)
+
+
+print(usb_relay.state)
 
 
 

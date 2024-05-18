@@ -216,3 +216,28 @@ class tabIMU:
                                   "Couldn't load data, something wrong",
                                   kind="error")
             return False
+
+
+    ##############################################################################
+    ####      ACTION FUNCTIONS        ############################################
+    ##############################################################################
+
+    # add_category_gui: attempts to add a category to the SQL database
+    # def analyze_file(self, filename):
+    #     print("Analyzing file")
+    #     afe_data = processor.load_csv(self.basefilepath + "/data/" + filename)
+    #     if afe_data is None:
+    #         guih.alert_user("Something wrong with data!",
+    #                               "Couldn't load data, something wrong",
+    #                         kind="error")
+    #         return False
+    #     afe_stats = afe_analysis.analyze_afe(afe_data)
+    #     # output_frame = tk.Frame(self.master)
+    #     # output_frame.grid(row=4, column=0)
+    #     text_box = tk.Text(self.fr_analysis, height=17)
+    #     text_box.grid(row=5, column=0, padx=15, pady=15)
+    #
+    #     # Add the dictionary contents to the Text widget
+    #     for key, value in afe_stats.items():
+    #         text_box.insert(tk.END, f"{key}: {value}\n")
+    #     return True

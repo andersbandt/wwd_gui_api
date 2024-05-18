@@ -8,10 +8,10 @@ class SCPI:
     """
         Serial SCPI interface
     """
-    # _SIF: None # TODO: understand why I had to comment out this line
-
+    _SIF: serial.Serial  # TODO: understand this line
 
     def __init__(self, port_dev, speed, timeout=2):
+        self._SIF = None
         self._SIF = serial.Serial(
             port=port_dev,
             baudrate=speed,

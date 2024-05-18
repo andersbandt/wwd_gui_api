@@ -44,6 +44,7 @@ class Prompt:
 
 
 # TODO: add entry box for baud rate
+# TODO: can I make these talk among them selves to know when a connection is maintained to a serial port (and underline the unavailable connnections or something)
 class SerialConnFrame(tk.Frame):
     def __init__(self, master, connect_command, close_command, bg=None):
         self.master = master

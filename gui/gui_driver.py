@@ -14,6 +14,7 @@ import os
 
 # import ClassController
 from class_controller import ClassController
+from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
 from gui import guiTab_1_mainDashboard
@@ -28,23 +29,30 @@ from gui import guiTab_5_USB
 class MainApplication:
     def __init__(self, window, height, width):
         self.nb = ttk.Notebook(window, height=height, width=width)
+        self.basefilepath = os.getcwd()
 
         self.controller = ClassController()
+
+        usb_dev = usbrelay_controller.find()
+        if usb_dev is None:
+            print("Can't configure USB device")
+            raise IndexError()
+        else:
+            self.controller.set_relay(
+                usbrelay_controller.USBRelayController(usb_dev)
+            )
 
         self.tab1 = None
         self.tab2 = None
         self.tab3 = None
         self.tab4 = None
         self.tab5 = None
-
-        self.basefilepath = os.getcwd()
-
         self.setTabs()
 
     # set up tab control
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
-        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.basefilepath)
+        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath)
         self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath)
         self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath)

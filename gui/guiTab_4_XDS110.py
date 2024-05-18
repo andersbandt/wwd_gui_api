@@ -108,20 +108,20 @@ class tabXDS110:
         self.toggle_drop[0].grid(row=3, column=3, padx=15, pady=15)
 
     def init_fr_firmware(self):
-        fr_method = self.fr_firmware
+        fr_m = self.fr_firmware
         # FIRMWARE BUILD
-        btn_build_firmware = Button(fr_method, text="Build firmware",
+        btn_build_firmware = Button(fr_m, text="Build firmware",
                                     command=lambda: threading.Thread(target=self.build_firmware).start(),
                                     bg="purple", fg="white", height=2, width=20)
         btn_build_firmware.grid(row=1, column=2, padx=15, pady=22)
         self.canvas3.grid(row=1, column=3, padx=15, pady=22)
         # FIRMWARE FLASH
-        btn_flash_firmware = Button(fr_method, text="Load firmware",
+        btn_flash_firmware = Button(fr_m, text="Load firmware",
                                     command=lambda: threading.Thread(target=self.flash_firmware).start(),
                                     bg="green", fg="white", height=2, width=20)
         btn_flash_firmware.grid(row=2, column=2, padx=15, pady=22)
         self.targetConfig_drop = guih.generate_drop_down(
-            fr_method,
+            fr_m,
             ["target_power", "probe_power"]
         )
         self.targetConfig_drop[0].grid(row=2, column=3, padx=3, pady=10)
@@ -220,11 +220,23 @@ class tabXDS110:
         # PERFORM TARGET CHECK
         flash_option = self.targetConfig_drop[1].get()
 
-        # CHECK TARGET STATUS
+        # CONFIG BASED ON POWER OPTIONS
         if flash_option == "target_power":
-            target_status = self.check_target()
-            if not target_status:
-                guih.alert_user("Can't flash firmware!", "Target/probe connection is not valid", "error")
+            # target_status = self.check_target()
+            # if not target_status:
+            #     guih.alert_user("Can't flash firmware!", "Target/probe connection is not valid", "error")
+            # enable target relay
+            print("Enabling target relay")
+            dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
+            # self.cc.relay.set_state(dut_vdd1_channel, 1)
+            self.cc.relay.set_state(1, 1)
+            self.cc.relay.set_state(2, 1)
+            # self.cc.relay.close_all()
+        elif flash_option == "probe_power":
+            # attempt to disconnect relay
+            self.cc.relay.open_all()
+
+        return False
 
 
         # FLASH FIRMWARE

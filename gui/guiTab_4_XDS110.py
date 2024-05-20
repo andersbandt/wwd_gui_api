@@ -228,10 +228,9 @@ class tabXDS110:
             # enable target relay
             print("Enabling target relay")
             dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
-            # self.cc.relay.set_state(dut_vdd1_channel, 1)
-            self.cc.relay.set_state(1, 1)
-            self.cc.relay.set_state(2, 1)
-            # self.cc.relay.close_all()
+            self.cc.relay.set_state(dut_vdd1_channel, 1)
+            print(f"\t... enabled channel {dut_vdd1_channel}")
+            self.cc.relay.close_all()
         elif flash_option == "probe_power":
             # attempt to disconnect relay
             self.cc.relay.open_all()

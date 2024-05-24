@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk
 import sv_ttk
 import os
+import usb
 
 # import ClassController
 from class_controller import ClassController
@@ -35,8 +36,13 @@ class MainApplication:
 
         usb_dev = usbrelay_controller.find()
         if usb_dev is None:
-            print("Can't configure USB device")
-            raise IndexError()
+            print("Can't configure USB relay device")
+            print("Dumping all usb info")
+            dev = usb.core.find(find_all=True)
+            for d in dev:
+                print(d)
+            print("Done with dump")
+            self.controller.set_relay(None)
         else:
             self.controller.set_relay(
                 usbrelay_controller.USBRelayController(usb_dev)
@@ -83,8 +89,9 @@ def main():
     window.title("WWD GUI API")
     window.geometry('1350x950')
 
-
     sv_ttk.set_theme("dark")
+
+
 
     ### add window Style
     # 	theme options are

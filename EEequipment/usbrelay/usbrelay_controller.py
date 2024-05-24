@@ -29,6 +29,7 @@ PRODUCT_ID = 0x05DF
 
 NUM_RELAY = 8
 
+
 def find():
     def _get_backend():
         import os
@@ -100,7 +101,7 @@ class USBRelayController(object):
 
         try:
             with open(
-                os.path.join(xdg.XDG_CONFIG_HOME, "usb-hid-relay", "config.yaml"), "r"
+                    os.path.join(xdg.XDG_CONFIG_HOME, "usb-hid-relay", "config.yaml"), "r"
             ) as f:
                 config = yaml.load(f, Loader=yaml.Loader)
 
@@ -125,13 +126,14 @@ class USBRelayController(object):
         config = configparser.ConfigParser()
         config.read(config_file)
 
+        # TODO: really understand the following code. Why is there a for loop? Can I just not read every channel instance?
         self.relay_mapping = {}
         for i in range(1, 9):
             channel_key = f'channel_{i}'
             if config.has_option('RELAY_CHANNELS', channel_key):
                 self.relay_mapping[channel_key] = config.get('RELAY_CHANNELS', channel_key)
-            else:
-                self.relay_mapping[channel_key] = None
+            if config.has_option('RELAY_CONNECT', channel_key):
+                self.relay_mapping[f"state_{i}"] = config.get('RELAY_CONNECT', channel_key)
 
     def print_relay_mappings(self):
         for channel, connection in self.relay_mapping.items():
@@ -140,12 +142,17 @@ class USBRelayController(object):
             else:
                 print(f"{channel}: Not configured")
 
+    def get_relay_mapping(self, relay):
+        return self.relay_mapping[f'channel_{relay}']
+
+    def get_relay_map_state(self, relay):
+        return self.relay_mapping[f'state_{relay}']
 
     def return_channel(self, mapping):
+        # returns the channel number for a certain "mapping" string
         channel = next((channel for channel, device in self.relay_mapping.items() if device == mapping), None)
         print(f'The channel for {mapping} is: {channel}')
         return int(channel[-1])
-
 
     def get_property(self, relay, name, default=None):
         value = self.defaults.get(name, default)
@@ -173,6 +180,7 @@ class USBRelayController(object):
         self.state = data[7]
 
     def _name_to_number(self, relay):
+        # NO IDEA WHAT THIS FUNCTION DOES
         def convert():
             invert = self.defaults.get("invert", False)
 
@@ -182,8 +190,7 @@ class USBRelayController(object):
                         int(self.aliases[relay]["relay"]),
                         self.aliases[relay].get("invert", invert),
                     )
-
-                return (int(relay), invert)
+                return int(relay), invert
             except ValueError:
                 pass
 
@@ -194,7 +201,6 @@ class USBRelayController(object):
             raise IndexError(
                 "Index %r is outside range [1..%d]" % (relay_num, self.num_relays)
             )
-
         return relay_num
 
     def _name_to_index(self, relay):
@@ -209,6 +215,20 @@ class USBRelayController(object):
         if self.state & (1 << idx):
             return xor(True, invert)
         return xor(False, invert)
+
+    def get_state_state(self, relay):
+        state_tf = self.get_state(relay)
+
+        # if relay is being driven
+        relay_wiring = self.get_relay_map_state(relay)
+        if state_tf:
+            if relay_wiring == "NO":
+                return True
+        else:
+            if relay_wiring == "NC":
+                return True
+
+        return False
 
     def set_state(self, relay, state):
         buf = array.array("B")
@@ -229,14 +249,12 @@ class USBRelayController(object):
         else:
             self.set_state(relay, not self.get_state(relay))
 
-
     def open_all(self):
-        for i in range(1, NUM_RELAY+1):
+        for i in range(1, NUM_RELAY + 1):
             self.set_state(i, 0)
 
-
     def close_all(self):
-        for i in range(1, NUM_RELAY+1):
+        for i in range(1, NUM_RELAY + 1):
             self.set_state(i, 1)
 
     def __getitem__(self, relay):

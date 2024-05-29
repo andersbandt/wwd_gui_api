@@ -58,8 +58,7 @@ class XDM1041:
         self.logger.info("Serial port status:{}".format(self.serial.is_open))
 
         self.set_mode(mode)
-        # self.set_range(rng)
-        self.set_range(3)
+        self.set_range(rng)
 
     def connect(self):
         if self.serial and self.serial.is_open is False:
@@ -94,8 +93,22 @@ class XDM1041:
 
         # we made it, set the range
         cmd = str(XDM1041Cmd.SET_RANGE).format(rng)
+        print(f"\tsetting DMM range with cmd: {cmd}")
         self.send_cmd(cmd)
 
+        
+    def set_range_auto(self):
+        cmd = str(XDM1041Cmd.SET_AUTO_MODE)
+        self.send_cmd(cmd)
+
+
+    def get_range_auto(self):
+        cmd = str(XDM1041Cmd.GET_AUTO_MODE)
+        self.send_cmd(cmd)
+        result = self.read_result()
+        return result
+        
+        
     def test_conn(self):
         cmd = str(XDM1041Cmd.IDN)
         self.send_cmd(cmd)

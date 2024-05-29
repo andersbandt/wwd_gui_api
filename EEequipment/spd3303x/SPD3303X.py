@@ -1,4 +1,8 @@
-from SCPI import SCPI
+
+#from SCPI import SCPI
+import pyvisa
+import time
+
 
 class SPD3303X:
     """
@@ -34,20 +38,27 @@ class SPD3303X:
         '''
         Query the manufacturer, product type, series, series no., software version, hardware version
         '''
-        self.scpi.send("*IDN?")
-        response = self.scpi.recv()
-        resp_arr = response.split(",")
-        self.manufacturer = resp_arr[0]
-        self.product_type = resp_arr[1]
-        self.series_number = resp_arr[2]
-        self.software_version = resp_arr[3]
-        self.hardware_version = resp_arr[4]
+        print("SPD3303X: issuing IDN? command")
+        print(self.inst.query('*IDN?'))
+        
+        # self.inst.write("*IDN?")
+        # time.sleep(1)
+        # print("SPD3303X: reading...")
+        # response = self.inst.read()
+        # print(str(response))
+
+#        resp_arr = response.split(",")
+#        self.manufacturer = resp_arr[0]
+#        self.product_type = resp_arr[1]
+#        self.series_number = resp_arr[2]
+#        self.software_version = resp_arr[3]
+#        self.hardware_version = resp_arr[4]
 
     def __send_cmd(self, cmd):
         '''
         Generic call to send command with error checking
         '''
-        self.scpi.send(cmd)
+        self.inst.write(cmd)
         # Check for an error in regards to that command
         self.check_error()
 
@@ -58,7 +69,7 @@ class SPD3303X:
         if file_num not in range(1,self.save_file_count+1):
             raise self.SPD3303Exception('20', f'Save file must be an integer 1 - {self.save_file_count}')
         else:
-            self.scpi.send(f"*SAV {file_num}")
+            self.inst.write(f"*SAV {file_num}")
 
     def recall(self, file_num):
         '''
@@ -67,7 +78,7 @@ class SPD3303X:
         if file_num not in range(1,self.save_file_count+1):
             raise self.SPD3303Exception('20', f'Save file must be an integer 1 - {self.save_file_count}')
         else:
-            self.scpi.send(f"*RCL {file_num}")
+            self.inst.write(f"*RCL {file_num}")
 
     def select_channel(self, channel):
         '''
@@ -76,14 +87,14 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"INSTrument CH{channel}")
+            self.inst.write(f"INSTrument CH{channel}")
 
     def get_active_channel(self):
         '''
         Query for the active channel
         '''
-        self.scpi.send("INSTrument?")
-        return self.scpi.recv()
+        self.inst.write("INSTrument?")
+        return self.inst.read()
 
     def get_current(self, channel):
         '''
@@ -92,8 +103,8 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"MEASure:CURRent? CH{channel}")
-            return float(self.scpi.recv())
+            self.inst.write(f"MEASure:CURRent? CH{channel}")
+            return float(self.inst.read())
 
     def get_voltage(self, channel):
         '''
@@ -102,8 +113,8 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"MEASure:VOLTage? CH{channel}")
-            return float(self.scpi.recv())
+            self.inst.write(f"MEASure:VOLTage? CH{channel}")
+            return float(self.inst.read())
 
     def get_power(self, channel):
         '''
@@ -112,8 +123,8 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"MEASure:POWEr? CH{channel}")
-            return float(self.scpi.recv())
+            self.inst.write(f"MEASure:POWEr? CH{channel}")
+            return float(self.inst.read())
 
     def set_current(self, channel, value):
         '''
@@ -131,7 +142,7 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"CH{channel}:CURRent?")
+            self.inst.write(f"CH{channel}:CURRent?")
 
     def set_voltage(self, channel, value):
         '''
@@ -149,7 +160,7 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"CH{channel}:VOLTage?")
+            self.inst.write(f"CH{channel}:VOLTage?")
 
     def output_on(self, channel):
         '''
@@ -158,7 +169,7 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"OUTPut CH{channel},ON")
+            self.inst.write(f"OUTPut CH{channel},ON")
 
     def output_off(self, channel):
         '''
@@ -167,11 +178,11 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"OUTPut CH{channel},OFF")
+            self.inst.write(f"OUTPut CH{channel},OFF")
 
     def set_operation_mode(self, mode):
         if mode == 0 or mode == 1 or mode == 2:
-            self.scpi.send(f"OUTPut:TRACK {mode}")
+            self.inst.write(f"OUTPut:TRACK {mode}")
         else:
             raise self.SPD3303Exception('22', f'Invalid Operation Mode')
 
@@ -191,7 +202,7 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"OUTPut:WAVE CH{channel},OFF")
+            self.inst.write(f"OUTPut:WAVE CH{channel},OFF")
 
     def set_timing_parameters(self, channel, group, voltage, current, time):
         '''
@@ -200,7 +211,7 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"TIMEr:SET CH{channel},{group},{voltage},{current},{time}")
+            self.inst.write(f"TIMEr:SET CH{channel},{group},{voltage},{current},{time}")
 
     def query_timing_parameters(self, channel, group):
         '''
@@ -209,8 +220,8 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"TIMEr:SET? CH{channel},{group}")
-            response = self.scpi.recv()
+            self.inst.write(f"TIMEr:SET? CH{channel},{group}")
+            response = self.inst.read()
             resp_arr = response.split(",")
             return (resp_arr[0],(resp_arr[1],resp_arr[2]))
 
@@ -221,7 +232,7 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"TIMEr CH{channel},ON")
+            self.inst.write(f"TIMEr CH{channel},ON")
 
     def turn_off_timer(self, channel):
         '''
@@ -230,14 +241,14 @@ class SPD3303X:
         if channel not in range(1,self.channel_count+1):
             raise self.SPD3303Exception('21', f'Channel # must be an integer 1 - {self.channel_count}')
         else:
-            self.scpi.send(f"TIMEr CH{channel},OFF")
+            self.inst.write(f"TIMEr CH{channel},OFF")
 
     def check_error(self):
         '''
         Check for an error on the system
         '''
-        self.scpi.send("SYSTem:ERRor?")
-        response = self.scpi.recv()
+        self.inst.write("SYSTem:ERRor?")
+        response = self.inst.read()
         resp_list = response.split('  ')
         # If error code zero do not raise exception, move along
         if resp_list[0] == '0':
@@ -251,15 +262,15 @@ class SPD3303X:
         '''
         Query the software version of the equipment
         '''
-        self.scpi.send("SYSTem:VERSion?")
-        return self.scpi.recv()
+        self.inst.write("SYSTem:VERSion?")
+        return self.inst.read()
 
     def check_status(self):
         '''
         Return the top level info about the power supply functional status
         '''
-        self.scpi.send("SYSTem:STATus?")
-        return self.scpi.recv()
+        self.inst.write("SYSTem:STATus?")
+        return self.inst.read()
 
     def assign_ip_addr(self, ip):
         '''
@@ -272,8 +283,8 @@ class SPD3303X:
         '''
         Query the static Internet Protocol (IP) address for the instrument
         '''
-        self.scpi.send(f"IPaddr?")
-        return self.scpi.recv()
+        self.inst.write(f"IPaddr?")
+        return self.inst.read()
 
     def assign_subnet_mask(self, subnet_mask):
         '''
@@ -286,8 +297,8 @@ class SPD3303X:
         '''
         Query the subnet mask for the instrument
         '''
-        self.scpi.send(f"MASKaddr?")
-        return self.scpi.recv()
+        self.inst.write(f"MASKaddr?")
+        return self.inst.read()
 
     def assign_gate_address(self, gate_addr):
         '''
@@ -301,35 +312,39 @@ class SPD3303X:
         Query the gate address for the instrument
         WARING: This command is invalid when DHCP is on
         '''
-        self.scpi.send(f"GATEaddr?")
-        return self.scpi.recv()
+        self.inst.write(f"GATEaddr?")
+        return self.inst.read()
     
     def dhcp(self, state):
         '''
         Turn on or off DHCP
         '''
         if state:
-            self.scpi.send(f"DHCP ON")
+            self.inst.write(f"DHCP ON")
         else:
-            self.scpi.send(f"DHCP OFF")
+            self.inst.write(f"DHCP OFF")
 
     def query_dhcp(self):
         '''
         Query to see the status of DHCP
         '''
-        self.scpi.send(f"DHCP?")
-        return self.scpi.recv()
+        self.inst.write(f"DHCP?")
+        return self.inst.read()
 
     def close(self):
         '''
         Close the socket connection
         '''
-        self.scpi.close()
+        self.inst.close()
 
-    def __init__(self, ip):
+    def __init__(self, instadd):
         '''
-        Init the SCPI connection and get the basic product info
+        Init the VISA (pyvisa) connection and get the basic product info
         '''
-        self.scpi = SCPI(ip, 5025)
+        rm = pyvisa.ResourceManager()
+        self.inst = rm.open_resource(instadd)
+        print("SPD3303X: VISA resource connected")
+        self.inst.write_termination='\n'
+        self.inst.read_termination='\n'
         self.__get_product_info()
             

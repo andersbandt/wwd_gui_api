@@ -55,8 +55,6 @@ def _get_backend():
     libpath = next(pathlib.Path(libusb.__file__).parent.rglob("x64/libusb-1.0.dll"))
     return usb.backend.libusb1.get_backend(find_library=lambda x: str(libpath))
 
-
-
 class match_relay(object):
     def __call__(self, device):
         manufacturer = usb.util.get_string(device, device.iManufacturer)

@@ -9,6 +9,7 @@
 # import needed modules
 import os
 import platform
+import configparser
 
 # import user defined modules
 from common import subprocessor as subp
@@ -16,38 +17,51 @@ from common import subprocessor as subp
 
 # get operating system information
 os_name = platform.system()
-print(f"Operating system is currently: {os_name}")
-
-# TODO: have all the below lines stored in some external configuration file.
-# set PATH information for XDS110 API
-if os_name == "Windows":
-    # base_ccs = "C:/ti/ccs1200/ccs/" # for PC
-    base_ccs = "C:/ti/ccs1240/ccs/" # for laptop
-    base_project_path = "C:/Users/ander/Documents/CCS/workspace_WWD/WWD_prog/"
-elif os_name == "Linux":
-    base_ccs = "/home/anders/ti/ccs1270/ccs/"
-    base_project_path = "/home/anders/Documents/CCS/workspace_WWD/WWD_prog/"
-else:
+print(f"Initializing XDS config paths with OS: {os_name}")
+if os_name != "Windows" and os_name != "Linux":
     print("Undefined operating system to set for XDS110-API paths!!!")
     raise BaseException
 
-# set common paths based on information above
+
+# initialize the config parser
+# set relay mapping / configuration
+config_file_path = "C:/Users/ander/Documents/GitHub/wwd_gui_api/EEequipment/xds110/config.ini"
+if os.path.exists(config_file_path):
+    config = configparser.ConfigParser()
+    config.read(config_file_path)
+else:
+    print(f"Configuration file {config_file_path} does not exist.")
+    raise BaseException
+
+
+# read in parameters from the config file
+base_ccs = config[os_name]["base_ccs"]
+# base_ccs = config.get(os_name, "base_ccs")
+
+base_project_path = config[os_name]["base_project_path"]
+
 base_tools_path = base_ccs + "ccs_base/common/uscif/"
 base_script_path = base_ccs + "ccs_base/scripting/"
 
-# set XDS110 API information
-if os_name == "Windows":
-    xds110_reset_cmd = "xds110/xds110reset.exe"
-    xds110_jtag_cmd = "dbgjtag.exe"
-    xds110_xds_cmd = "xds110/xdsdfu.exe"
-    gmake_cmd = base_ccs + "utils/bin/gmake.exe"
-    load_cmd = base_script_path + "examples/loadti/loadti.bat"
-elif os_name == "Linux":
-    xds110_reset_cmd = "xds110/xds110reset"
-    xds110_jtag_cmd = "dbgjtag"
-    xds110_xds_cmd = "xds110/xdsdfu"
-    gmake_cmd = base_ccs + "utils/bin/gmake"
-    load_cmd = base_script_path + "examples/loadti/loadti.sh"
+
+xds110_reset_cmd = config[os_name]["xds110_reset_cmd"]
+xds110_jtag_cmd = config[os_name]["xds110_jtag_cmd"]
+xds110_xds_cmd = config[os_name]["xds110_xds_cmd"]
+gmake_cmd = base_ccs + config[os_name]["gmake_cmd"]
+load_cmd = base_script_path + config[os_name]["load_cmd"]
+
+
+# Debug output to check if paths are set correctly
+print(f"base_ccs: {base_ccs}")
+print(f"base_project_path: {base_project_path}")
+print(f"base_tools_path: {base_tools_path}")
+print(f"base_script_path: {base_script_path}")
+print(f"xds110_reset_cmd: {xds110_reset_cmd}")
+print(f"xds110_jtag_cmd: {xds110_jtag_cmd}")
+print(f"xds110_xds_cmd: {xds110_xds_cmd}")
+print(f"gmake_cmd: {gmake_cmd}")
+print(f"load_cmd: {load_cmd}")
+
 
 
 class XDS110Exception(Exception):

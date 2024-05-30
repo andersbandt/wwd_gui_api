@@ -6,8 +6,8 @@ import array
 import os
 import usb.core
 import usb.util
-import xdg
-import yaml
+# import xdg
+# import yaml
 import configparser
 
 USB_TYPE_CLASS = 0x20
@@ -98,22 +98,8 @@ class USBRelayController(object):
 
         self.aliases = {}
         self.defaults = {}
+        self.relay_mapping = {}
 
-        try:
-            with open(
-                    os.path.join(xdg.XDG_CONFIG_HOME, "usb-hid-relay", "config.yaml"), "r"
-            ) as f:
-                config = yaml.load(f, Loader=yaml.Loader)
-
-            if self.serial in config:
-                self.aliases = config[self.serial].get("aliases", {})
-                self.defaults = config[self.serial].get("defaults", {})
-
-        except FileNotFoundError:
-            print("Couldn't find config.yaml file for relays. No biggie though I guess")
-            pass
-
-        self.relay_mapping = None
         # set relay mapping / configuration
         config_file_path = "/home/anders/Documents/GitHub/wwd_gui_api/EEequipment/usbrelay/config.ini"
         if os.path.exists(config_file_path):
@@ -121,13 +107,13 @@ class USBRelayController(object):
             self.print_relay_mappings()
         else:
             print(f"Configuration file {config_file_path} does not exist.")
+            raise BaseException
 
+    # TODO: really understand the following code. Why is there a for loop? Can I just not read every channel instance?
     def read_relay_config(self, config_file):
         config = configparser.ConfigParser()
         config.read(config_file)
 
-        # TODO: really understand the following code. Why is there a for loop? Can I just not read every channel instance?
-        self.relay_mapping = {}
         for i in range(1, 9):
             channel_key = f'channel_{i}'
             if config.has_option('RELAY_CHANNELS', channel_key):

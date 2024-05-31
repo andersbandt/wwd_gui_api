@@ -66,34 +66,6 @@ def convertTuple(tup):
 ####      TREE FUNCTIONS           ###########################################
 ##############################################################################
 
-# TODO: get this angle matrix generation function working properly
-#   has to be some component of odd/even in the for loop...
-# generate_tree_angles: generates an array of the different angles to plot children node from a parent
-def generate_tree_angles(num_children, max_angle):
-    if num_children == 0:
-        return [0]
-
-    if num_children == 1:
-        return [0]
-
-    if num_children == 2:
-        return [max_angle / 2, -max_angle / 2]
-
-    if num_children == 3:
-        return [max_angle, 0, -max_angle]
-
-    if num_children == 4:
-        return [max_angle, max_angle * 1 / 2, -max_angle * 1 / 2, -max_angle]
-
-    if num_children == 5:
-        return [max_angle, max_angle * 3 / 5, 0, -max_angle * 3 / 5, -max_angle]
-
-    if num_children == 6:
-        return [max_angle, max_angle * 4 / 5, max_angle * 2 / 5, -max_angle * 2 / 5, -max_angle * 4 / 5, -max_angle]
-
-    print("Uh oh, this statement shouldn't be reached! No angle matrix was found!")
-    print("ERROR: can't generate angle matrix for number of children: " + str(num_children))
-
 
 # drawLine: draws a line between coordinates (x1, y1) and (x2, y2) on 'canvas'
 def drawLine(canvas, x1, y1, x2, y2):

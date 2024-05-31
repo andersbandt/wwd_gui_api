@@ -108,7 +108,6 @@ class USBRelayController(object):
             if self.serial in config:
                 self.aliases = config[self.serial].get("aliases", {})
                 self.defaults = config[self.serial].get("defaults", {})
-
         except FileNotFoundError:
             print("Couldn't find config.yaml file for relays. No biggie though I guess")
             pass

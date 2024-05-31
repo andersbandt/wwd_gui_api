@@ -54,6 +54,7 @@ class SerialConnFrame(tk.Frame):
         self.connect_serial = connect_command
         self.disconnect_serial = close_command
         self.com_drop = None
+        self.baud_drop = None
 
 
     def initialize_fr(self):
@@ -73,18 +74,26 @@ class SerialConnFrame(tk.Frame):
         # Initial port list
         self.refresh_ports()
 
-        # place CONNECT button and STATUS indicator
-        self.canvas1.grid(row=4, column=2, padx=15, pady=3)
+        # place baud rate list
+        self.baud_drop = guih.generate_drop_down(
+            self,
+            ["115200", "9600"]
+        )
+        self.baud_drop[0].grid(row=2, column=1, padx=3, pady=10)
+
         # Button to refresh the list of COM ports
         # TARGET - BUTTON/STATUS
         btn_connect_serial = Button(self, text="Connect to COM",
                                     command=self.connect_serial,
                                     bg="green", fg="white", height=1, width=15)
-        btn_connect_serial.grid(row=2, column=1, padx=15, pady=1)
+        btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
         btn_disconnect_serial = Button(self, text="Disconnect COM",
                                        command=self.disconnect_serial,
                                        bg="orange", fg="black", height=1, width=15)
-        btn_disconnect_serial.grid(row=3, column=1, padx=15, pady=3)
+        btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
+
+        # place CONNECT button and STATUS indicator
+        self.canvas1.grid(row=5, column=2, padx=15, pady=3)
 
     def refresh_ports(self):
         menu = self.com_drop[0]["menu"]

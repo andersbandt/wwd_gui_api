@@ -35,18 +35,18 @@ class MainApplication:
         self.controller = ClassController()
 
         usb_dev = usbrelay_controller.find()
-        if usb_dev is None:
-            print("Can't configure USB relay device")
-            print("Dumping all usb info")
-            dev = usb.core.find(find_all=True)
-            for d in dev:
-                print(d)
-            print("Done with dump")
-            self.controller.set_relay(None)
-        else:
-            self.controller.set_relay(
-                usbrelay_controller.USBRelayController(usb_dev)
-            )
+        # if usb_dev is None:
+        #     print("Can't configure USB relay device")
+        #     # print("Dumping all usb info")
+        #     # dev = usb.core.find(find_all=True)
+        #     # for d in dev:
+        #     #     print(d)
+        #     # print("Done with dump")
+        #     self.controller.set_relay(None)
+        # else:
+        self.controller.set_relay(
+            usbrelay_controller.USBRelayController(usb_dev)
+        )
 
         self.tab1 = None
         self.tab2 = None

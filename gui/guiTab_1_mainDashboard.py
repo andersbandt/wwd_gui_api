@@ -38,6 +38,7 @@ class tabMainDashboard:
         style.configure("TButtonOff.TButton", background="red")
 
         # add some other variables
+        self.relay_status = self.cc.relay.status
         self.relay_btns = []
 
         # initialize tab content
@@ -57,7 +58,7 @@ class tabMainDashboard:
         Label(fr_m, text="Relay status").grid(row=1, column=1, padx=5, pady=5)
         Label(fr_m, text="Relay config").grid(row=2, column=1, padx=5, pady=5)
         my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        if self.cc.relay is not None:
+        if self.relay_status:
             self.canvas1.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
             return True
         else:

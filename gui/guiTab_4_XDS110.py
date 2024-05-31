@@ -13,8 +13,8 @@ from tkinter import ttk
 import threading
 
 # import user defined modules
-from common import xds110_api as xds110
-from common.xds110_api import base_project_path, gmake_cmd
+from EEequipment.xds110 import xds110_api as xds110
+from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
 from gui import gui_helper as guih
 from gui import gui_class as guic

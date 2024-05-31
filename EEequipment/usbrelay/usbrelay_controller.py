@@ -91,17 +91,23 @@ class USBRelayController(object):
     def __init__(self, device, timeout=5000):
         self.device = device
         self.timeout = timeout
-        self.product = usb.util.get_string(device, device.iProduct)
-        self.num_relays = int(self.product[8:])
 
-        self._update_status()
+        if self.device is not None:
+            self.product = usb.util.get_string(device, device.iProduct)
+            self.num_relays = int(self.product[8:])
+            self._update_status()
+            self.status = True
+        else:
+            self.product = None
+            self.num_relays = None
+            self.status = False
 
         self.aliases = {}
         self.defaults = {}
         self.relay_mapping = {}
 
         # set relay mapping / configuration
-        config_file_path = "/home/anders/Documents/GitHub/wwd_gui_api/EEequipment/usbrelay/config.ini"
+        config_file_path = "EEequipment/usbrelay/config.ini"
         if os.path.exists(config_file_path):
             self.read_relay_config(config_file_path)
             self.print_relay_mappings()

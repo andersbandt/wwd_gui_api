@@ -5,7 +5,6 @@ class XDM1041Mode(Enum):
     """
     Enum class to set the states of the meter and to associate __str__ with the command codes
     """
-
     MODE_VOLTAGE_DC = 2
     MODE_VOLTAGE_AC = 3
     MODE_CURRENT_DC = 4
@@ -86,8 +85,13 @@ class XDM1041Cmd(Enum):
     GET_CALC_MIN = 53
     GET_CALC_MAX = 54
 
-    def __str__(self):
+    FUNC_1 = 55
+    FUNC_2 = 56
 
+    RANGE = 57
+
+
+    def __str__(self):
         if self.value == XDM1041Cmd.IDN.value:
             return "*IDN?\n"
 
@@ -150,3 +154,12 @@ class XDM1041Cmd(Enum):
 
         elif self.value == XDM1041Cmd.SET_CALC_FUNC_AVG.value:
             return "CALC:FUNC AVER\n"
+
+        elif self.value == XDM1041Cmd.FUNC_1.value:
+            return "FUNC1?"
+
+        elif self.value == XDM1041Cmd.FUNC_2.value:
+            return "FUNC2?"
+
+        elif self.value == XDM1041Cmd.RANGE.value:
+            return "RANGE?"

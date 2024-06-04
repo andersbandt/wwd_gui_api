@@ -7,12 +7,10 @@
 
 # import needed GUI packages
 import tkinter as tk
-from tkinter import *
-from tkinter import ttk
 import tkinter.scrolledtext as tkst
 import tkinter.filedialog as tkfd
 import tkinter.messagebox as tkmb
-import tkinter.font as tkFont
+import tkinter.font as tkFont # TODO: let's figure out how to use this
 
 # import needed packages
 from collections import namedtuple
@@ -20,15 +18,12 @@ import threading
 import time
 from time import localtime, strftime, perf_counter_ns
 import math
+from datetime import datetime
 
 
 # import user defined modules
 from data.csv_helper import CSVHelper
-# from EEequipment.xdm1041.xdm1041defs import XDM1041Mode, XDM1041Cmd
-# from EEequipment.xdm1041.xdm1041main import XDM1041
-
-from EEequipment import xdm1041
-
+from EEequipment.xdm1041 import *
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -43,12 +38,14 @@ class tabDMM:
         self.fr_rec = tk.Frame(self.frame, bg="#00bcd4")
         self.fr_rec.grid(row=5, column=0, pady=10, padx=10)
 
-        self.dmm = None
-        self.record_speed = 1
+        # set up serial / DMM variables
         self.ser_status = False
 
         # set up recording information
-        self.recording = False
+        self.record_speed = 1
+        self.record_status = False
+        self.recCnt = 0
+        self.recName = ''
         self.data_dir = "data/dmm_data/"
         self.csvh = None
 
@@ -102,19 +99,6 @@ class tabDMM:
         self.labelId.grid(row=0, column=1, sticky='E')
         self.idframe.grid(row=1, column=0, columnspan=2)
 
-        # row 3: rec status monitor split into 2 columns
-        #
-        #        (8)           (40)                         = 48
-        #         0              1
-        #   0   #recs         <filename>
-        self.recmon = tk.Frame(self.frame)
-        self.RecName = ''
-        self.labelRNums = tk.Label(self.recmon, text='', width=8, relief='sunken')
-        self.labelRecFn = tk.Label(self.recmon, text='{:24s}'.format(self.RecName), width=40, relief='sunken')
-        self.labelRNums.grid(row=0, column=0, sticky='W')
-        self.labelRecFn.grid(row=0, column=1, sticky='E')
-        self.recmon.grid(row=2, column=0, columnspan=2)
-
         # row 4: labels split into 5 columns
         #   (10)     (9)     10)    (9)     (10)    = 48
         #     0       1       3      4       5
@@ -161,11 +145,17 @@ class tabDMM:
 
     def init_fr_rec(self):
         fr_m = self.fr_rec
+
+        self.labelRNums = tk.Label(fr_m, text='', width=8, relief='sunken')
+        self.labelRecFn = tk.Label(fr_m, text='{:24s}'.format(self.recName), width=40, relief='sunken')
+        self.labelRNums.grid(row=0, column=0, padx=10, pady=10, sticky='W')
+        self.labelRecFn.grid(row=0, column=1, sticky='E')
+
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
         self.btn_record = tk.Button(fr_m, text='RECORD THIS', bd=5, command=self.record_DMM, width=12)
-        self.optRecSpd.grid(row=0, column=0, sticky='W')
-        self.btn_record.grid(row=0, column=3, sticky='W')
+        self.optRecSpd.grid(row=1, column=0, padx=3, sticky='W')
+        self.btn_record.grid(row=1, column=3, pady=5, padx=3, sticky='W')
 
     def init_fr_PT100(self):
             #        (8)      (10)   (10)   (10)   (10)        = 48
@@ -190,65 +180,14 @@ class tabDMM:
 
 
     ##############################################################################
-    ####      ACTION FUNCTIONS        ############################################
+    ####      PT100 FUNCTIONS        ############################################
     ##############################################################################
-
-    def GetResponse(self, Cmd, Numeric=False):
-        """
-            sends a command (that will trigger a response) and returns
-            that response
-
-            Because of bugs in the XDM1041, it may sometimes timeout and
-            sometimes return multiple responses. For timeouts, a "?" is
-            returned. Multiple responses are discarded.
-
-            It also translates some of the weird characters send by the
-            XDM1041 for non-ASCII chars
-        """
-        Successful = False
-        n = 0
-        while not Successful:
-            s = self.dmm.send_cmd(Cmd)
-            print(f"Anders your response says {s}")
-
-            if s != '':
-                if Numeric:
-                    try:
-                        v = float(s)
-                        Successful = True
-                        Res = v
-                    except ValueError:
-                        Successful = True
-                        Res = 0
-                else:
-                    Successful = True
-                    if s.endswith('\\xa6\\xb8'):
-                        s = s[:-8] + 'Ohm'
-                    elif s.endswith('\\xa6\\xccF'):
-                        s = s[:-9] + 'uF'
-                    elif s.endswith('"'):
-                        s = s.strip('"')
-                    Res = s
-            else:
-                # print('nothing'+str(n))
-                sleep(0.1)
-                n = n + 1
-                if n > 5:
-                    if Numeric:
-                        Res = 0
-                    else:
-                        Res = '?'
-                    break
-        # print(Cmd+str(Res))
-        return Res
-
 
     def DoPT100Unit(self, event=None):
         """
             changes the unit for PT100
         """
         self.PT100_Unit = self.PT100UnitVal.get()
-
 
     def DoPT100(self, event=None):
         """
@@ -264,68 +203,8 @@ class tabDMM:
         else:
             tkmb.showinfo('info', 'switch to 500 Ohm RES mode with REL to compensate for wire res.')
 
-
-    ##############################################################################
-    ####      RECORDING FUNCTIONS        #########################################
-    ##############################################################################
-
-    # starts the DMM recording
-    def record_DMM(self):
-
-        # conditionally STOP / START the recording
-        if not self.recording:
-            if self.ser_status:
-                self.change_record_speed()
-                self.prompt.print(f"Starting DMM record every {self.record_speed} seconds ...")
-                self.csvh = CSVHelper(self.data_dir + 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv')
-                self.csvh.initialize_file(["Time", "Range", "Func1", "Meas1"])
-                # self.PollCount = 0
-                # self.RecNums = 0
-
-                self.labelRecFn.config(text='{:24s}'.format(self.RecName))
-                # self.labelRNums.config(text='#{:7n}'.format(XXXXXX))
-                self.recording = True
-
-                # start the thread
-                threading.Thread(target=lambda: self.thread_record_dmm()).start()
-            else:
-                guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
-                # tkmb.showerror("rec error", "can't create " + self.RecName) # TODO: compare this error method to my alert method
-        else:
-            self.prompt.print("Stopped DMM record !")
-            self.labelRNums.config(text='')
-            self.btn_record.config(relief='raised')
-            self.recording = False
-
-        # successful exit of record function
-        return True
-
-
-    # changes the recording speed
-    def change_record_speed(self):
-        try:
-            self.record_speed = self.parse_time_to_seconds(self.RecSpdVal.get())
-        except Exception as e:
-            raise(e)
-
-
-    # polls the meter every 1 second. The time is adjusted to maintain accuracy
-    def PollMiniBM(self, event=None):
-
-        def WriteRec(n, m2):
-            """
-                write a record to the recording file
-            """
-            self.f.write('{:5n},{:10s},{:10s},{:10s},{:10s},{:10s}\n'.format(
-                n,
-                self.Auto + ':' + self.Range,
-                self.Fu1,
-                str(self.Meas1),
-                self.Fu2,
-                m2))
-            self.RecNums += 1
-
-        def PT100(ohm, vnull=0.0):
+    def update_PT100(self):
+        def PT100_temp_convert(self, ohm, vnull=0.0):
             """
                 convert a resistance reading of a standard PT100 probe to
                 a temperature in celsius. The resistance must be >=100 Ohm
@@ -337,99 +216,70 @@ class tabDMM:
             R0 = 100.0
             return (-A + math.sqrt(A * A - 4 * B * (1 - (ohm - vnull) / R0))) / (2 * B)
 
-        if self.dmm != None:
-            self.PollCount += 1
-            self.labeltime.config(text='{:8n}'.format(self.PollCount))
-            err = False
-            try:
-                self.Meas1 = self.GetResponse('MEAS1?', Numeric=True)
-                self.Auto = 'A' if self.GetResponse('AUTO?') == '1' else 'M'
-                self.Fu1 = self.GetResponse('FUNC1?')
-                if (self.Fu1.upper() == 'DIOD' or self.Fu1.upper() == 'CONT'):
-                    self.Range = ''
-                else:
-                    self.Range = self.GetResponse('RANGE?')
+        if self.PT100_On:
+            if self.Range.upper() == '500 OHM':
+                if (self.Meas1 >= 100) and (self.Meas1 < 550):
+                    self.Fu2 = 'PT100'
+                    self.Meas2 = PT100_temp_convert(self.Meas1)
+                    if self.PT100_Unit == 'F':
+                        self.Meas2 = 32 + self.Meas2 * (9 / 5)
+                    elif self.PT100_Unit == 'K':
+                        self.Meas2 = 273.15 + self.Meas2
 
-                if self.Fu1.upper().endswith('AC'):
-                    self.Fu2 = self.GetResponse('FUNC2?')
-                    if self.Fu2.upper() == 'NONE':
-                        self.Fu2 = ''
-                    else:
-                        self.Meas2 = self.GetResponse('MEAS2?', Numeric=True)
-                        #
-                        # bug fix: the XDM1041 scales the frequency wrongly
-                        #
-                        if self.Range.endswith('mV'):
-                            self.Meas2 = self.Meas2 * 1000
-                        elif self.Range.endswith('uA'):
-                            self.Meas2 = self.Meas2 * 1000000
-                        elif self.Range.endswith('mA'):
-                            self.Meas2 = self.Meas2 * 1000
                 else:
-                    self.Fu2 = ''
-                    self.Meas2 = 0
-
-                if self.Fu1Old.upper() == 'RES' and self.Fu1.upper() != 'RES':
+                    tkmb.showinfo('info', 'resistance out of range for PT100')
                     self.PT100_On = False
                     self.buttonPT100.config(relief='raised')
 
-                self.Fu1Old = self.Fu1
-
-            except:
-                err = True
-                raise
-            if err:
-                tkmb.showerror("comms error", "lost connection ")
-                self.frame.quit()
             else:
-                if self.PT100_On:
-                    if self.Range.upper() == '500 OHM':
-                        if (self.Meas1 >= 100) and (self.Meas1 < 550):
-                            self.Fu2 = 'PT100'
-                            self.Meas2 = PT100(self.Meas1)
-                            if self.PT100_Unit == 'F':
-                                self.Meas2 = 32 + self.Meas2 * (9 / 5)
-                            elif self.PT100_Unit == 'K':
-                                self.Meas2 = 273.15 + self.Meas2
-
-                        else:
-                            tkmb.showinfo('info', 'resistance out of range for PT100')
-                            self.PT100_On = False
-                            self.buttonPT100.config(relief='raised')
-
-                    else:
-                        tkmb.showinfo('info', 'must be in 500 Ohm range to use PT100')
-                        self.PT100_On = False
-                        self.buttonPT100.config(relief='raised')
-
-                self.valueRange.config(text='{:8s}'.format(self.Auto + ':' + self.Range))
-                self.valueFu1.config(text='{:8s}'.format(self.Fu1))
-                self.valueMeas1.config(text=self.PrettyFloat(self.Meas1))
-                self.valueFu2.config(text='{:8s}'.format(self.Fu2))
-                m2 = ''
-                if self.Fu2 != '':
-                    m2 = self.PrettyFloat(self.Meas2)
-                self.valueFu2.config(text='{:8s}'.format(self.Fu2))
-                self.valueMeas2.config(text=m2)
-
-                if self.RecName != '':
-                    if self.ARec_On:
-                        if self.PollCount % self.RecSpd == 0:
-                            WriteRec(self.PollCount, m2)
-                    elif self.MRec_On:
-                        if self.Man_On:
-                            WriteRec(self.RecNums + 1, m2)
-                            self.Man_On = False
-                            self.buttonMan.config(relief='raised')
-
-                    self.labelRNums.config(text='{:8n}'.format(self.RecNums))
-
-        elapsed = (perf_counter_ns() - self.ProgStart) // 1000000  # time in ms since start
-        # time2sleep = 1000 - (elapsed % 1000)
-        time2sleep = 5*1000
-        self.frame.after(time2sleep, self.PollMiniBM)
+                tkmb.showinfo('info', 'must be in 500 Ohm range to use PT100')
+                self.PT100_On = False
+                self.buttonPT100.config(relief='raised')
 
 
+    ##############################################################################
+    ####      RECORDING FUNCTIONS        #########################################
+    ##############################################################################
+
+    # starts the DMM recording
+    def record_DMM(self):
+        # conditionally STOP / START the recording
+        if not self.record_status:
+            if self.ser_status:
+                # START RECORDING
+                self.change_record_speed()
+                self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
+                self.prompt.print(f"Starting DMM record every {self.record_speed} seconds ...")
+                self.csvh = CSVHelper(self.data_dir + self.recName)
+                self.csvh.initialize_file(["Time", "Range", "Func1", "Meas1"])
+                self.btn_record.config(relief='sunken')
+                self.labelRecFn.config(text='{:24s}'.format(self.recName))
+                self.recCnt = 0
+                self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
+                self.record_status = True
+
+                # start the thread
+                threading.Thread(target=lambda: self.thread_record_dmm()).start()
+            else:
+                guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
+        else:
+            # STOP RECORDING
+            self.prompt.print("Stopped DMM record !")
+            self.labelRNums.config(text='')
+            self.btn_record.config(relief='raised')
+            self.record_status = False
+
+        # successful exit of record function
+        return True
+
+
+
+    def change_record_speed(self):
+        # changes the recording speed
+        try:
+            self.record_speed = self.parse_time_to_seconds(self.RecSpdVal.get())
+        except Exception as e:
+            raise e
 
     #################################
     #### THREADS SHIT    ############
@@ -437,12 +287,35 @@ class tabDMM:
 
     def thread_record_dmm(self):
         print("Starting DMM record!")
-        while self.recording:
+        while self.record_status and self.ser_status:
             print("Taking DMM measurement ...")
-            val = self.cc.dmm.read_val1_str()
-            self.csvh.add_row("xxx_time", "xxx_range", "xxx_func", xdm1041)
+            val_str = self.cc.dmm.read_val1_str()
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            self.csvh.add_row([timestamp, "xxx_range", "xxx_func", xdm1041helper.parse_voltage_str(val_str)])
+            self.recCnt += 1
             time.sleep(self.record_speed)
 
+        # if serial disconnect caused termination, call the start/stop record function
+        if self.record_status:
+            self.record_DMM()
+
+        print("DMM record thread exiting.")
+
+
+    # TODO: this function doesn't work. None of the values are getting updated
+    def gui_refresh(self):
+        self.valueRange.config(text='{:8s}'.format(self.Auto + ':' + self.Range))
+        self.valueFu1.config(text='{:8s}'.format(self.Fu1))
+        self.valueMeas1.config(text=self.PrettyFloat(self.Meas1))
+        self.valueFu2.config(text='{:8s}'.format(self.Fu2))
+        self.valueFu2.config(text='{:8s}'.format(self.Fu2))
+        self.valueMeas2.config(text=None)
+
+
+# TODO: an alternative method to threads. Could possibly be better for GUI updates? Check performance somehow
+# elapsed = (perf_counter_ns() - self.ProgStart) // 1000000  # time in ms since start
+# time2sleep = 1000 - (elapsed % 1000)
+# self.frame.after(time2sleep, self.PollMiniBM)
 
     #################################
     #### SERIAL (COM)  ##############
@@ -471,12 +344,12 @@ class tabDMM:
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
 
-
     def serial_close(self):
         self.prompt.print(f"Serial close!")
         self.dmm.disconnect()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
+
 
     #################################
     #### HELPER        ##############

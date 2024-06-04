@@ -7,6 +7,5 @@
   </component>
   <component name="PackageRequirementsSettings">
     <option name="versionSpecifier" value="Don't specify version" />
-    <option name="removeUnused" value="true" />
   </component>
 </module>

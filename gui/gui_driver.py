@@ -87,7 +87,7 @@ def main():
     window = tk.Tk()
 
     window.title("WWD GUI API")
-    window.geometry('1350x950')
+    window.geometry('1280x900')
 
     sv_ttk.set_theme("dark")
 

@@ -1,6 +1,5 @@
 
 
-
 # import modules
 import logging
 import serial
@@ -52,7 +51,7 @@ class XDM1041:
             stopbits=serial.STOPBITS_ONE,
             timeout=0.5,
             xonxoff=False,
-            writeTimeout=0.5
+            write_timeout=0.5
         )
 
         self.logger.info("Serial port status:{}".format(self.serial.is_open))
@@ -67,6 +66,11 @@ class XDM1041:
     def disconnect(self):
         if self.serial and self.serial.is_open:
             self.serial.close()
+
+    def get_range(self):
+        cmd = str(XDM1041Cmd.RANGE)
+        self.send_cmd(cmd)
+        return self.read_result()
 
     def set_range(self, rng: int) -> bool:
 
@@ -96,18 +100,15 @@ class XDM1041:
         print(f"\tsetting DMM range with cmd: {cmd}")
         self.send_cmd(cmd)
 
-        
     def set_range_auto(self):
         cmd = str(XDM1041Cmd.SET_AUTO_MODE)
         self.send_cmd(cmd)
-
 
     def get_range_auto(self):
         cmd = str(XDM1041Cmd.GET_AUTO_MODE)
         self.send_cmd(cmd)
         return self.read_result()
-        
-        
+
     def test_conn(self):
         cmd = str(XDM1041Cmd.IDN)
         self.send_cmd(cmd)
@@ -172,6 +173,16 @@ class XDM1041:
     def set_mode(self, mode: XDM1041Mode):
         cmd = str(mode)
         self.send_cmd(cmd)
+
+    def get_func1(self):
+        cmd = str(XDM1041Cmd.FUNC_1)
+        self.send_cmd(cmd)
+        return self.read_result()
+
+    def get_func2(self):
+        cmd = str(XDM1041Cmd.FUNC_2)
+        self.send_cmd(cmd)
+        return self.read_result()
 
     def set_sample_speed_slow(self):
         cmd = str(XDM1041Cmd.RATE_S)

@@ -6,8 +6,12 @@ numpy
 scipy
 fpdf
 usb
+future
+setuptools
+PyVISA
 
 
 #added by anders
 sv_ttk
 tkinter
+

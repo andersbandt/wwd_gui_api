@@ -63,6 +63,90 @@ def df_float(df, column):
     return df
 
 
+# TODO: this function is dogshit. Needs usage evaluated or a ChatGPT improvement. And to get out of here
+def PrettyFloat(self, v):
+    """
+        A crude but functional formatter that shows floating
+        points in engineering format
+
+        Input                result
+                             1234567890
+
+       +1234567800        to +1.23456E9
+        +123456780        to +123.456E6
+        +12345678         to +12.3456E6
+        +1234567.8        to +1.23456E6
+        +123456.78        to +123.456E3
+        +12345.678        to +12.3456E3
+        +1234.5678        to +1.23456E3
+        +123.45678        to   +123.456
+        +12.345678        to   +12.3456
+        +1.2345678        to   +1.23456
+        +0.12345678       to +123.45E-3
+        +0.012345678      to +12.345E-3
+        +0.0012345678     to +1.2345E-3
+        +0.00012345678    to +123.45E-6
+        +0.000012345678   to +12.345E-6
+        +0.0000012345678  to +1.2345E-6
+        +0.00000012345678 to +123.45E-9
+        +0.00000001234567 to +12.345E-9
+        +0.00000000123456 to +1.2345E-9
+
+    """
+    av = abs(v)
+    if av < 1:
+        v = v * 1000
+        if av >= 1E-1:
+            vs = '{:+7.2f}E-3'.format(v)
+        elif av >= 1E-2:
+            vs = '{:+7.3f}E-3'.format(v)
+        elif av >= 1E-3:
+            vs = '{:+7.4f}E-3'.format(v)
+        else:
+            v = v * 1000
+            if av >= 1E-4:
+                vs = '{:+7.2f}E-6'.format(v)
+            elif av >= 1E-5:
+                vs = '{:+7.3f}E-6'.format(v)
+            elif av >= 1E-6:
+                vs = '{:+7.4f}E-6'.format(v)
+            else:
+                v = v * 1000
+                if av >= 1E-7:
+                    vs = '{:+7.2f}E-9'.format(v)
+                elif av >= 1E-8:
+                    vs = '{:+7.3f}E-9'.format(v)
+                else:
+                    vs = '{:+7.4f}E-9'.format(v)
+    else:
+        if av < 1E1:
+            vs = ' {:+8.4f}'.format(v)
+        elif av < 1E2:
+            vs = ' {:+8.3f}'.format(v)
+        elif av < 1E3:
+            vs = ' {:+8.2f}'.format(v)
+        else:
+            v = v / 1000
+            if av < 1E4:
+                vs = '{:+8.5f}E3'.format(v)
+            elif av < 1E5:
+                vs = '{:+8.4f}E3'.format(v)
+            elif av < 1E6:
+                vs = '{:+8.3f}E3'.format(v)
+            else:
+                v = v / 1000
+                if av < 1E7:
+                    vs = '{:+8.5f}E6'.format(v)
+                elif av < 1E8:
+                    vs = '{:+8.4f}E6'.format(v)
+                elif av < 1E9:
+                    vs = '{:+8.3f}E6'.format(v)
+                else:
+                    v = v / 1000
+                    vs = '{:+8.5f}E9'.format(v)
+    return vs
+
+
 ##############################################################
 ################   DATA and .csv FUNCS   #####################
 ##############################################################
@@ -111,8 +195,6 @@ def load_csv_numpy(file_path):
     # data = np.genfromtxt(file_path, delimiter=',', dtype=None, names=True, encoding=None)
     data = np.genfromtxt(file_path, delimiter=',', dtype=None, encoding=None, skip_header=2)
     return data
-
-
 
 
 def load_dataset():

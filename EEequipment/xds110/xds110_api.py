@@ -24,8 +24,7 @@ if os_name != "Windows" and os_name != "Linux":
 
 
 # initialize the config parser
-# set relay mapping / configuration
-config_file_path = "C:/Users/ander/Documents/GitHub/wwd_gui_api/EEequipment/xds110/config.ini"
+config_file_path = "EEequipment/xds110/config.ini"
 if os.path.exists(config_file_path):
     config = configparser.ConfigParser()
     config.read(config_file_path)

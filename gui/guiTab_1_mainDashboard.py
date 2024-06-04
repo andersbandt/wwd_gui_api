@@ -67,19 +67,20 @@ class tabMainDashboard:
 
 
     def init_fr_relay_control(self):
-        if self.cc.relay is not None:
-            fr_m = self.fr_relay_control
+        fr_m = self.fr_relay_control
 
-            # add button for GUI refresh of relay states
-            btn2 = Button(fr_m, text=f"Refresh states", command=lambda: self.gui_refresh_relay_state())
-            btn2.grid(row=0, column=1, padx=10, pady=10)
+        # add button for GUI refresh of relay states
+        btn2 = Button(fr_m, text=f"Refresh states", command=lambda: self.gui_refresh_relay_state())
+        btn2.grid(row=0, column=1, padx=10, pady=10)
 
-            # Create and place individual relay control buttons
-            for i in range(8):
-                name = self.cc.relay.get_relay_mapping(i+1)
-                btn = tk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i+1))
-                btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)
-                self.relay_btns.append(btn)
+        # Create and place individual relay control buttons
+        for i in range(8):
+            name = self.cc.relay.get_relay_mapping(i+1)
+            btn = tk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i+1))
+            btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)
+            self.relay_btns.append(btn)
+
+        self.gui_refresh_relay_state()
 
 
     def toggle_relay(self, relay_num):
@@ -89,14 +90,17 @@ class tabMainDashboard:
 
 
     def gui_refresh_relay_state(self):
-        for i, btn in enumerate(self.relay_btns):
-            if self.cc.relay.get_state_state(i+1):
-                print(f"Configuring button {i} with state ON")
-                # btn.config(style="TButtonOn.TButton")
-                btn.config(bg="green")
-            else:
-                print(f"Configuring button {i} with state OFF")
-                # btn.config(style="TButtonOff.TButton")
-                btn.config(bg="red")
-        print("DONE refresh of relay state")
+        if self.relay_status:
+            for i, btn in enumerate(self.relay_btns):
+                if self.cc.relay.get_state_state(i+1):
+                    print(f"Configuring button {i} with state ON")
+                    # btn.config(style="TButtonOn.TButton")
+                    btn.config(bg="green")
+                else:
+                    print(f"Configuring button {i} with state OFF")
+                    # btn.config(style="TButtonOff.TButton")
+                    btn.config(bg="red")
+            print("DONE refresh of relay state")
+        else:
+            print("Can't refresh relay state with inactive relay!!!")
 

@@ -59,7 +59,6 @@ class SPD3303X:
         Generic call to send command with error checking
         '''
         self.inst.write(cmd)
-        # Check for an error in regards to that command
         self.check_error()
 
     def save(self, file_num):

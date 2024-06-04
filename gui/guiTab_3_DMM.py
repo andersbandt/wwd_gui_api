@@ -16,14 +16,19 @@ import tkinter.font as tkFont
 
 # import needed packages
 from collections import namedtuple
-from time import sleep, localtime, strftime, perf_counter_ns
+import threading
+import time
+from time import localtime, strftime, perf_counter_ns
 import math
 
 
 # import user defined modules
-from EEequipment import SCPI
-from EEequipment.xdm1041.xdm1041defs import XDM1041Mode, XDM1041Cmd
-from EEequipment.xdm1041.xdm1041main import XDM1041
+from data.csv_helper import CSVHelper
+# from EEequipment.xdm1041.xdm1041defs import XDM1041Mode, XDM1041Cmd
+# from EEequipment.xdm1041.xdm1041main import XDM1041
+
+from EEequipment import xdm1041
+
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -32,15 +37,20 @@ class tabDMM:
     def __init__(self, master, class_controller, basefilepath):
         self.master = master
         self.cc = class_controller
+        self.basefilepath = basefilepath
         self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
-        self.basefilepath = basefilepath
+        self.fr_rec = tk.Frame(self.frame, bg="#00bcd4")
+        self.fr_rec.grid(row=5, column=0, pady=10, padx=10)
 
-
-        self.MiniBM = None # I think this is the DMM object?
         self.dmm = None
         self.record_speed = 1
         self.ser_status = False
+
+        # set up recording information
+        self.recording = False
+        self.data_dir = "data/dmm_data/"
+        self.csvh = None
 
         # set up prompt
         self.fr_prompt = tk.Frame(self.frame, bg="gray")
@@ -70,8 +80,7 @@ class tabDMM:
         # self.entryPort.focus_set()
         self.PollCount = 0
         self.ProgStart = perf_counter_ns()
-        self.PollMiniBM()
-
+        # self.PollMiniBM()
 
     def init_fr_port(self):
         self.fr_port = guic.SerialConnFrame(self.frame,
@@ -80,7 +89,6 @@ class tabDMM:
                                             bg="#00bcd4")
         self.fr_port.initialize_fr()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
-
 
     def init_fr_info(self):
         # row 1: id split into 2 columns
@@ -151,24 +159,15 @@ class tabDMM:
         self.Meas2 = 0
         self.Auto = ''
 
-
     def init_fr_rec(self):
-        self.recframe = tk.Frame(self.frame, bg="gray")
-        self.recframe.grid(row=5, column=0, columnspan=4, pady=10, padx=10)
-
+        fr_m = self.fr_rec
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h']
-        self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(self.recframe, options)
-
-        self.btn_record = tk.Button(self.recframe, text='RECORD THIS', bd=5, command=self.record_DMM, width=12)
-
+        self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
+        self.btn_record = tk.Button(fr_m, text='RECORD THIS', bd=5, command=self.record_DMM, width=12)
         self.optRecSpd.grid(row=0, column=0, sticky='W')
         self.btn_record.grid(row=0, column=3, sticky='W')
 
-
-
     def init_fr_PT100(self):
-            # row 6 options
-            #
             #        (8)      (10)   (10)   (10)   (10)        = 48
             #         0        1      2      3       4
             #   0   PT100Unit PT100
@@ -190,8 +189,6 @@ class tabDMM:
             self.PT100_Unit = self.PT100UnitList[0]
 
 
-
-
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
@@ -211,7 +208,9 @@ class tabDMM:
         Successful = False
         n = 0
         while not Successful:
-            s = self.MiniBM.sendcmd(Cmd)
+            s = self.dmm.send_cmd(Cmd)
+            print(f"Anders your response says {s}")
+
             if s != '':
                 if Numeric:
                     try:
@@ -244,99 +243,6 @@ class tabDMM:
         return Res
 
 
-# TODO: this function is dogshit. Needs usage evaluated or a ChatGPT improvement. And to get out of here
-    def PrettyFloat(self, v):
-        """
-            A crude but functional formatter that shows floating
-            points in engineering format
-
-            Input                result
-                                 1234567890
-
-           +1234567800        to +1.23456E9
-            +123456780        to +123.456E6
-            +12345678         to +12.3456E6
-            +1234567.8        to +1.23456E6
-            +123456.78        to +123.456E3
-            +12345.678        to +12.3456E3
-            +1234.5678        to +1.23456E3
-            +123.45678        to   +123.456
-            +12.345678        to   +12.3456
-            +1.2345678        to   +1.23456
-            +0.12345678       to +123.45E-3
-            +0.012345678      to +12.345E-3
-            +0.0012345678     to +1.2345E-3
-            +0.00012345678    to +123.45E-6
-            +0.000012345678   to +12.345E-6
-            +0.0000012345678  to +1.2345E-6
-            +0.00000012345678 to +123.45E-9
-            +0.00000001234567 to +12.345E-9
-            +0.00000000123456 to +1.2345E-9
-
-        """
-        av = abs(v)
-        if av < 1:
-            v = v * 1000
-            if av >= 1E-1:
-                vs = '{:+7.2f}E-3'.format(v)
-            elif av >= 1E-2:
-                vs = '{:+7.3f}E-3'.format(v)
-            elif av >= 1E-3:
-                vs = '{:+7.4f}E-3'.format(v)
-            else:
-                v = v * 1000
-                if av >= 1E-4:
-                    vs = '{:+7.2f}E-6'.format(v)
-                elif av >= 1E-5:
-                    vs = '{:+7.3f}E-6'.format(v)
-                elif av >= 1E-6:
-                    vs = '{:+7.4f}E-6'.format(v)
-                else:
-                    v = v * 1000
-                    if av >= 1E-7:
-                        vs = '{:+7.2f}E-9'.format(v)
-                    elif av >= 1E-8:
-                        vs = '{:+7.3f}E-9'.format(v)
-                    else:
-                        vs = '{:+7.4f}E-9'.format(v)
-        else:
-            if av < 1E1:
-                vs = ' {:+8.4f}'.format(v)
-            elif av < 1E2:
-                vs = ' {:+8.3f}'.format(v)
-            elif av < 1E3:
-                vs = ' {:+8.2f}'.format(v)
-            else:
-                v = v / 1000
-                if av < 1E4:
-                    vs = '{:+8.5f}E3'.format(v)
-                elif av < 1E5:
-                    vs = '{:+8.4f}E3'.format(v)
-                elif av < 1E6:
-                    vs = '{:+8.3f}E3'.format(v)
-                else:
-                    v = v / 1000
-                    if av < 1E7:
-                        vs = '{:+8.5f}E6'.format(v)
-                    elif av < 1E8:
-                        vs = '{:+8.4f}E6'.format(v)
-                    elif av < 1E9:
-                        vs = '{:+8.3f}E6'.format(v)
-                    else:
-                        v = v / 1000
-                        vs = '{:+8.5f}E9'.format(v)
-        return vs
-
-
-    def DoRecSpd(self, event=None):
-        """
-            changes the recording speed
-        """
-        RecSpdSec = (1, 2, 5, 10, 30, 60, 300, 600, 1800, 3600)
-        idx = self.RecSpdList.index(self.RecSpdVal.get())
-        self.record_speed = RecSpdSec[idx]
-
-
     def DoPT100Unit(self, event=None):
         """
             changes the unit for PT100
@@ -359,53 +265,52 @@ class tabDMM:
             tkmb.showinfo('info', 'switch to 500 Ohm RES mode with REL to compensate for wire res.')
 
 
+    ##############################################################################
+    ####      RECORDING FUNCTIONS        #########################################
+    ##############################################################################
+
+    # starts the DMM recording
     def record_DMM(self):
-        """
-            starts or stops the recording and shows the
-            recording filename while recording is on.
-        """
-        self.prompt.print("Starting DMM record ...")
 
-        def StartNewFile():
-            self.RecName = 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
+        # conditionally STOP / START the recording
+        if not self.recording:
+            if self.ser_status:
+                self.change_record_speed()
+                self.prompt.print(f"Starting DMM record every {self.record_speed} seconds ...")
+                self.csvh = CSVHelper(self.data_dir + 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv')
+                self.csvh.initialize_file(["Time", "Range", "Func1", "Meas1"])
+                # self.PollCount = 0
+                # self.RecNums = 0
 
-            try:
-                self.f = open(self.RecName, 'w')
-                self.f.write('Time[S],')
-                self.f.write('Range,Func1,Meas1,Func2,Meas2\n')
-                self.PollCount = 0
-                self.RecNums = 0
-                self.labelRNums.config(text='#{:7n}'.format(self.RecNums))
-            except:
-                tkmb.showerror("rec error", "can't create " + self.RecName)
-                self.RecName = ''
-                self.labelRNums.config(text='')
-                self.buttonMRec.config(relief='raised')
-                self.buttonARec.config(relief='raised')
-                self.ARec_On = False
-            return
+                self.labelRecFn.config(text='{:24s}'.format(self.RecName))
+                # self.labelRNums.config(text='#{:7n}'.format(XXXXXX))
+                self.recording = True
 
-        if self.ser_status:
-            if self.RecName == '':
-                StartNewFile()
+                # start the thread
+                threading.Thread(target=lambda: self.thread_record_dmm()).start()
             else:
-                if self.ARec_On:
-                    self.f.close()
-                    StartNewFile()
-                else:
-                    self.f.close()
-                    self.RecName = ''
-                    self.labelRNums.config(text='')
-            self.labelRecFn.config(text='{:24s}'.format(self.RecName))
+                guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
+                # tkmb.showerror("rec error", "can't create " + self.RecName) # TODO: compare this error method to my alert method
         else:
-            guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
-            self.prompt.print("Error starting DMM record!")
+            self.prompt.print("Stopped DMM record !")
+            self.labelRNums.config(text='')
+            self.btn_record.config(relief='raised')
+            self.recording = False
+
+        # successful exit of record function
+        return True
 
 
+    # changes the recording speed
+    def change_record_speed(self):
+        try:
+            self.record_speed = self.parse_time_to_seconds(self.RecSpdVal.get())
+        except Exception as e:
+            raise(e)
+
+
+    # polls the meter every 1 second. The time is adjusted to maintain accuracy
     def PollMiniBM(self, event=None):
-        """
-            polls the meter every 1s. The time is adjusted to maintain accuracy
-        """
 
         def WriteRec(n, m2):
             """
@@ -432,12 +337,11 @@ class tabDMM:
             R0 = 100.0
             return (-A + math.sqrt(A * A - 4 * B * (1 - (ohm - vnull) / R0))) / (2 * B)
 
-        if self.MiniBM != None:
+        if self.dmm != None:
             self.PollCount += 1
             self.labeltime.config(text='{:8n}'.format(self.PollCount))
             err = False
             try:
-
                 self.Meas1 = self.GetResponse('MEAS1?', Numeric=True)
                 self.Auto = 'A' if self.GetResponse('AUTO?') == '1' else 'M'
                 self.Fu1 = self.GetResponse('FUNC1?')
@@ -526,27 +430,26 @@ class tabDMM:
         self.frame.after(time2sleep, self.PollMiniBM)
 
 
+
+    #################################
+    #### THREADS SHIT    ############
+    #################################
+
+    def thread_record_dmm(self):
+        print("Starting DMM record!")
+        while self.recording:
+            print("Taking DMM measurement ...")
+            val = self.cc.dmm.read_val1_str()
+            self.csvh.add_row("xxx_time", "xxx_range", "xxx_func", xdm1041)
+            time.sleep(self.record_speed)
+
+
     #################################
     #### SERIAL (COM)  ##############
     #################################
 
-
     def connect_serial(self, event=None):
-        """
-            given a port name, the function tries to connect.
-
-            Note that once it connects successfully. a subsequent
-            disconnect terminate the program
-
-        """
-        error_flag = 0
         port = self.fr_port.get_port()
-        # error_flag |= self.serial_init(serial_port)
-
-
-        # self.MiniBM = SCPI.SCPI(port, speed=115200, timeout=0.1)
-        # self.id = self.GetResponse('*IDN?')
-
 
         self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
         self.id = self.dmm.test_conn()
@@ -556,7 +459,7 @@ class tabDMM:
 
         # BAD ID received
         if self.id == '' or len(self.id) < 3:
-            self.MiniBM = None
+            self.dmm = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
@@ -574,3 +477,29 @@ class tabDMM:
         self.dmm.disconnect()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
+
+    #################################
+    #### HELPER        ##############
+    #################################
+
+    def parse_time_to_seconds(self, time_str):
+        """Convert a time string to seconds.
+
+        Args:
+            time_str (str): Time string to convert. Should end with 's', 'm', or 'h'.
+
+        Returns:
+            int: Time in seconds.
+        """
+        if not isinstance(time_str, str):
+            raise ValueError("Input should be a string.")
+
+        time_str = time_str.strip().lower()
+        if time_str.endswith('s'):
+            return int(time_str[:-1])
+        elif time_str.endswith('m'):
+            return int(time_str[:-1]) * 60
+        elif time_str.endswith('h'):
+            return int(time_str[:-1]) * 3600
+        else:
+            raise ValueError("Time string should end with 's', 'm', or 'h'.")

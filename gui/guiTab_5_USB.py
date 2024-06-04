@@ -12,7 +12,6 @@ from tkinter import ttk
 import threading
 import serial
 import time
-from serial.tools import list_ports
 from datetime import datetime
 
 # import user defined modules

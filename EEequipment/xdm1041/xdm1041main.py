@@ -42,7 +42,7 @@ class XDM1041:
     def __init__(self, serial_device, mode: XDM1041Mode, rng: int = 0):
 
         self.mode = mode
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__) # TODO: get this logger working!
 
         self.serial = serial.Serial(
             port=serial_device,
@@ -84,12 +84,12 @@ class XDM1041:
         """
         if self.mode not in XDM1041.range_ref_dict:
             self.logger.error("Selected mode:{} does not support range selection!".format(self.mode.name))
-            return -1
+            return False
 
         range_dict = XDM1041.range_ref_dict[self.mode]
         if rng not in range_dict.keys():
             self.logger.error("Selected range: {} is not supported!".format(rng))
-            return -1
+            return False
 
         # we made it, set the range
         cmd = str(XDM1041Cmd.SET_RANGE).format(rng)
@@ -105,8 +105,7 @@ class XDM1041:
     def get_range_auto(self):
         cmd = str(XDM1041Cmd.GET_AUTO_MODE)
         self.send_cmd(cmd)
-        result = self.read_result()
-        return result
+        return self.read_result()
         
         
     def test_conn(self):
@@ -223,7 +222,6 @@ class XDM1041:
         result = self.read_result()
         result = float(result)
         return result
-
 
     def read_voltage(self):
         self.set_mode(XDM1041Mode.MODE_VOLTAGE_DC)

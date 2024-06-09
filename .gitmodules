@@ -1,0 +1,3 @@
+[submodule "EEequipment"]
+	path = EEequipment
+	url = https://github.com/andersbandt/EEequipment

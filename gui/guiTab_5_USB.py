@@ -28,6 +28,10 @@ class tabUSB:
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
+        # serial Object
+        self.ser_obj = None
+        self.ser_status = False
+
         # print welcome text
         l1 = ttk.Label(self.frame, text="USB (COM) connection", style="BW.TLabel",
                        font=("Arial", 16))
@@ -41,7 +45,7 @@ class tabUSB:
         self.prompt2 = guic.Prompt(self.fr_prompt2, "Serial output", "black", height=30, width=100)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, None, bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, lambda: self.serial_close(), bg="#00bcd4")
         self.fr_port.initialize_fr()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
@@ -51,10 +55,6 @@ class tabUSB:
         self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
         self.test_drop = None  # fr_state
         self.output_file_name = None  # fr_state
-
-        # serial Object
-        self.ser_obj = None
-        self.ser_status = False
 
         # initialize tab content
         self.initTabContent()
@@ -159,18 +159,50 @@ class tabUSB:
         while True:
             if self.ser_obj.serStatus is False:
                 self.fr_port.set_status(False)
+                # self.tr_mc.start()
+                # self.fr_port.set_color("yellow")
 
                 # test mode
                 my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
                 self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            else:
+                self.fr_port.set_status(True)
             time.sleep(5)
 
+    # TODO: try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
+    def manage_connection(self):
+        status = True
+        while status:
+            if self.ser_obj.serStatus is False:
+                print("Attempt to reopen serial ...")
+                self.ser_obj.reopen()
+                time.sleep(3)
+
+            if self.ser_status is False:
+                status = False
+
+# TODO: for some reason I only get prints when I hit "disconnect" now
+# TODO: performance of the application is unusable after a few "connect" and "disconnect" cycles. Need to improve handling of THREADS
     def thread_print_display(self):
         print("Thread print!")
         self.prompt2.clear()
-        threading.Thread(target=lambda: self.gui_refresh()).start()
-        threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath, None, "raw")).start()
-        threading.Thread(target=lambda: self.ser_obj.get_data(printmode=False)).start()
+
+        print("Starting thread 1 (gui refresh)")
+        t1 = threading.Thread(target=self.gui_refresh, daemon=True)
+        t1.start()
+
+        print("Starting thread 3 (get_data)")
+        self.t3 = guic.StoppableThread(target=self.ser_obj.get_data, kwargs={'printmode': False})
+        self.t3.start()
+
+        print("Starting thread 2 (process_data)")
+        self.t2 = guic.StoppableThread(
+            target=self.ser_obj.process_data,
+            args=(self.basefilepath, None, "raw")
+        )
+        self.t2.start()
+
+        print("Done with thread creation! Successful exit hopefully!")
         return True
 
     #################################
@@ -196,6 +228,7 @@ class tabUSB:
         self.ser_obj.close()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
+        self.t2.stop()
 
     def start_process(self, data_subfolder, file_ext, parameters):
         self.stop_process()
@@ -210,7 +243,7 @@ class tabUSB:
 
         threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath,
                                                                   f"{formatted_datetime}_{file_ext}_{file_str_ext}",
-                                                                  "data", # data MODE {raw, timestamp, data}
+                                                                  "data",  # data MODE {raw, timestamp, data}
                                                                   parameters=parameters)
                          ).start()
 

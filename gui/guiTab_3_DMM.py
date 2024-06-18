@@ -8,9 +8,8 @@
 # import needed GUI packages
 import tkinter as tk
 import tkinter.scrolledtext as tkst
-import tkinter.filedialog as tkfd
 import tkinter.messagebox as tkmb
-import tkinter.font as tkFont # TODO: let's figure out how to use this
+import tkinter.font as tkFont  # TODO: let's figure out how to use this
 
 # import needed packages
 from collections import namedtuple
@@ -23,7 +22,8 @@ from datetime import datetime
 
 # import user defined modules
 from data.csv_helper import CSVHelper
-from EEequipment.xdm1041 import *
+from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
+from EEequipment.xdm1041 import xdm1041helper
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -246,6 +246,9 @@ class tabDMM:
         # conditionally STOP / START the recording
         if not self.record_status:
             if self.ser_status:
+                # SETUP DMM
+                self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
+
                 # START RECORDING
                 self.change_record_speed()
                 self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
@@ -271,8 +274,6 @@ class tabDMM:
 
         # successful exit of record function
         return True
-
-
 
     def change_record_speed(self):
         # changes the recording speed

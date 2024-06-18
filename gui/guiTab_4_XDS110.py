@@ -5,7 +5,6 @@
 @brief    control device through serial (COM) port
 """
 
-
 # import needed packages
 import tkinter as tk
 from tkinter import *
@@ -52,7 +51,7 @@ class tabXDS110:
         self.canvas3 = tk.Canvas(self.fr_firmware, width=50, height=50)  # fr_firmware
         self.canvas4 = tk.Canvas(self.fr_firmware, width=50, height=50)  # fr_firmware
         self.toggle_drop = None  # fr_target
-        self.lbl_target_v = None # fr_target
+        self.lbl_target_v = None  # fr_target
         self.targetConfig_drop = None  # fr_firmware
 
         self.ser_obj = None
@@ -88,13 +87,12 @@ class tabXDS110:
         self.lbl_target_v.config(text="x.xx V")
         self.lbl_target_v.grid(row=1, column=3, padx=15, pady=22)
 
-        var_usedmm = tk.IntVar()
-        tk.Checkbutton(self.fr_target,
-                       text="Use DMM",
-                       variable=var_usedmm,
-                       onvalue=1,
-                       offvalue=0,
-                       command=None).grid(row=2, column=3)
+        self.var_usedmm = tk.IntVar()
+        ttk.Checkbutton(self.fr_target,
+                        text="Use DMM",
+                        variable=self.var_usedmm,
+                        onvalue=1,
+                        offvalue=0).grid(row=2, column=3)
 
         # ROW 3
         btn_toggle_target = Button(self.fr_target, text="Toggle target",
@@ -149,36 +147,31 @@ class tabXDS110:
             return False
 
     def check_target(self):
-        target_status = True
-
         # check through dmm
-        if self.cc.dmm is not None:
-            dmm_voltage = self.cc.dmm.read_voltage()
-            print(f"DMM got this for a measurement: {dmm_voltage}")
-            self.lbl_target_v.config(text=f"{dmm_voltage} V")
-            if dmm_voltage < 1.0:
-                target_status = False
+        if self.var_usedmm.get():
+            if self.cc.dmm is not None:
+                dmm_voltage = self.cc.dmm.read_voltage()
+                print(f"DMM got this for a measurement: {dmm_voltage}")
+                self.lbl_target_v.config(text=f"{dmm_voltage} V")
 
+        my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         # update status of xds110
+
         xds110_status = self.check_xds110()
         if not xds110_status:
-            target_status = False
+            # IF NO VALID XDS110 PROBE CONNECTION
+            self.canvas2.itemconfig(my_oval, fill="yellow")  # Fill the circle with GREEN
         else:
             # get target status
             packet = xds110.get_jtag_integrity()
             self.prompt.print(packet.get_string())
 
-
-        # set status indicator
-        my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        if target_status:
             if packet.result:
                 self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
                 return True
-        else:
-            self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
-            return False
-
+            else:
+                self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                return False
 
     def toggle_target(self):
         xds110_status = self.check_xds110()
@@ -196,11 +189,11 @@ class tabXDS110:
         packet = subp.execute_Popen(
             exec_path,
             gmake_cmd,
-            ["-k", # Keep going when some targets can't be made
-             "-j", # allow N jobs at once
-             "8", # 8 jobs
+            ["-k",  # Keep going when some targets can't be made
+             "-j",  # allow N jobs at once
+             "8",  # 8 jobs
              "all",
-             "-O"]) # Synchronize output of parallel jobs by TYPE (might not be setup right)
+             "-O"])  # Synchronize output of parallel jobs by TYPE (might not be setup right)
         self.prompt.print(packet.get_string())
 
         if len(packet.stderr) < 2:
@@ -228,13 +221,15 @@ class tabXDS110:
             # enable target relay
             print("Enabling target relay")
             dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
-            self.cc.relay.set_state(dut_vdd1_channel, 1)
+
+            try:
+                self.cc.relay.set_state(dut_vdd1_channel, 1)
+            except Exception as e:
+                guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
             print(f"\t... enabled channel {dut_vdd1_channel}")
-            # self.cc.relay.close_all()
         elif flash_option == "probe_power":
             # attempt to disconnect relay
             self.cc.relay.open_all()
-
 
         # FLASH FIRMWARE
         self.canvas4.itemconfig(my_oval, fill="yellow")

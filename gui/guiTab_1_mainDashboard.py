@@ -6,6 +6,7 @@ from tkinter import ttk
 
 
 # import user defined modules
+from EEequipment.usbrelay import usbrelay_controller
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from analysis import afe_analysis
@@ -54,6 +55,10 @@ class tabMainDashboard:
         fr_m = self.fr_main_status
         self.canvas1.grid(row=1, column=2, padx=15, pady=22)
 
+        Button(
+            fr_m, text=f"Auto-connect", bg="purple", fg="black", command=self.relay_autoconnect
+        ).grid(row=0, column=1, padx=5, pady=5)
+
         # RELAY STATUS INDICATOR
         Label(fr_m, text="Relay status").grid(row=1, column=1, padx=5, pady=5)
         Label(fr_m, text="Relay config").grid(row=2, column=1, padx=5, pady=5)
@@ -70,7 +75,7 @@ class tabMainDashboard:
         fr_m = self.fr_relay_control
 
         # add button for GUI refresh of relay states
-        btn2 = Button(fr_m, text=f"Refresh states", command=lambda: self.gui_refresh_relay_state())
+        btn2 = Button(fr_m, bg="orange", text=f"Refresh states", command=lambda: self.gui_refresh_relay_state())
         btn2.grid(row=0, column=1, padx=10, pady=10)
 
         # Create and place individual relay control buttons
@@ -84,11 +89,12 @@ class tabMainDashboard:
 
 
     def toggle_relay(self, relay_num):
-        print(f"Now toggling relay {relay_num} from GUI")
+        # print(f"Now toggling relay {relay_num} from GUI")
         self.cc.relay.toggle_state(relay_num)
         self.gui_refresh_relay_state()
 
 
+    # TODO: how can I figure out how to call this each time I click into this tab ?
     def gui_refresh_relay_state(self):
         if self.relay_status:
             for i, btn in enumerate(self.relay_btns):
@@ -97,10 +103,21 @@ class tabMainDashboard:
                     # btn.config(style="TButtonOn.TButton")
                     btn.config(bg="green")
                 else:
-                    print(f"Configuring button {i} with state OFF")
+                    # print(f"Configuring button {i} with state OFF")
                     # btn.config(style="TButtonOff.TButton")
                     btn.config(bg="red")
-            print("DONE refresh of relay state")
+            # print("DONE refresh of relay state")
         else:
             print("Can't refresh relay state with inactive relay!!!")
 
+
+    def relay_autoconnect(self):
+        usb_dev = usbrelay_controller.find()
+        print(usb_dev)
+        print("Found above for USB device")
+        self.cc.set_relay(
+            usbrelay_controller.USBRelayController(usb_dev)
+        )
+        if usb_dev is not None:
+            self.relay_status = True
+            self.init_fr_main_status()

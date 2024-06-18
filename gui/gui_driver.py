@@ -25,11 +25,11 @@ from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
 
 
-
-
 class MainApplication:
     def __init__(self, window, height, width):
         self.nb = ttk.Notebook(window, height=height, width=width)
+        self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+
         self.basefilepath = os.getcwd()
 
         self.controller = ClassController()
@@ -74,6 +74,18 @@ class MainApplication:
 
         return True
 
+    def on_tab_changed(self, event):
+        selected_tab = event.widget.tab(event.widget.select(), "text")
+        print(selected_tab)
+        if selected_tab == "MAIN":
+            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1)
+            # Run your action for Tab 1 here
+        elif selected_tab == "Tab 2":
+            print("Tab 2 selected")
+            # Run your action for Tab 2 here
+        elif selected_tab == "Tab 3":
+            print("Tab 3 selected")
+            # Run your action for Tab 3 here
 
 ###########################################################
 ######################### MAIN ############################
@@ -90,7 +102,6 @@ def main():
     window.geometry('1280x900')
 
     sv_ttk.set_theme("dark")
-
 
 
     ### add window Style

@@ -9,7 +9,7 @@
 from datetime import datetime
 import serial
 import collections
-
+import time
 
 # import user created modules
 from common import SerialGeneral
@@ -20,8 +20,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
     def __init__(self, port, baudrate):
         super().__init__(port, baudrate)
         self.procStatus = False
-        self.r_buf = collections.deque(maxlen=200) # read circular buffer
-
+        self.r_buf = collections.deque(maxlen=200)  # read circular buffer
 
     def get_data(self, printmode=False):
         while self.serStatus:  # Loop until serial status becomes False
@@ -35,7 +34,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
                         print(ser_bytes)
 
                     # Decode bytes to string if needed
-                    serStrDat = ser_bytes.decode('utf-8').strip() # removed .strip() from this method
+                    serStrDat = ser_bytes.decode('utf-8').strip()  # removed .strip() from this method
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                     self.r_buf.append([timestamp, serStrDat])
             except (serial.serialutil.SerialException, OSError) as e:  # (Windows, Linux)
@@ -43,7 +42,6 @@ class SerialReader(SerialGeneral.SerialGeneral):
                 print(e)
                 # Log the exception if needed
                 break  # Exit the loop on serial exception
-
 
     def process_data(self, basefilepath, name_ext, data_mode, parameters=None):
         print(f"Starting to process data with mode: {data_mode}")
@@ -54,11 +52,12 @@ class SerialReader(SerialGeneral.SerialGeneral):
             log_csv = logger.init_csv(basefilepath, name_ext, parameters)
         elif data_mode == "raw" or data_mode == "timestamp":
             log_text = logger.init_text("log/", "\n\n\n===================================\n"
-                                                        "=======INFO: USB LOG START=========\n"
-                                                        "===================================\n")
+                                                "=======INFO: USB LOG START=========\n"
+                                                "===================================\n")
 
         # Loop while serial status is True and buffer is not empty
-        while self.serStatus and self.procStatus:
+        # while self.serStatus and self.procStatus:
+        while self.procStatus:
             if self.r_buf:
                 data = self.r_buf.pop()
                 print(data)  # Process the data as needed
@@ -78,9 +77,5 @@ class SerialReader(SerialGeneral.SerialGeneral):
                     raise BaseException("ERROR: undefined data mode for SerialReader")
         print("Stop processing data.")
 
-
     def stop_process(self):
         self.procStatus = False
-
-
-

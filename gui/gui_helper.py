@@ -33,8 +33,8 @@ def generate_drop_down(frame, options):
 ##############################################################################
 
 # promptYesNo: prompts the user for a yes or no response with a certain 'message' prompt
-def promptYesNo(message):
-    response = messagebox.askquestion('ALERT', message)
+def promptYesNo(title, message):
+    response = messagebox.askquestion(title, message)
 
     if response == "yes":
         return True

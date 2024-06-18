@@ -1,3 +1,4 @@
+
 [submodule "EEequipment"]
 	path = EEequipment
-	url = https://github.com/andersbandt/EEequipment
+	url = git@github.com:andersbandt/EEequipment.git

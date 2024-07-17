@@ -76,7 +76,6 @@ class tabMainDashboard:
         self.gui_refresh_relay_state()
 
 
-    # TODO: how can I figure out how to call this each time I click into this tab ?
     def gui_refresh_relay_state(self):
         if self.relay_status:
             for i, btn in enumerate(self.relay_btns):

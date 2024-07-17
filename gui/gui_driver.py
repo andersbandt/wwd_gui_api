@@ -76,13 +76,9 @@ class MainApplication:
         print(selected_tab)
         if selected_tab == "MAIN":
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1)
-            # Run your action for Tab 1 here
-        elif selected_tab == "Tab 2":
+        elif selected_tab == "PS Control":
             print("Tab 2 selected")
-            # Run your action for Tab 2 here
-        elif selected_tab == "Tab 3":
-            print("Tab 3 selected")
-            # Run your action for Tab 3 here
+            guiTab_6_PS.tabPS.gui_refresh_relay_state(self.tab6)
 
 ###########################################################
 ######################### MAIN ############################

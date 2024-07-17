@@ -72,6 +72,7 @@ class tabPS:
         fr_m = self.fr_control
 
 # TODO: rename all of these variable names
+        # TODO: just add some direct ON and OFF buttons to ensure that I don't get messed with the toggle
         # Channel 1 Controls
         self.channel1_label = tk.Label(fr_m, text="Channel 1")
         self.channel1_label.grid(row=0, column=0, padx=10, pady=10)
@@ -83,8 +84,8 @@ class tabPS:
                                                                                                      self.channel1_voltage.get()))
         self.channel1_set_btn.grid(row=0, column=2, padx=10, pady=10)
 
-        self.channel1_toggle_btn = tk.Button(fr_m, text="Turn On", command=lambda: self.toggle_channel(1))
-        self.channel1_toggle_btn.grid(row=0, column=3, padx=10, pady=10)
+        self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
+        self.ch1_toggle_btn.grid(row=0, column=3, padx=10, pady=10)
 
         # Channel 2 Controls
         self.channel2_label = tk.Label(fr_m, text="Channel 2")
@@ -97,13 +98,30 @@ class tabPS:
                                                                                                      self.channel2_voltage.get()))
         self.channel2_set_btn.grid(row=1, column=2, padx=10, pady=10)
 
-        self.channel2_toggle_btn = tk.Button(fr_m, text="Turn On", command=lambda: self.toggle_channel(2))
-        self.channel2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
+        self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
+        self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
         # Status display
         self.status_label = tk.Label(fr_m, text="Status:")
         self.status_label.grid(row=2, column=0, columnspan=4, padx=10, pady=10)
 
+
+    # NOTE: thisfunction is quite similiar to the relay one in tab 1
+    def gui_refresh_relay_state(self):
+        if self.ps is not None:
+            status_decode = self.ps.check_status()
+        else:
+            return
+
+        if status_decode["ch1_state"] == "ON":
+            self.ch1_toggle_btn.config(bg="green")
+        else:
+            self.ch1_toggle_btn.config(bg="red")
+
+        if status_decode["ch2_state"] == "ON":
+            self.ch2_toggle_btn.config(bg="green")
+        else:
+            self.ch2_toggle_btn.config(bg="red")
     #################################
     #### ACTION FUNCTIONS  ##########
     #################################
@@ -126,6 +144,7 @@ class tabPS:
         else:
             raise Exception("Wrong channel input")
 
+        self.gui_refresh_relay_state()
 
     def set_voltage(self, channel, voltage_str):
         if self.ps is not None:
@@ -149,13 +168,16 @@ class tabPS:
         self.ps = SPD3303X.SPD3303X(port)
         self.id = self.ps.test_conn()
         if self.id is not False:
-            self.prompt.print("Connected to PS")
-            self.prompt.print(f"Got id: {self.id}")
-            # self.buttonConn.config(relief='sunken')
+            self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)
             # self.labelId.config(text=self.id)
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
+            self.ps.output_off(1)
+            self.ps.output_off(2)
+            self.ch1_on = 0
+            self.ch2_on = 0
+            self.gui_refresh_relay_state()
 
         else: # BAD ID received
         # if self.id == '' or len(self.id) < 3:

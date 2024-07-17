@@ -15,6 +15,9 @@ class ClassController():
     def set_dmm(self, dmm):
         self.dmm = dmm
 
+    def set_ps(self, ps):
+        self.ps = ps
+
     def set_relay(self, relay):
         self.relay = relay
 

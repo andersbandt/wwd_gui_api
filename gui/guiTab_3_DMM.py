@@ -50,9 +50,10 @@ class tabDMM:
         self.csvh = None
 
         # set up prompt
-        self.fr_prompt = tk.Frame(self.frame, bg="gray")
-        self.fr_prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-        self.prompt = guic.Prompt(self.fr_prompt, "DMM Console Output", "black", height=25, width=140)
+        # self.fr_prompt = tk.Frame(self.frame, bg="gray")
+        # self.fr_prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt = guic.Prompt(self.frame, "DMM Console Output", height=25, width=140)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
         self.initTabContent()

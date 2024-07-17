@@ -7,9 +7,7 @@ from tkinter import ttk
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
-from gui import gui_helper as guih
 from gui import gui_class as guic
-from analysis import afe_analysis
 
 
 class tabMainDashboard:
@@ -25,9 +23,14 @@ class tabMainDashboard:
                        font=("Arial", 16))
         l1.grid(column=0, row=0, columnspan=2)
 
+        # add some other variables
+        self.relay_status = self.cc.relay.status # TODO: audit actual usage of relay_status variable.... could push it all to the AutoConnFrame?
+        self.relay_btns = []
+
         # init frames within tab
-        self.fr_main_status = tk.Frame(self.frame, bg="#00bcd4")
+        self.fr_main_status = guic.AutoConnFrame(self.frame, "Relay", self.relay_autoconnect, None, bg="#00bcd4")
         self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_main_status.status = self.cc.relay.status
         self.fr_relay_control = tk.Frame(self.frame, bg="#00bcd4")
         self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
 
@@ -38,10 +41,6 @@ class tabMainDashboard:
         style.configure("TButtonOn.TButton", background="green")
         style.configure("TButtonOff.TButton", background="red")
 
-        # add some other variables
-        self.relay_status = self.cc.relay.status
-        self.relay_btns = []
-
         # initialize tab content
         self.initTabContent()
 
@@ -50,25 +49,8 @@ class tabMainDashboard:
         self.init_fr_main_status()
         self.init_fr_relay_control()
 
-
     def init_fr_main_status(self):
-        fr_m = self.fr_main_status
-        self.canvas1.grid(row=1, column=2, padx=15, pady=22)
-
-        Button(
-            fr_m, text=f"Auto-connect", bg="purple", fg="black", command=self.relay_autoconnect
-        ).grid(row=0, column=1, padx=5, pady=5)
-
-        # RELAY STATUS INDICATOR
-        Label(fr_m, text="Relay status").grid(row=1, column=1, padx=5, pady=5)
-        Label(fr_m, text="Relay config").grid(row=2, column=1, padx=5, pady=5)
-        my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        if self.relay_status:
-            self.canvas1.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
-            return True
-        else:
-            self.canvas1.itemconfig(my_oval, fill="red")  # Fill the circle with RED
-            return False
+        self.fr_main_status.init_fr()
 
 
     def init_fr_relay_control(self):
@@ -79,7 +61,7 @@ class tabMainDashboard:
         btn2.grid(row=0, column=1, padx=10, pady=10)
 
         # Create and place individual relay control buttons
-        for i in range(8):
+        for i in range(4): # TODO: this integer should come from the `config.ini` number (
             name = self.cc.relay.get_relay_mapping(i+1)
             btn = tk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i+1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)

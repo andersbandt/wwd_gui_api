@@ -37,12 +37,11 @@ class tabUSB:
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
 
-        self.fr_prompt1 = tk.Frame(self.frame, bg="gray")
-        self.fr_prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-        self.prompt1 = guic.Prompt(self.fr_prompt1, "Debug serial", "black", height=14, width=140)
-        self.fr_prompt2 = tk.Frame(self.frame, bg="purple")
-        self.fr_prompt2.grid(row=0, column=2, rowspan=5, columnspan=1, padx=12, pady=12)
-        self.prompt2 = guic.Prompt(self.fr_prompt2, "Serial output", "black", height=30, width=100)
+        self.prompt1 = guic.Prompt(self.frame, "Debug serial", height=14, width=140)
+        self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        # self.fr_prompt2 = tk.Frame(self.frame, bg="purple")
+        # self.fr_prompt2.grid(row=0, column=2, rowspan=5, columnspan=1, padx=12, pady=12)
+        # self.prompt2 = guic.Prompt(self.fr_prompt2, "Serial output", "black", height=30, width=100)
 
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, lambda: self.serial_close(), bg="#00bcd4")
@@ -158,13 +157,12 @@ class tabUSB:
     def gui_refresh(self):
         while True:
             if self.ser_obj.serStatus is False:
-                self.fr_port.set_status(False)
-                # self.tr_mc.start()
-                # self.fr_port.set_color("yellow")
-
-                # test mode
-                my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-                self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                if self.ser_status:
+                    self.ser_obj.stop_process()
+                    self.ser_status = False
+                    self.fr_port.set_status(self.ser_status)
+                    my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+                    self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             else:
                 self.fr_port.set_status(True)
             time.sleep(5)
@@ -185,7 +183,7 @@ class tabUSB:
 # TODO: performance of the application is unusable after a few "connect" and "disconnect" cycles. Need to improve handling of THREADS
     def thread_print_display(self):
         print("Thread print!")
-        self.prompt2.clear()
+        # self.prompt2.clear()
 
         print("Starting thread 1 (gui refresh)")
         t1 = threading.Thread(target=self.gui_refresh, daemon=True)
@@ -225,7 +223,7 @@ class tabUSB:
 
     def serial_close(self):
         self.prompt1.print(f"Serial close!")
-        self.ser_obj.close()
+        self.ser_obj.stop_process()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
         self.t2.stop()

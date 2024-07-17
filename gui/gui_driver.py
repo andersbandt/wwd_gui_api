@@ -23,6 +23,10 @@ from gui import guiTab_2_IMU
 from gui import guiTab_3_DMM
 from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
+from gui import guiTab_6_PS
+
+
+# TODO: now that I'm adding all these pieces of test equipment I need some way to have a "graceful exit" (shutting off all supplies, etc)
 
 
 class MainApplication:
@@ -35,15 +39,6 @@ class MainApplication:
         self.controller = ClassController()
 
         usb_dev = usbrelay_controller.find()
-        # if usb_dev is None:
-        #     print("Can't configure USB relay device")
-        #     # print("Dumping all usb info")
-        #     # dev = usb.core.find(find_all=True)
-        #     # for d in dev:
-        #     #     print(d)
-        #     # print("Done with dump")
-        #     self.controller.set_relay(None)
-        # else:
         self.controller.set_relay(
             usbrelay_controller.USBRelayController(usb_dev)
         )
@@ -53,6 +48,7 @@ class MainApplication:
         self.tab3 = None
         self.tab4 = None
         self.tab5 = None
+        self.tab6 = None
         self.setTabs()
 
     # set up tab control
@@ -63,15 +59,16 @@ class MainApplication:
         self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath)
         self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath)
+        self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath)
 
         self.nb.add(self.tab1.frame, text="MAIN")
         self.nb.add(self.tab2.frame, text="IMU Analysis")
         self.nb.add(self.tab3.frame, text="DMM Control")
         self.nb.add(self.tab4.frame, text="XDS110 JTAG")
         self.nb.add(self.tab5.frame, text="USB COMM")
+        self.nb.add(self.tab6.frame, text="PS Control")
 
         self.nb.grid(column=0, row=0)
-
         return True
 
     def on_tab_changed(self, event):

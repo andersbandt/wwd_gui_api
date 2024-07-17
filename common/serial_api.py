@@ -4,28 +4,38 @@
 import time
 import serial
 from serial.tools import list_ports
+import pyvisa
 import glob
 
 
 
-def get_ports():
+def get_ports(method=2):
     # METHOD 1: worked best on windows
-    ports = [port.device for port in list_ports.comports()]
+    if method == 1:
+        ports = [port.device for port in list_ports.comports()]
 
     # METHOD 2: trying to get Linux to work. Search for serial ports in /dev/
-    temp_ports = glob.glob('/dev/tty[A-Za-z]*') # NOTE: this method just prints a fuck ton of ports
+    elif method == 2:
+        temp_ports = glob.glob('/dev/tty[A-Za-z]*') # NOTE: this method just prints a fuck ton of ports
 
-    ports = []
-    for a_port in temp_ports:
+        ports = []
+        for a_port in temp_ports:
 
-        try:
-            s = serial.Serial(a_port)
-            s.close()
-            ports.append(a_port)
-        except serial.SerialException:
-            pass
+            try:
+                s = serial.Serial(a_port)
+                s.close()
+                ports.append(a_port)
+            except serial.SerialException:
+                pass
 
-    # METHOD 3: output of "lsbusb" command
+    elif method == 3:
+        rm = pyvisa.ResourceManager()
+        ports = rm.list_resources()
+
+    else:
+        ports = None
+
+    # METHOD 4: output of "lsbusb" command
     # testing. one last print
     # devices = show_ports_linux()
     # ports = []

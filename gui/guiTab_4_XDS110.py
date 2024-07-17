@@ -33,9 +33,8 @@ class tabXDS110:
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.fr_prompt = tk.Frame(self.frame, bg="gray")
-        self.fr_prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-        self.prompt = guic.Prompt(self.fr_prompt, "XDS110 Comms", "black", height=25, width=140)
+        self.prompt = guic.Prompt(self.frame, "XDS110 Comms", height=25, width=140)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
         self.fr_xds110 = tk.Frame(self.frame, bg="#00bcd4")
@@ -120,7 +119,7 @@ class tabXDS110:
         btn_flash_firmware.grid(row=2, column=2, padx=15, pady=22)
         self.targetConfig_drop = guih.generate_drop_down(
             fr_m,
-            ["target_power", "probe_power"]
+            ["target_power", "probe_power", "supply_power"]
         )
         self.targetConfig_drop[0].grid(row=2, column=3, padx=3, pady=10)
         self.canvas4.grid(row=2, column=4, padx=15, pady=22)
@@ -203,6 +202,8 @@ class tabXDS110:
             self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             return False
 
+# TODO: BIG FEATURE: I want to set some auto-off with an adjustable seconds to turn off device power after flashing
+# TODO: let's have some delay before flashing as well ... that way I can run to device and get some connection / prober setup
     def flash_firmware(self):
         print("... executing loadti to flash firmware ...")
         my_oval = self.canvas4.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
@@ -213,23 +214,31 @@ class tabXDS110:
         # PERFORM TARGET CHECK
         flash_option = self.targetConfig_drop[1].get()
 
-        # CONFIG BASED ON POWER OPTIONS
-        if flash_option == "target_power":
-            # target_status = self.check_target()
-            # if not target_status:
-            #     guih.alert_user("Can't flash firmware!", "Target/probe connection is not valid", "error")
-            # enable target relay
-            print("Enabling target relay")
-            dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
-
+        # CONFIG POWER
+        if flash_option == "target_power" or flash_option == "probe_power":
             try:
+                self.cc.ps.output_off(1)
+            except AttributeError:
+                pass
+                guih.promptYesNo("Can't access power supply!", "Can't access supply to turn off. Continue with flash?")
+
+        if flash_option == "target_power":
+            try:
+                dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1") # TODO: I need to think of some better way to check class_controller status (if it's None or not)
                 self.cc.relay.set_state(dut_vdd1_channel, 1)
-            except Exception as e:
+            except AttributeError:
                 guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
-            print(f"\t... enabled channel {dut_vdd1_channel}")
         elif flash_option == "probe_power":
-            # attempt to disconnect relay
             self.cc.relay.open_all()
+        elif flash_option == "supply_power":
+            self.cc.relay.open_all()
+            try:
+                self.cc.ps.set_voltage(1, 2.6) #  TODO: put both of these into a config file (default PS channel, target voltage)
+                self.cc.ps.output_on(1)
+            except AttributeError:
+                guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
+                self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                return
 
         # FLASH FIRMWARE
         self.canvas4.itemconfig(my_oval, fill="yellow")

@@ -10,20 +10,22 @@ from gui import gui_helper as guih
 from common import serial_api
 
 
-class Prompt:
-    def __init__(self, frame, title, bg_color, height, width):
-        self.frame = frame
+# TODO: let's take all the hex color codes down below and all them to be input as some sort of template
+class Prompt(tk.Frame):
+    def __init__(self, master, title, height, width):
+        super().__init__(master, height=height, width=width, bg="#6272a4")
         self.height = height
         self.width = width
-        self.bg_color = bg_color
 
         # set up text box for user communication
-        Label(frame, text=title).grid(row=0, column=0, pady=3)
-        clear_button = tk.Button(frame, text="Clear console", command=self.clear, bg="black", fg="white")
-        clear_button.grid(row=0, column=1, padx=7, pady=3, sticky="ew")
-        self.prompt = Text(frame,
-                           height=height, width=width,
-                           bg=bg_color, fg="white",
+        Label(self, text=title, bg="#ff79c6", fg="#282a36").grid(row=0, column=0, pady=3)
+        clear_button = tk.Button(self, text="Clear console", command=self.clear, bg="#f1fa8c", fg="#282a36")
+        clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
+        self.prompt = Text(self,
+                           height=height,
+                           width=width,
+                           bg="#282a36",
+                           fg="#f8f8f2",
                            borderwidth=10)
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
@@ -45,15 +47,17 @@ class Prompt:
 
 
 # TODO: add entry box for baud rate
+# TODO: can this guy inherit from AutoConnFrame ???
 # TODO: can I make these talk among them selves to know when a connection is maintained to a serial port (and underline the unavailable connnections or something)
 class SerialConnFrame(tk.Frame):
-    def __init__(self, master, connect_command, close_command, bg=None):
+    def __init__(self, master, connect_command, close_command, port_func=2, bg=None):
         self.master = master
         super().__init__(self.master, bg=bg)
         self.canvas1 = tk.Canvas(self, width=50, height=50)  # create a Canvas widget
         self.status_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         self.connect_serial = connect_command
         self.disconnect_serial = close_command
+        self.port_func = port_func
         self.com_drop = None
         self.baud_drop = None
 
@@ -100,7 +104,7 @@ class SerialConnFrame(tk.Frame):
         menu.delete(0, "end")
 
         # update port list
-        ports = serial_api.get_ports()
+        ports = serial_api.get_ports(method=self.port_func)
 
         # add each port name to the drop down menu
         for string in ports:
@@ -118,6 +122,47 @@ class SerialConnFrame(tk.Frame):
 
     def set_color(self, color):
         self.canvas1.itemconfig(self.status_oval, fill="yellow")
+
+
+class AutoConnFrame(tk.Frame):
+    def __init__(self, master, name, connect_command, disconnect_command, bg=None):
+        self.master = master
+        super().__init__(self.master, bg=bg)
+
+        self.name = name
+        self.status = False
+        self.canvas = tk.Canvas(self, width=50, height=50)  # create a Canvas widget
+        self.status_oval = self.canvas.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+        self.connect_cmd = connect_command
+        self.disconnect_cmd = disconnect_command
+
+    def init_fr(self):
+        self.canvas.grid(row=1, column=2, padx=15, pady=22)
+
+        Button(
+            self, text=f"Auto-connect", bg="purple", fg="black", command=self.connect_cmd
+        ).grid(row=0, column=1, padx=5, pady=5)
+
+        # RELAY STATUS INDICATOR
+        Label(self, text=f"{self.name} status").grid(row=1, column=1, padx=5, pady=5)
+        Label(self, text=f"{self.name} config").grid(row=2, column=1, padx=5, pady=5)
+
+        self.gui_refresh()
+
+    def gui_refresh(self):
+        if self.status:
+            self.canvas.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
+        else:
+            self.canvas.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
+
+    def connect(self):
+        self.status = self.connect_cmd()
+        self.gui_refresh()
+
+    def disconnect(self):
+        self.status = self.disconnect_cmd
+        self.status = False
+        self.gui_refresh()
 
 
 class StoppableThread(threading.Thread):

@@ -54,6 +54,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
             log_text = logger.init_text("log/", "\n\n\n===================================\n"
                                                 "=======INFO: USB LOG START=========\n"
                                                 "===================================\n")
+            self.logfile = log_text
 
         # Loop while serial status is True and buffer is not empty
         # while self.serStatus and self.procStatus:
@@ -79,3 +80,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
 
     def stop_process(self):
         self.procStatus = False
+        self.close()
+        logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
+
+

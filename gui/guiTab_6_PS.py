@@ -1,0 +1,173 @@
+"""
+@file     guiTab_6_PS.py
+@author   Anders Bandt
+@date     May 2024
+@brief    control power supply test equipment
+"""
+
+# import needed GUI packages
+import tkinter as tk
+import tkinter.scrolledtext as tkst
+import tkinter.messagebox as tkmb
+import tkinter.font as tkFont  # TODO: let's figure out how to use this
+
+# import needed packages
+from collections import namedtuple
+import threading
+import time
+from time import localtime, strftime, perf_counter_ns
+import math
+from datetime import datetime
+
+
+# import user defined modules
+from data.csv_helper import CSVHelper
+from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
+from EEequipment.xdm1041 import xdm1041helper
+from EEequipment.spd3303x import SPD3303X
+from gui import gui_helper as guih
+from gui import gui_class as guic
+
+
+class tabPS:
+    def __init__(self, master, class_controller, basefilepath):
+        self.master = master
+        self.cc = class_controller
+        self.basefilepath = basefilepath
+        self.frame = tk.Frame(self.master)
+        self.frame.grid(row=0, column=0)
+        self.fr_control = tk.Frame(self.frame, bg="#00bcd4")
+        self.fr_control.grid(row=0, column=0, pady=10, padx=10)
+
+        # set up serial / PS variables
+        self.ps = None
+        self.conn_status = False # TODO: rename all the other frames "connection" variable to align with this one
+        self.ch1_on = False
+        self.ch2_on = False
+
+        # set up prompt
+        # self.fr_prompt = tk.Frame(self.frame, bg="gray")
+        # self.fr_prompt
+        self.prompt = guic.Prompt(self.frame, "PS Console Output", height=25, width=140)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+
+        # initialize tab content
+        self.initTabContent()
+
+    def initTabContent(self):
+        print("Initializing tab 6 (PS) content")
+        self.init_fr_port()
+        self.init_fr_control()
+
+    def init_fr_port(self):
+        self.fr_port = guic.SerialConnFrame(self.frame,
+                                            self.connect_pyvisa,
+                                            self.disconnect_pyvisa,
+                                            port_func=3,
+                                            bg="#00bcd4")
+        self.fr_port.initialize_fr()
+        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
+
+    def init_fr_control(self):
+        fr_m = self.fr_control
+
+# TODO: rename all of these variable names
+        # Channel 1 Controls
+        self.channel1_label = tk.Label(fr_m, text="Channel 1")
+        self.channel1_label.grid(row=0, column=0, padx=10, pady=10)
+
+        self.channel1_voltage = tk.Entry(fr_m)
+        self.channel1_voltage.grid(row=0, column=1, padx=10, pady=10)
+
+        self.channel1_set_btn = tk.Button(fr_m, text="Set Voltage", command=lambda: self.set_voltage(1,
+                                                                                                     self.channel1_voltage.get()))
+        self.channel1_set_btn.grid(row=0, column=2, padx=10, pady=10)
+
+        self.channel1_toggle_btn = tk.Button(fr_m, text="Turn On", command=lambda: self.toggle_channel(1))
+        self.channel1_toggle_btn.grid(row=0, column=3, padx=10, pady=10)
+
+        # Channel 2 Controls
+        self.channel2_label = tk.Label(fr_m, text="Channel 2")
+        self.channel2_label.grid(row=1, column=0, padx=10, pady=10)
+
+        self.channel2_voltage = tk.Entry(fr_m)
+        self.channel2_voltage.grid(row=1, column=1, padx=10, pady=10)
+
+        self.channel2_set_btn = tk.Button(fr_m, text="Set Voltage", command=lambda: self.set_voltage(2,
+                                                                                                     self.channel2_voltage.get()))
+        self.channel2_set_btn.grid(row=1, column=2, padx=10, pady=10)
+
+        self.channel2_toggle_btn = tk.Button(fr_m, text="Turn On", command=lambda: self.toggle_channel(2))
+        self.channel2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
+
+        # Status display
+        self.status_label = tk.Label(fr_m, text="Status:")
+        self.status_label.grid(row=2, column=0, columnspan=4, padx=10, pady=10)
+
+    #################################
+    #### ACTION FUNCTIONS  ##########
+    #################################
+
+    def toggle_channel(self, channel):
+        if channel == 1:
+            if self.ch1_on is True:
+                self.ps.output_off(channel)
+                self.ch1_on = False
+            else:
+                self.ps.output_on(channel)
+                self.ch1_on = True
+        elif channel == 2:
+            if self.ch2_on is True:
+                self.ps.output_off(channel)
+                self.ch2_on = False
+            else:
+                self.ps.output_on(channel)
+                self.ch2_on = True
+        else:
+            raise Exception("Wrong channel input")
+
+
+    def set_voltage(self, channel, voltage_str):
+        if self.ps is not None:
+            # have to format input text box into float
+            voltage = float(voltage_str)
+            self.ps.set_voltage(channel, voltage)
+        else:
+            guih.alert_user("Can't set voltage", "No PS connection!", "alert")
+
+
+    #################################
+    #### SERIAL (COM)  ##############
+    #################################
+
+# TODO: same thing with these functions. Standardize the "connection" variables for each tab
+    # TODO: on connection let's read the on/off variable status and set the button indicators (or toggle will be off by one)
+    def connect_pyvisa(self, event=None):
+        self.prompt.print("Connect to PYVISA resource!")
+        port = self.fr_port.get_port()
+
+        self.ps = SPD3303X.SPD3303X(port)
+        self.id = self.ps.test_conn()
+        if self.id is not False:
+            self.prompt.print("Connected to PS")
+            self.prompt.print(f"Got id: {self.id}")
+            # self.buttonConn.config(relief='sunken')
+            self.cc.set_ps(self.ps)
+            # self.labelId.config(text=self.id)
+            self.ser_status = True
+            self.fr_port.set_status(self.ser_status)
+
+        else: # BAD ID received
+        # if self.id == '' or len(self.id) < 3:
+            self.ps = None
+            self.ser_status = False
+            self.fr_port.set_status(self.ser_status)
+            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
+
+
+    def disconnect_pyvisa(self):
+        self.prompt.print(f"Close PYVISA resource!")
+        self.ps.close()
+        self.ser_status = False
+        self.fr_port.set_status(self.ser_status)
+

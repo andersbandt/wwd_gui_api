@@ -4,7 +4,7 @@
 @date     March 2024
 @brief    control device through serial (COM) port
 """
-
+import time
 # import needed packages
 import tkinter as tk
 from tkinter import *
@@ -106,17 +106,32 @@ class tabXDS110:
 
     def init_fr_firmware(self):
         fr_m = self.fr_firmware
-        # FIRMWARE BUILD
+
         btn_build_firmware = Button(fr_m, text="Build firmware",
                                     command=lambda: threading.Thread(target=self.build_firmware).start(),
                                     bg="purple", fg="white", height=2, width=20)
         btn_build_firmware.grid(row=1, column=2, padx=15, pady=22)
         self.canvas3.grid(row=1, column=3, padx=15, pady=22)
-        # FIRMWARE FLASH
+
         btn_flash_firmware = Button(fr_m, text="Load firmware",
                                     command=lambda: threading.Thread(target=self.flash_firmware).start(),
                                     bg="green", fg="white", height=2, width=20)
         btn_flash_firmware.grid(row=2, column=2, padx=15, pady=22)
+
+        Label(fr_m, text="Time delay to flash (seconds)").grid(row=3,  column=2)
+        self.entry_timesleep = Entry(fr_m, textvariable="seconds")
+        self.entry_timesleep.grid(row=3, column=3)
+
+        Label(fr_m, text="Auto off (seconds)").grid(row=4,  column=2)
+        self.entry_timeautoff = Entry(fr_m)
+        self.entry_timeautoff.grid(row=4, column=3)
+        self.var_autooff = tk.IntVar()
+        ttk.Checkbutton(self.fr_target,
+                        text="Auto off?",
+                        variable=self.var_autooff,
+                        onvalue=1,
+                        offvalue=0).grid(row=2, column=3)
+
         self.targetConfig_drop = guih.generate_drop_down(
             fr_m,
             ["target_power", "probe_power", "supply_power"]
@@ -198,12 +213,17 @@ class tabXDS110:
         if len(packet.stderr) < 2:
             self.canvas3.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
             return True
+        elif "error" in packet.stderr.lower():
+            self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            return False
+        elif "warning" in packet.stderr.lower():
+            self.canvas3.itemconfig(my_oval, fill="orange")  # Fill the circle with RED
+            return True
         else:
             self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             return False
 
-# TODO: BIG FEATURE: I want to set some auto-off with an adjustable seconds to turn off device power after flashing
-# TODO: let's have some delay before flashing as well ... that way I can run to device and get some connection / prober setup
+
     def flash_firmware(self):
         print("... executing loadti to flash firmware ...")
         my_oval = self.canvas4.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
@@ -241,13 +261,36 @@ class tabXDS110:
                 return
 
         # FLASH FIRMWARE
+        # apply time delay (if added)
+        sleep_second = self.entry_timesleep.get()
+        if sleep_second != "":
+            if guih.is_float(sleep_second):
+                time.sleep(float(sleep_second))
+        else:
+            guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
+
+        # perform flashing according to debug API
         self.canvas4.itemconfig(my_oval, fill="yellow")
         [firmware_status, packet] = xds110.flash_firmware(
             flash_option
         )
-        self.prompt.print(packet.get_string())
 
+        self.prompt.print(packet.get_string())
         if firmware_status:
             self.canvas4.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
         else:
             self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+
+        # auto shut off of target
+        if self.var_autooff.get():
+            wait_seconds = self.entry_timeautoff.get()
+            if guih.is_float(wait_seconds):
+                # time.sleep(float(wait_seconds)) # TODO: I need to actually figure out how to implement a non-blocking auto-off call
+                return True
+            else:
+                return False
+
+    ##############################################################################
+    ####      HELPER FUNCTIONS        ############################################
+    ##############################################################################
+

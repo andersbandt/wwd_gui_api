@@ -27,6 +27,25 @@ def generate_drop_down(frame, options):
     return drop, clicked_opt
 
 
+##############################################################################
+####      DATA VERIFICATION FUNCTIONS           ##############################
+##############################################################################
+
+def is_int(integer_maybe):
+    try:
+        int(integer_maybe)
+    except Exception:
+        return False
+    return True
+
+
+def is_float(float_maybe):
+    try:
+        float(float_maybe)
+    except Exception:
+        return False
+    return True
+
 
 ##############################################################################
 ####      PROMPT/ALERT FUNCTIONS           ###################################
@@ -64,11 +83,9 @@ def convertTuple(tup):
 ####      TREE FUNCTIONS           ###########################################
 ##############################################################################
 
-
 # drawLine: draws a line between coordinates (x1, y1) and (x2, y2) on 'canvas'
 def drawLine(canvas, x1, y1, x2, y2):
     canvas.create_line(x1, y1, x2, y2, tags="line")
-
 
 def paintBranch(canvas, depth, x1, y1, length, angle):
     if depth >= 0:

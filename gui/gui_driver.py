@@ -27,7 +27,9 @@ from gui import guiTab_6_PS
 
 
 # TODO: now that I'm adding all these pieces of test equipment I need some way to have a "graceful exit" (shutting off all supplies, etc)
-
+# TODO: in the same fashion, can we do an autoconnect feature?
+#   my spitball idea was to (for each of the SerialConn frames) have some autosave function where it will save the device path in a file each time you hit Connect
+#   then can load it back up based on ID
 
 class MainApplication:
     def __init__(self, window, height, width):
@@ -77,7 +79,6 @@ class MainApplication:
         if selected_tab == "MAIN":
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1)
         elif selected_tab == "PS Control":
-            print("Tab 2 selected")
             guiTab_6_PS.tabPS.gui_refresh_relay_state(self.tab6)
 
 ###########################################################

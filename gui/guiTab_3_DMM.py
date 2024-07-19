@@ -323,6 +323,7 @@ class tabDMM:
     #### SERIAL (COM)  ##############
     #################################
 
+# TODO: adjust default settings of DMM upon connection (mainly set speed to fast and range to auto?)
     def connect_serial(self, event=None):
         port = self.fr_port.get_port()
 

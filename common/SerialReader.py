@@ -43,13 +43,13 @@ class SerialReader(SerialGeneral.SerialGeneral):
                 # Log the exception if needed
                 break  # Exit the loop on serial exception
 
-    def process_data(self, basefilepath, name_ext, data_mode, parameters=None):
+    def process_data(self, basefilepath, name_ext, data_mode, data_type=None, parameters=None):
         print(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True
 
         # INIT OF LOG FILE
         if data_mode == "data":
-            log_csv = logger.init_csv(basefilepath, name_ext, parameters)
+            log_csv = logger.init_csv(basefilepath, data_type, name_ext, parameters)
         elif data_mode == "raw" or data_mode == "timestamp":
             log_text = logger.init_text("log/", "\n\n\n===================================\n"
                                                 "=======INFO: USB LOG START=========\n"

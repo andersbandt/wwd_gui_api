@@ -79,9 +79,9 @@ def append_text(filename, data):
 #### csv  #######################
 #################################
 
-def init_csv(basefilepath, name_ext, parameters):
+def init_csv(basefilepath, name_type, name_ext, parameters):
     filename = get_filename(basefilepath,  # basefilepath
-                            "data/clock_data",  # name_type (output folder) # TODO: make this a parameter
+                            f"data/{name_type}",  # name_type (output folder)
                             name_ext,  # name_ext
                             "csv")  # .extension
 

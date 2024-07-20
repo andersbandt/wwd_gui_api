@@ -44,7 +44,7 @@ class tabUSB:
         # self.prompt2 = guic.Prompt(self.fr_prompt2, "Serial output", "black", height=30, width=100)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self.frame, self.connect_serial, lambda: self.serial_close(), bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(self.frame, "USB serial", self.connect_serial, lambda: self.serial_close(), bg="#00bcd4")
         self.fr_port.initialize_fr()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 

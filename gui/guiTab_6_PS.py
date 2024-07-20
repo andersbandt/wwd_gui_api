@@ -61,6 +61,7 @@ class tabPS:
 
     def init_fr_port(self):
         self.fr_port = guic.SerialConnFrame(self.frame,
+                                            "Power supply PyVISA",
                                             self.connect_pyvisa,
                                             self.disconnect_pyvisa,
                                             port_func=3,

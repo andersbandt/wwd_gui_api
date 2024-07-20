@@ -82,6 +82,7 @@ class tabDMM:
 
     def init_fr_port(self):
         self.fr_port = guic.SerialConnFrame(self.frame,
+                                            "DMM Serial",
                                             self.connect_serial,
                                             self.serial_close,
                                             bg="#00bcd4")

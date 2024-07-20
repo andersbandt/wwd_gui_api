@@ -6,6 +6,7 @@ numpy
 scipy
 fpdf
 usb
+pyusb
 future
 setuptools
 PyVISA
@@ -14,4 +15,5 @@ PyVISA
 #added by anders
 sv_ttk
 tkinter
+libusb
 

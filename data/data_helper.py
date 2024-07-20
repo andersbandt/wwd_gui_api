@@ -151,23 +151,27 @@ def PrettyFloat(self, v):
 ################   DATA and .csv FUNCS   #####################
 ##############################################################
 
-### data loading functions
-# TODO: maybe edit this function to read the first line some other way and use that as the headers
-def load_csv_pandas(filepath, columns=None):
-    # DEFAULT COLUMNS (only for AFE)
-    if columns is None:
-        columns = ['timestamp', 'fifo', 'data']
+def get_first_row_csv(filepath):
+    # TODO: complete this function to extract first row as array
+    return ["timestamp", "fifo", "data"]
+
+
+def load_csv_pandas(filepath, columns=None, read_columns=False):
+    # SETUP FILE INFORMATION (column headers)
+    if read_columns or columns is None:
+        columns = get_first_row_csv(filepath)
+
     print(f"\nINFO: Attempting to open a .csv using columns: \n\t{columns}")
     print(f"\tusing path --> {filepath}\n")
 
-    #  laod in data
+    # LOAD DATA
     try:
         # Load data from CSV file
         df = pd.read_csv(filepath)
     except pd.errors.EmptyDataError:
         print("Pandas says data is empty! No columns to parse from file")
         return None
-    # # Extract columns
+    # Extract columns
     pandas_data = df[columns]
 
     if len(pandas_data[columns[0]].tolist()) == 0:

@@ -1,3 +1,11 @@
+"""
+@file     gui_class.py
+@author   Anders Bandt
+@date     July 2024
+@brief    contains Class objects for the Tkinter GUI
+"""
+
+
 # import modules
 import tkinter as tk
 from tkinter import *
@@ -46,17 +54,56 @@ class Prompt(tk.Frame):
         self.prompt.delete("1.0", "end")  # basically line index from
 
 
-# TODO: add entry box for baud rate
-# TODO: can this guy inherit from AutoConnFrame ???
-# TODO: can I make these talk among them selves to know when a connection is maintained to a serial port (and underline the unavailable connnections or something)
-class SerialConnFrame(tk.Frame):
-    def __init__(self, master, connect_command, close_command, port_func=2, bg=None):
+class ConnFrame(tk.Frame):
+    def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
         self.master = master
         super().__init__(self.master, bg=bg)
+        self.name = name
+        self.connect_cmd = connect_cmd
+        self.disconnect_cmd = disconnect_cmd
+
+        self.status = False
         self.canvas1 = tk.Canvas(self, width=50, height=50)  # create a Canvas widget
         self.status_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.connect_serial = connect_command
-        self.disconnect_serial = close_command
+        self.init_base_fr()
+
+    def init_base_fr(self):
+        label = tk.Label(self, text=self.name)
+        label.grid(row=0, column=0)
+
+    def connect(self):
+        self.status = self.connect_cmd()
+        self.gui_refresh()
+
+    def disconnect(self):
+        self.status = self.disconnect_cmd
+        self.status = False
+        self.gui_refresh()
+
+    def set_status(self, status):
+        if status:
+            self.canvas1.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
+        else:
+            self.canvas1.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
+
+    def gui_refresh(self):
+        if self.status:
+            self.canvas1.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
+        else:
+            self.canvas1.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
+
+    def set_color(self, color):
+        self.canvas1.itemconfig(self.status_oval, fill=color)
+
+
+# SerialConnFrame: just a basic serial connection frame
+# TODO: can I make these talk among them selves to know when a connection is maintained to a serial port
+#  (and underline the unavailable connnections or something)
+class SerialConnFrame(ConnFrame):
+    def __init__(self, master, name, connect_cmd, disconnect_cmd, port_func=2, bg=None):
+        self.master = master
+        super().__init__(self.master, name, connect_cmd, disconnect_cmd, bg=bg)
+
         self.port_func = port_func
         self.com_drop = None
         self.baud_drop = None
@@ -79,6 +126,7 @@ class SerialConnFrame(tk.Frame):
         self.refresh_ports()
 
         # place baud rate list
+        # TODO: this baud rate does nothing. Because my `connect_serial` functions are ambigious, this may be hard to splice in?
         self.baud_drop = guih.generate_drop_down(
             self,
             ["115200", "9600"]
@@ -88,11 +136,11 @@ class SerialConnFrame(tk.Frame):
         # Button to refresh the list of COM ports
         # TARGET - BUTTON/STATUS
         btn_connect_serial = Button(self, text="Connect to COM",
-                                    command=self.connect_serial,
+                                    command=self.connect_cmd,
                                     bg="green", fg="white", height=1, width=15)
         btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
         btn_disconnect_serial = Button(self, text="Disconnect COM",
-                                       command=self.disconnect_serial,
+                                       command=self.disconnect_cmd,
                                        bg="orange", fg="black", height=1, width=15)
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 
@@ -114,30 +162,14 @@ class SerialConnFrame(tk.Frame):
     def get_port(self):
         return self.com_drop[1].get()
 
-    def set_status(self, status):
-        if status:
-            self.canvas1.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
-        else:
-            self.canvas1.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
 
-    def set_color(self, color):
-        self.canvas1.itemconfig(self.status_oval, fill="yellow")
-
-
-class AutoConnFrame(tk.Frame):
-    def __init__(self, master, name, connect_command, disconnect_command, bg=None):
+class AutoConnFrame(ConnFrame):
+    def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
         self.master = master
-        super().__init__(self.master, bg=bg)
-
-        self.name = name
-        self.status = False
-        self.canvas = tk.Canvas(self, width=50, height=50)  # create a Canvas widget
-        self.status_oval = self.canvas.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.connect_cmd = connect_command
-        self.disconnect_cmd = disconnect_command
+        super().__init__(self.master, name, connect_cmd, disconnect_cmd, bg=bg)
 
     def init_fr(self):
-        self.canvas.grid(row=1, column=2, padx=15, pady=22)
+        self.canvas1.grid(row=1, column=2, padx=15, pady=22)
 
         Button(
             self, text=f"Auto-connect", bg="purple", fg="black", command=self.connect_cmd
@@ -149,20 +181,7 @@ class AutoConnFrame(tk.Frame):
 
         self.gui_refresh()
 
-    def gui_refresh(self):
-        if self.status:
-            self.canvas.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
-        else:
-            self.canvas.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
 
-    def connect(self):
-        self.status = self.connect_cmd()
-        self.gui_refresh()
-
-    def disconnect(self):
-        self.status = self.disconnect_cmd
-        self.status = False
-        self.gui_refresh()
 
 
 class StoppableThread(threading.Thread):

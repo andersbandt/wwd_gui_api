@@ -16,6 +16,7 @@ import threading
 # import user created modules
 from gui import gui_helper as guih
 from common import serial_api
+import class_controller as cc
 
 
 # TODO: let's take all the hex color codes down below and all them to be input as some sort of template
@@ -68,12 +69,13 @@ class ConnFrame(tk.Frame):
         self.init_base_fr()
 
     def init_base_fr(self):
-        label = tk.Label(self, text=self.name)
+        label = ttk.Label(self, text=self.name, style="BW.TLabel", font=("Arial", 12))
         label.grid(row=0, column=0)
 
     def connect(self):
         self.status = self.connect_cmd()
         self.gui_refresh()
+        return self.status
 
     def disconnect(self):
         self.status = self.disconnect_cmd
@@ -97,16 +99,19 @@ class ConnFrame(tk.Frame):
 
 
 # SerialConnFrame: just a basic serial connection frame
-# TODO: can I make these talk among them selves to know when a connection is maintained to a serial port
-#  (and underline the unavailable connnections or something)
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, port_func=2, bg=None):
         self.master = master
         super().__init__(self.master, name, connect_cmd, disconnect_cmd, bg=bg)
 
-        self.port_func = port_func
+
+        self.port_func = port_func # NOTE: this tracks what method is used to populate array of ports
         self.com_drop = None
         self.baud_drop = None
+
+        # TODO: try an autoconnect here (conditional on me properly saving them)
+        self.port = None
+
 
     def initialize_fr(self):
         # Button to refresh the list of COM ports
@@ -136,16 +141,22 @@ class SerialConnFrame(ConnFrame):
         # Button to refresh the list of COM ports
         # TARGET - BUTTON/STATUS
         btn_connect_serial = Button(self, text="Connect to COM",
-                                    command=self.connect_cmd,
+                                    command=self.connect,
                                     bg="green", fg="white", height=1, width=15)
         btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
         btn_disconnect_serial = Button(self, text="Disconnect COM",
-                                       command=self.disconnect_cmd,
+                                       command=self.disconnect,
                                        bg="orange", fg="black", height=1, width=15)
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 
         # place CONNECT button and STATUS indicator
         self.canvas1.grid(row=5, column=2, padx=15, pady=3)
+
+    def serial_connect(self):
+        status = self.connect()
+        if status:
+            self.port = self.get_port()
+            self.cc.set_used_port(self.port, self.name)
 
     def refresh_ports(self):
         menu = self.com_drop[0]["menu"]
@@ -153,6 +164,8 @@ class SerialConnFrame(ConnFrame):
 
         # update port list
         ports = serial_api.get_ports(method=self.port_func)
+
+        # TODO: add a check here for used ports (look in cc dictionary)
 
         # add each port name to the drop down menu
         for string in ports:

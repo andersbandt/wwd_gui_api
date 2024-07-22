@@ -137,14 +137,6 @@ class tabDMM:
         self.valueMeas2.grid(row=0, column=4, sticky='W')
         self.valueframe.grid(row=4, column=0, columnspan=5)
 
-        self.Range = ''
-        self.Fu1 = ''
-        self.Fu1Old = ''
-        self.Meas1 = 0
-        self.Fu2 = ''
-        self.Meas2 = 0
-        self.Auto = ''
-
     def init_fr_rec(self):
         fr_m = self.fr_rec
 
@@ -179,6 +171,19 @@ class tabDMM:
 
             self.PT100_On = False
             self.PT100_Unit = self.PT100UnitList[0]
+
+
+    ##############################################################################
+    ####      DMM FUNCTIONS           ############################################
+    ##############################################################################
+
+    def update_DMM(self):
+        self.dmm_Auto = self.dmm.get_range_auto()
+        self.dmm_Range = None
+        self.dmm_Fu1 = None
+        self.dmm_Fu2 = None
+        self.dmm_Meas1 = self.dmm.read_val1_str()
+        self.dmm_Meas2 = self.dmm.read_val2_str()
 
 
     ##############################################################################
@@ -305,46 +310,39 @@ class tabDMM:
         print("DMM record thread exiting.")
 
 
-    # TODO: this function doesn't work. None of the values are getting updated
     def gui_refresh(self):
-        self.valueRange.config(text='{:8s}'.format(self.Auto + ':' + self.Range))
-        self.valueFu1.config(text='{:8s}'.format(self.Fu1))
-        self.valueMeas1.config(text=self.PrettyFloat(self.Meas1))
-        self.valueFu2.config(text='{:8s}'.format(self.Fu2))
-        self.valueFu2.config(text='{:8s}'.format(self.Fu2))
-        self.valueMeas2.config(text=None)
+        self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
+        self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
+        self.valueMeas1.config(text=self.PrettyFloat(self.dmm_Meas1))
+        self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
+        self.valueMeas1.config(text=self.PrettyFloat(self.dmm_Meas2))
 
-
-# TODO: an alternative method to threads. Could possibly be better for GUI updates? Check performance somehow
-# elapsed = (perf_counter_ns() - self.ProgStart) // 1000000  # time in ms since start
-# time2sleep = 1000 - (elapsed % 1000)
-# self.frame.after(time2sleep, self.PollMiniBM)
 
     #################################
     #### SERIAL (COM)  ##############
     #################################
 
-# TODO: adjust default settings of DMM upon connection (mainly set speed to fast and range to auto?)
     def connect_serial(self, event=None):
         port = self.fr_port.get_port()
 
         self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
-        self.id = self.dmm.test_conn()
+        self.dmm_id = self.dmm.test_conn()
 
         self.prompt.print("Connected to DMM")
-        self.prompt.print(f"Got id: {self.id}")
+        self.prompt.print(f"Got id: {self.dmm_id}")
 
         # BAD ID received
-        if self.id == '' or len(self.id) < 3:
+        if self.dmm_id == '' or len(self.id) < 3:
             self.dmm = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
         # GOOD ID received
         else:
-            # self.buttonConn.config(relief='sunken')
             self.cc.set_dmm(self.dmm)
-            self.labelId.config(text=self.id)
+            self.cc.dmm.set_sample_speed_fast()
+            self.gui_refresh()
+            self.labelId.config(text=self.dmm_id)
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
 

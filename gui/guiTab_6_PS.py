@@ -9,21 +9,13 @@
 import tkinter as tk
 import tkinter.scrolledtext as tkst
 import tkinter.messagebox as tkmb
-import tkinter.font as tkFont  # TODO: let's figure out how to use this
 
 # import needed packages
-from collections import namedtuple
-import threading
 import time
 from time import localtime, strftime, perf_counter_ns
-import math
-from datetime import datetime
 
 
 # import user defined modules
-from data.csv_helper import CSVHelper
-from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
-from EEequipment.xdm1041 import xdm1041helper
 from EEequipment.spd3303x import SPD3303X
 from gui import gui_helper as guih
 from gui import gui_class as guic
@@ -72,32 +64,31 @@ class tabPS:
     def init_fr_control(self):
         fr_m = self.fr_control
 
-# TODO: rename all of these variable names
         # TODO: just add some direct ON and OFF buttons to ensure that I don't get messed with the toggle
-        # Channel 1 Controls
-        self.channel1_label = tk.Label(fr_m, text="Channel 1")
-        self.channel1_label.grid(row=0, column=0, padx=10, pady=10)
+        # CHANNEL 1 CONTROLS
+        self.ch1_label = tk.Label(fr_m, text="Channel 1")
+        self.ch1_label.grid(row=0, column=0, padx=10, pady=10)
 
-        self.channel1_voltage = tk.Entry(fr_m)
-        self.channel1_voltage.grid(row=0, column=1, padx=10, pady=10)
+        self.ch1_voltage = tk.Entry(fr_m)
+        self.ch1_voltage.grid(row=0, column=1, padx=10, pady=10)
 
-        self.channel1_set_btn = tk.Button(fr_m, text="Set Voltage", command=lambda: self.set_voltage(1,
-                                                                                                     self.channel1_voltage.get()))
-        self.channel1_set_btn.grid(row=0, column=2, padx=10, pady=10)
+        self.ch1_set_btn = tk.Button(fr_m, text="Set Voltage", command=lambda: self.set_voltage(1,
+                                                                                                     self.ch1_voltage.get()))
+        self.ch1_set_btn.grid(row=0, column=2, padx=10, pady=10)
 
         self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
         self.ch1_toggle_btn.grid(row=0, column=3, padx=10, pady=10)
 
-        # Channel 2 Controls
-        self.channel2_label = tk.Label(fr_m, text="Channel 2")
-        self.channel2_label.grid(row=1, column=0, padx=10, pady=10)
+        # CHANNEL 2 CONTROLS
+        self.ch2_label = tk.Label(fr_m, text="Channel 2")
+        self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
 
-        self.channel2_voltage = tk.Entry(fr_m)
-        self.channel2_voltage.grid(row=1, column=1, padx=10, pady=10)
+        self.ch2_voltage = tk.Entry(fr_m)
+        self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
 
-        self.channel2_set_btn = tk.Button(fr_m, text="Set Voltage", command=lambda: self.set_voltage(2,
-                                                                                                     self.channel2_voltage.get()))
-        self.channel2_set_btn.grid(row=1, column=2, padx=10, pady=10)
+        self.ch2_set_btn = tk.Button(fr_m, text="Set Voltage", command=lambda: self.set_voltage(2,
+                                                                                                     self.ch2_voltage.get()))
+        self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
 
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
         self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
@@ -107,8 +98,8 @@ class tabPS:
         self.status_label.grid(row=2, column=0, columnspan=4, padx=10, pady=10)
 
 
-    # NOTE: thisfunction is quite similiar to the relay one in tab 1
-    def gui_refresh_relay_state(self):
+    # NOTE: this function is quite similar to the relay one in tab 1
+    def gui_refresh_channel_state(self):
         if self.ps is not None:
             status_decode = self.ps.check_status()
         else:
@@ -123,6 +114,7 @@ class tabPS:
             self.ch2_toggle_btn.config(bg="green")
         else:
             self.ch2_toggle_btn.config(bg="red")
+
     #################################
     #### ACTION FUNCTIONS  ##########
     #################################
@@ -145,7 +137,7 @@ class tabPS:
         else:
             raise Exception("Wrong channel input")
 
-        self.gui_refresh_relay_state()
+        self.gui_refresh_channel_state()
 
     def set_voltage(self, channel, voltage_str):
         if self.ps is not None:
@@ -161,7 +153,6 @@ class tabPS:
     #################################
 
 # TODO: same thing with these functions. Standardize the "connection" variables for each tab
-    # TODO: on connection let's read the on/off variable status and set the button indicators (or toggle will be off by one)
     def connect_pyvisa(self, event=None):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
@@ -178,7 +169,7 @@ class tabPS:
             self.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
-            self.gui_refresh_relay_state()
+            self.gui_refresh_channel_state()
 
         else: # BAD ID received
         # if self.id == '' or len(self.id) < 3:

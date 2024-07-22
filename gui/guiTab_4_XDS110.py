@@ -4,12 +4,15 @@
 @date     March 2024
 @brief    control device through serial (COM) port
 """
-import time
+
 # import needed packages
+import time
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
 import threading
+import configparser
+import os
 
 # import user defined modules
 from EEequipment.xds110 import xds110_api as xds110
@@ -18,6 +21,22 @@ from common import subprocessor as subp
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
+
+
+# initialize the config parser
+config_file_path = "config/target.ini"
+if os.path.exists(config_file_path):
+    config = configparser.ConfigParser()
+    config.read(config_file_path)
+else:
+    print(f"Configuration file {config_file_path} does not exist.")
+    raise BaseException
+
+
+# read in parameters from the config file
+ps_channel = int(config["Target"]["ps_channel"])
+device_vdds = float(config["Target"]["vdds"])
+print("Yepppp")
 
 class tabXDS110:
     def __init__(self, master, class_controller, basefilepath):
@@ -244,7 +263,7 @@ class tabXDS110:
 
         if flash_option == "target_power":
             try:
-                dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1") # TODO: I need to think of some better way to check class_controller status (if it's None or not)
+                dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
                 self.cc.relay.set_state(dut_vdd1_channel, 1)
             except AttributeError:
                 guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
@@ -253,7 +272,7 @@ class tabXDS110:
         elif flash_option == "supply_power":
             self.cc.relay.open_all()
             try:
-                self.cc.ps.set_voltage(1, 2.6) #  TODO: put both of these into a config file (default PS channel, target voltage)
+                self.cc.ps.set_voltage(ps_channel, device_vdds)
                 self.cc.ps.output_on(1)
             except AttributeError:
                 guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")

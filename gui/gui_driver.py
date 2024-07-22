@@ -26,10 +26,11 @@ from gui import guiTab_5_USB
 from gui import guiTab_6_PS
 
 
-# TODO: now that I'm adding all these pieces of test equipment I need some way to have a "graceful exit" (shutting off all supplies, etc)
-# TODO: in the same fashion, can we do an autoconnect feature?
-#   my spitball idea was to (for each of the SerialConn frames) have some autosave function where it will save the device path in a file each time you hit Connect
-#   then can load it back up based on ID
+# TODO: an alternative method to threads. Could possibly be better for GUI updates? Check performance somehow
+# elapsed = (perf_counter_ns() - self.ProgStart) // 1000000  # time in ms since start
+# time2sleep = 1000 - (elapsed % 1000)
+# self.frame.after(time2sleep, self.PollMiniBM)
+
 
 class MainApplication:
     def __init__(self, window, height, width):
@@ -77,9 +78,9 @@ class MainApplication:
         selected_tab = event.widget.tab(event.widget.select(), "text")
         print(selected_tab)
         if selected_tab == "MAIN":
-            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1)
+            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1, "auto")
         elif selected_tab == "PS Control":
-            guiTab_6_PS.tabPS.gui_refresh_relay_state(self.tab6)
+            guiTab_6_PS.tabPS.gui_refresh_channel_state(self.tab6)
 
 ###########################################################
 ######################### MAIN ############################
@@ -96,7 +97,6 @@ def main():
     window.geometry('1280x900')
 
     sv_ttk.set_theme("dark")
-
 
     ### add window Style
     # 	theme options are
@@ -116,7 +116,6 @@ def main():
     # run application
     window.mainloop()
 
-# dir = filedialog.askdirectory()
-
-
-
+    print("TKINTER is shutting down!")
+    print("Anders you should put some graceful exit stuff here!")
+    # TODO: now that I'm adding all these pieces of test equipment I need some way to have a "graceful exit" (shutting off all supplies, etc)

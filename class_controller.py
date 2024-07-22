@@ -2,15 +2,13 @@
 
 
 
-class ClassController():
+class ClassController:
     def __init__(self):
         self.dmm = None
         self.ps = None
         self.relay = None
 
-        # TODO: finish implementing some cc array to store used ports and their usage
         self.ports_used = {}
-
 
     def set_dmm(self, dmm):
         self.dmm = dmm
@@ -23,4 +21,8 @@ class ClassController():
 
     def set_used_port(self, port, usage):
         self.ports_used[port] = usage
+        print(f"Debug print of cc ports used: {self.ports_used}")
+
+        # TODO: complete function here to write to some file with ports used (XML?)
+        #   or could keep things consistent and use that same config.ini filetype?
 

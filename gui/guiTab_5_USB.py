@@ -179,7 +179,6 @@ class tabUSB:
             if self.ser_status is False:
                 status = False
 
-# TODO: for some reason I only get prints when I hit "disconnect" now
 # TODO: performance of the application is unusable after a few "connect" and "disconnect" cycles. Need to improve handling of THREADS
     def thread_print_display(self):
         print("Thread print!")

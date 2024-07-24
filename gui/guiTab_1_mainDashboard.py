@@ -8,10 +8,14 @@ from tkinter import *
 from EEequipment.usbrelay import usbrelay_controller
 from gui import gui_class as guic
 from gui import gui_helper as guih
+from gui.guiTab_parent import ThemedApp
 
 
-class tabMainDashboard:
-    def __init__(self, master, class_controller, basefilepath):
+# TODO: all tabs should initialize from a Parent class. Why didn't I think of that sooner!
+
+class tabMainDashboard(ThemedApp):
+    def __init__(self, master, class_controller, basefilepath, theme_file):
+        super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
         self.frame = tk.Frame(self.master)

@@ -11,13 +11,14 @@ import tkinter as tk
 from tkinter import ttk
 import sv_ttk
 import os
-import usb
+import time
 
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
+from gui.guiTab_parent import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_IMU
 from gui import guiTab_3_DMM
@@ -32,8 +33,10 @@ from gui import guiTab_6_PS
 # self.frame.after(time2sleep, self.PollMiniBM)
 
 
-class MainApplication:
-    def __init__(self, window, height, width):
+class MainApplication(ThemedApp):
+    def __init__(self, window, height, width, theme_file): # TODO: consider changing "window" to "root" (seems proper)
+        super().__init__(window, theme_file)
+
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
 
@@ -57,7 +60,7 @@ class MainApplication:
     # set up tab control
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
-        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath)
+        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath, "config/darcula.json")
         self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath)
         self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath)
@@ -96,22 +99,26 @@ def main():
     window.title("WWD GUI API")
     window.geometry('1280x900')
 
-    sv_ttk.set_theme("dark")
+    # sv_ttk.set_theme("dark")
 
     ### add window Style
-    # 	theme options are
-    # 	"default", "alt", "classic", "clam"
     # style = ttk.Style(window)
-    # style.theme_use("")
-
-    # style.configure('TNotebook.Tab', background="green3")
-    # style.map("TNotebook", background=[("selected", "green3")])
-
     # style.configure('TNotebook.Tab', background="Red")
     # style.map("TNotebook", background=[("selected", "red")])
+    # style.theme_use("clam") # options are: "default", "alt", "classic", "clam"
+
+    # Configure styles for notebook tabs
+    # style.configure('TNotebook.Tab',
+    #                 background="#FF6347",  # Tomato red background
+    #                 foreground="#000000",  # Black text
+    #                 font=('Arial', 12, 'bold'),  # Font family, size, and style
+    #                 padding=(10, 5))  # Padding around the text
+    # style.map("TNotebook.Tab",
+    #           background=[("selected", "red")],
+    #           foreground=[("selected", "white")])
 
     # place main app
-    MainApplication(window, 1800, 1800)
+    MainApplication(window, 1800, 1800, "config/darcula.json")
 
     # run application
     window.mainloop()

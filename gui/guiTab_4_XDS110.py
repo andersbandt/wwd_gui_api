@@ -258,15 +258,20 @@ class tabXDS110:
             try:
                 self.cc.ps.output_off(1)
             except AttributeError:
-                pass
-                guih.promptYesNo("Can't access power supply!", "Can't access supply to turn off. Continue with flash?")
+                res = guih.promptYesNo("Can't access power supply!", "Can't access supply to turn off. Continue with flash?")
+                if not res:
+                    self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                    return False
 
         if flash_option == "target_power":
             try:
                 dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
                 self.cc.relay.set_state(dut_vdd1_channel, 1)
             except AttributeError:
-                guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
+                res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
+                if not res:
+                    self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                    return False
         elif flash_option == "probe_power":
             self.cc.relay.open_all()
         elif flash_option == "supply_power":
@@ -282,10 +287,9 @@ class tabXDS110:
         # FLASH FIRMWARE
         # apply time delay (if added)
         sleep_second = self.entry_timesleep.get()
-        if sleep_second != "":
-            if guih.is_float(sleep_second):
-                time.sleep(float(sleep_second))
-        else:
+        if guih.is_float(sleep_second):
+            time.sleep(float(sleep_second))
+        elif sleep_second != '':
             guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
 
         # perform flashing according to debug API

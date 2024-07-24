@@ -1,0 +1,19 @@
+{
+    "background": "#2B2B2B",
+    "foreground": "#A9B7C6",
+    "selected_background": "#3C3F41",
+    "selected_foreground": "#FFFFFF",
+    "tab_background": "#2B2B2B",
+    "tab_foreground": "#A9B7C6",
+    "selected_tab_background": "#3C3F41",
+    "selected_tab_foreground": "#FFFFFF",
+    "font": {
+        "family": "Arial",
+        "size": 12,
+        "style": "bold"
+    },
+    "padding": {
+        "horizontal": 10,
+        "vertical": 5
+    }
+}

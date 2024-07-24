@@ -61,11 +61,11 @@ class MainApplication(ThemedApp):
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
         self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath)
-        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath)
-        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath)
-        self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath)
-        self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath)
+        self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath, "config/darcula.json")
+        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json")
+        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
+        self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json")
+        self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json")
 
         self.nb.add(self.tab1.frame, text="MAIN")
         self.nb.add(self.tab2.frame, text="IMU Analysis")
@@ -95,27 +95,10 @@ def main():
 
     # setup window
     window = tk.Tk()
-
     window.title("WWD GUI API")
     window.geometry('1280x900')
 
     # sv_ttk.set_theme("dark")
-
-    ### add window Style
-    # style = ttk.Style(window)
-    # style.configure('TNotebook.Tab', background="Red")
-    # style.map("TNotebook", background=[("selected", "red")])
-    # style.theme_use("clam") # options are: "default", "alt", "classic", "clam"
-
-    # Configure styles for notebook tabs
-    # style.configure('TNotebook.Tab',
-    #                 background="#FF6347",  # Tomato red background
-    #                 foreground="#000000",  # Black text
-    #                 font=('Arial', 12, 'bold'),  # Font family, size, and style
-    #                 padding=(10, 5))  # Padding around the text
-    # style.map("TNotebook.Tab",
-    #           background=[("selected", "red")],
-    #           foreground=[("selected", "white")])
 
     # place main app
     MainApplication(window, 1800, 1800, "config/darcula.json")

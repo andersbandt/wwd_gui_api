@@ -16,12 +16,13 @@ from common import SerialReader
 from common.SerialReader import SerialReader
 from gui import gui_helper as guih
 from imu import imu_analysis
+from gui.guiTab_parent import ThemedFrame
 
 
-class tabIMU:
-    def __init__(self, master, basefilepath):
+class tabIMU(ThemedFrame):
+    def __init__(self, master, basefilepath, theme_file):
+        super().__init__(master, theme_file)
         self.master = master
-        self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
         self.data_folder = "/data/imu_data"

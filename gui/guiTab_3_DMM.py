@@ -26,14 +26,15 @@ from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
 from EEequipment.xdm1041 import xdm1041helper
 from gui import gui_helper as guih
 from gui import gui_class as guic
+from gui.guiTab_parent import ThemedFrame
 
 
-class tabDMM:
-    def __init__(self, master, class_controller, basefilepath):
+class tabDMM(ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_file):
+        super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
-        self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.fr_rec = tk.Frame(self.frame, bg="#00bcd4")
         self.fr_rec.grid(row=5, column=0, pady=10, padx=10)

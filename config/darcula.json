@@ -15,5 +15,21 @@
     "padding": {
         "horizontal": 10,
         "vertical": 5
+    },
+    "tab1_background": "#3C3F41",
+    "tab2_background": "#2B2B2B",
+    "tab3_background": "#3C3F41",
+    "tab4_background": "#2B2B2B",
+    "tab5_background": "#3C3F41",
+    "tab6_background": "#2B2B2B",
+    "button": {
+        "background": "#4A4A4A",
+        "foreground": "#FFFFFF",
+        "active_background": "#6A6A6A",
+        "active_foreground": "#FFFFFF"
+    },
+    "label": {
+        "background": "#2B2B2B",
+        "foreground": "#A9B7C6"
     }
 }

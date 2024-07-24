@@ -20,6 +20,7 @@ from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
 from gui import gui_helper as guih
 from gui import gui_class as guic
+from gui.guiTab_parent import ThemedFrame
 
 
 
@@ -38,11 +39,11 @@ ps_channel = int(config["Target"]["ps_channel"])
 device_vdds = float(config["Target"]["vdds"])
 print("Yepppp")
 
-class tabXDS110:
-    def __init__(self, master, class_controller, basefilepath):
+class tabXDS110(ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_file):
+        super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
-        self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
 

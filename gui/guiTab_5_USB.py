@@ -18,13 +18,13 @@ from datetime import datetime
 from common.SerialReader import SerialReader
 from gui import gui_helper as guih
 from gui import gui_class as guic
+from gui.guiTab_parent import ThemedFrame
 
-
-class tabUSB:
-    def __init__(self, master, class_controller, basefilepath):
+class tabUSB(ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_file):
+        super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
-        self.frame = tk.Frame(self.master)
         self.frame.grid(row=0, column=0)
         self.basefilepath = basefilepath
 

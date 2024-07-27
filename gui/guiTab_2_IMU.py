@@ -23,21 +23,21 @@ class tabIMU(ThemedFrame):
     def __init__(self, master, basefilepath, theme_file):
         super().__init__(master, theme_file)
         self.master = master
-        self.frame.grid(row=0, column=0)
+        self.grid(row=0, column=0)
         self.basefilepath = basefilepath
         self.data_folder = "/data/imu_data"
 
         # print welcome text
-        l1 = ttk.Label(self.frame, text="IMU Control Center", style="BW.TLabel",
+        l1 = ttk.Label(self, text="IMU Control Center", style="BW.TLabel",
                        font=("Arial", 16))
         l1.grid(column=0, row=0)
 
         # init frames within tab
-        self.fr_add_data = tk.Frame(self.frame, bg="#00bcd4")
+        self.fr_add_data = tk.Frame(self, bg="#00bcd4")
         self.fr_add_data.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_analysis = tk.Frame(self.frame, bg="#0f0dba")
+        self.fr_analysis = tk.Frame(self, bg="#0f0dba")
         self.fr_analysis.grid(row=2, column=0, padx=30, pady=12)
-        self.fr_prompt = tk.Frame(self.frame, bg="gray")
+        self.fr_prompt = tk.Frame(self, bg="gray")
         self.fr_prompt.grid(row=10, column=0, padx=30, pady=12)
 
         # add some other variables
@@ -151,25 +151,25 @@ class tabIMU(ThemedFrame):
         file_str_ext = out_file_name_obj.get("1.0", "end").strip(
             "\n")  # I THINK THIS CATEGORY NAME IS GETTING STRIPPED WRONG
         if file_str_ext == "":
-            gui_helper.gui_print(self.frame, self.prompt, "Detected blank file name, going to use default")
+            gui_helper.gui_print(self, self.prompt, "Detected blank file name, going to use default")
             file_str_ext = None
         else:
-            gui_helper.gui_print(self.frame, self.prompt, f"Using filename extension: {file_str_ext}")
+            gui_helper.gui_print(self, self.prompt, f"Using filename extension: {file_str_ext}")
 
         # init serial object and start data processing
         error_flag |= self.serial_init(serial_port)
         error_flag |= self.ser_obj.init_data_process(self.basefilepath + self.data_folder, filename_ext=file_str_ext)
 
         if error_flag:
-            gui_helper.gui_print(self.frame, self.prompt, "Something went wrong starting data record")
+            gui_helper.gui_print(self, self.prompt, "Something went wrong starting data record")
 
     def serial_init(self, serial_port):
-        gui_helper.gui_print(self.frame, self.prompt, f"Init with port: {serial_port}")
+        gui_helper.gui_print(self, self.prompt, f"Init with port: {serial_port}")
         self.ser_obj = SerialReader(serial_port)
         return True
 
     def stop_record(self):
-        gui_helper.gui_print(self.frame, self.prompt, "Stopping data record")
+        gui_helper.gui_print(self, self.prompt, "Stopping data record")
         self.ser_obj.stop_data_process()
         pass
 
@@ -178,7 +178,7 @@ class tabIMU(ThemedFrame):
         serial_port = self.com_dropdown[1].get()
         error_flag |= self.serial_init(serial_port)
 
-        gui_helper.gui_print(self.frame, self.prompt, f"Starting live graph with: {serial_port}")
+        gui_helper.gui_print(self, self.prompt, f"Starting live graph with: {serial_port}")
         while True:
             data = self.ser_obj.get_data()
             print(f"gui got this data: {data}")

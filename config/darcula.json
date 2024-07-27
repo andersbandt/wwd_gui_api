@@ -1,6 +1,8 @@
 {
-    "background": "#2B2B2B",
-    "foreground": "#A9B7C6",
+    "bg_dark": "#2B2B2B",
+    "bg_light": "#6272A4",
+    "fg_light": "#F8F8F2",
+    "fg_dark": "#6272A4",
     "selected_background": "#3C3F41",
     "selected_foreground": "#FFFFFF",
     "tab_background": "#2B2B2B",
@@ -31,5 +33,12 @@
     "label": {
         "background": "#2B2B2B",
         "foreground": "#A9B7C6"
-    }
+    },
+    "light_1": "#FF79C6",
+    "light_2": "#282A36",
+    "light_3": "#F1FA8C",
+    "light_4": "#8BE9FD",
+    "dark_1": "#FF5555",
+    "dark_2": "#50FA7B",
+    "dark_3": "#FFB86C"
 }

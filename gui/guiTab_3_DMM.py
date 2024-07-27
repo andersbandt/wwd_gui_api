@@ -7,12 +7,11 @@
 
 # import needed GUI packages
 import tkinter as tk
-import tkinter.scrolledtext as tkst
+from tkinter import ttk
 import tkinter.messagebox as tkmb
 import tkinter.font as tkFont  # TODO: let's figure out how to use this
 
 # import needed packages
-from collections import namedtuple
 import threading
 import time
 from time import localtime, strftime, perf_counter_ns
@@ -35,9 +34,13 @@ class tabDMM(ThemedFrame):
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
-        self.frame.grid(row=0, column=0)
-        self.fr_rec = tk.Frame(self.frame, bg="#00bcd4")
-        self.fr_rec.grid(row=5, column=0, pady=10, padx=10)
+        self.grid(row=0, column=0)
+
+        # set up frames
+        self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_rec = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
+        self.fr_rec.grid(row=1, column=0, pady=10, padx=10)
 
         # set up serial / DMM variables
         self.ser_status = False
@@ -51,92 +54,80 @@ class tabDMM(ThemedFrame):
         self.csvh = None
 
         # set up prompt
-        # self.fr_prompt = tk.Frame(self.frame, bg="gray")
-        # self.fr_prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-        self.prompt = guic.Prompt(self.frame, "DMM Console Output", height=25, width=140)
+        self.prompt = guic.Prompt(self, "DMM Console Output", height=21, width=140)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
         self.initTabContent()
 
     def initTabContent(self):
-        # the overall structure is aranged in 6 rows
-        #  row	use
-        #    0  port
-        #    1  id
-        #    2  recording status monitor
-        #    3  labels for values
-        #    4  values
-        #    5  recording control
-        #    6  options
         print("Initializing tab 3 (DMM) content")
         self.init_fr_port()
         self.init_fr_info()
         self.init_fr_rec()
         self.init_fr_PT100()
 
-        # remaining intitalisation and start of main loop
+        # remaining initialisation and start of main loop
         # self.entryPort.focus_set()
         self.PollCount = 0
         self.ProgStart = perf_counter_ns()
         # self.PollMiniBM()
 
     def init_fr_port(self):
-        self.fr_port = guic.SerialConnFrame(self.frame,
+        self.fr_port = guic.SerialConnFrame(self,
                                             "DMM Serial",
                                             self.connect_serial,
                                             self.serial_close,
                                             bg="#00bcd4")
-        self.fr_port.initialize_fr()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
+        self.fr_port.initialize_fr()
 
     def init_fr_info(self):
-        # row 1: id split into 2 columns
-        #  (8)                  (40)               = 48
-        #   0                     1
-        #  time             id (as reported)
-        self.idframe = tk.Frame(self.frame)
-        self.labeltime = tk.Label(self.idframe, width=8, text='', relief='sunken')
-        self.labelId = tk.Label(self.idframe, width=40, text='', relief='sunken')
-        self.labeltime.grid(row=0, column=0, sticky='E')
-        self.labelId.grid(row=0, column=1, sticky='E')
-        self.idframe.grid(row=1, column=0, columnspan=2)
+        self.labelInfo = ttk.Label(self.fr_info, text='DMM Info', style="TPinkLabel.TLabel", width=15)
+        self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
-        # row 4: labels split into 5 columns
-        #   (10)     (9)     10)    (9)     (10)    = 48
-        #     0       1       3      4       5
-        #   range   fu1    meas1    fu2     meas2
-        self.labelframe = tk.Frame(self.frame)
+        # Add labels for device information
+        self.labelDeviceID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
+        self.labelDeviceIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
 
-        self.labelRange = tk.Label(self.labelframe, width=10, text='Range')
-        self.labelFu1 = tk.Label(self.labelframe, width=9, text='Func1')
-        self.labelMeas1 = tk.Label(self.labelframe, width=10, text='Meas1')
-        self.labelFu2 = tk.Label(self.labelframe, width=9, text='Func2')
-        self.labelMeas2 = tk.Label(self.labelframe, width=10, text='Meas2')
-        self.labelRange.grid(row=0, column=0, sticky='W')
-        self.labelFu1.grid(row=0, column=1, sticky='W')
-        self.labelMeas1.grid(row=0, column=2, sticky='W')
-        self.labelFu2.grid(row=0, column=3, sticky='W')
-        self.labelMeas2.grid(row=0, column=4, sticky='W')
-        self.labelframe.grid(row=3, column=0, columnspan=5)
+        self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
+        self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
-        # row 5: values split into 5 columns
-        #   (10)     (9)     10)    (9)     (10)    = 48
-        #     0       1       3      4       5
-        #   range   fu1    meas1    fu2     meas2
-        self.valueframe = tk.Frame(self.frame)
+        # Position the device information labels
+        self.labelDeviceID.grid(row=1, column=0, sticky='W', padx=5, pady=2)
+        self.labelDeviceIDValue.grid(row=1, column=1, sticky='W', padx=5, pady=2)
 
-        self.valueRange = tk.Label(self.valueframe, width=10, text='', relief='sunken')
-        self.valueFu1 = tk.Label(self.valueframe, width=9, text='', relief='sunken')
-        self.valueMeas1 = tk.Label(self.valueframe, width=10, text='', relief='sunken')
-        self.valueFu2 = tk.Label(self.valueframe, width=9, text='', relief='sunken')
-        self.valueMeas2 = tk.Label(self.valueframe, width=10, text='', relief='sunken')
-        self.valueRange.grid(row=0, column=0, sticky='W')
-        self.valueFu1.grid(row=0, column=1, sticky='W')
-        self.valueMeas1.grid(row=0, column=2, sticky='W')
-        self.valueFu2.grid(row=0, column=3, sticky='W')
-        self.valueMeas2.grid(row=0, column=4, sticky='W')
-        self.valueframe.grid(row=4, column=0, columnspan=5)
+        self.labelTimeConnected.grid(row=2, column=0, sticky='W', padx=5, pady=2)
+        self.labelTimeConnectedValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
+
+        # Add labels for range and measurements
+        self.labelRange = ttk.Label(self.fr_info, width=10, text='Range', style="TLabel", anchor='w')
+        self.labelFu1 = ttk.Label(self.fr_info, width=9, text='Func1', style="TLabel", anchor='w')
+        self.labelMeas1 = ttk.Label(self.fr_info, width=10, text='Meas1', style="TLabel", anchor='w')
+        self.labelFu2 = ttk.Label(self.fr_info, width=9, text='Func2', style="TLabel", anchor='w')
+        self.labelMeas2 = ttk.Label(self.fr_info, width=10, text='Meas2', style="TLabel", anchor='w')
+
+        # Position the range and measurement labels
+        self.labelRange.grid(row=3, column=0, sticky='W', padx=5, pady=2)
+        self.labelFu1.grid(row=4, column=0, sticky='W', padx=5, pady=2)
+        self.labelMeas1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
+        self.labelFu2.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+        self.labelMeas2.grid(row=7, column=0, sticky='W', padx=5, pady=2)
+
+        # Add value labels for range and measurements
+        self.valueRange = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueFu1 = tk.Label(self.fr_info, width=9, text='', relief='sunken', anchor='w')
+        self.valueMeas1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueFu2 = tk.Label(self.fr_info, width=9, text='', relief='sunken', anchor='w')
+        self.valueMeas2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+
+        # Position the value labels
+        self.valueRange.grid(row=3, column=1, sticky='W', padx=5, pady=2)
+        self.valueFu1.grid(row=4, column=1, sticky='W', padx=5, pady=2)
+        self.valueMeas1.grid(row=5, column=1, sticky='W', padx=5, pady=2)
+        self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
+        self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
+
 
     def init_fr_rec(self):
         fr_m = self.fr_rec
@@ -156,7 +147,7 @@ class tabDMM(ThemedFrame):
             #        (8)      (10)   (10)   (10)   (10)        = 48
             #         0        1      2      3       4
             #   0   PT100Unit PT100
-            self.optframe = tk.Frame(self.frame)
+            self.optframe = tk.Frame(self)
 
             self.PT100UnitList = ('C', 'F', 'K')
             self.PT100UnitVal = tk.StringVar()

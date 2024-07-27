@@ -44,24 +44,24 @@ class tabXDS110(ThemedFrame):
         super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
-        self.frame.grid(row=0, column=0)
+        self.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
         # print welcome text
-        l1 = ttk.Label(self.frame, text="XDS110 and target control", style="BW.TLabel",
+        l1 = ttk.Label(self, text="XDS110 and target control", style="BW.TLabel",
                        font=("Arial", 16))
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.prompt = guic.Prompt(self.frame, "XDS110 Comms", height=25, width=140)
+        self.prompt = guic.Prompt(self, "XDS110 Comms", height=25, width=140)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
-        self.fr_xds110 = tk.Frame(self.frame, bg="#00bcd4")
+        self.fr_xds110 = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_xds110.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_target = tk.Frame(self.frame, bg="#0f0dba")
+        self.fr_target = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_target.grid(row=2, column=0, padx=30, pady=12)
-        self.fr_firmware = tk.Frame(self.frame, bg="#0f0dba")
+        self.fr_firmware = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_firmware.grid(row=2, column=1, padx=30, pady=12)
 
         # add some other variables
@@ -86,9 +86,11 @@ class tabXDS110(ThemedFrame):
 
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
-        btn_check_xds110 = Button(self.fr_xds110, text="XDS110 Check",
-                                  command=lambda: threading.Thread(target=self.check_xds110).start(),
-                                  bg="green", fg="white", height=2, width=15)
+        # btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check",
+        #                           command=lambda: threading.Thread(target=self.check_xds110).start(),
+        #                           bg="green", fg="white", height=2, width=15)
+        btn_check_xds110 = ttk.Button(self.fr_xds110, text="XDS110 Check", style="TGreenButton.TButton",
+                                  command=lambda: threading.Thread(target=self.check_xds110).start())
         btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
         self.canvas1.grid(row=3, column=2, padx=15, pady=22)
 

@@ -28,8 +28,8 @@ class tabPS(ThemedFrame):
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
-        self.frame.grid(row=0, column=0)
-        self.fr_control = tk.Frame(self.frame, bg="#00bcd4")
+        self.grid(row=0, column=0)
+        self.fr_control = tk.Frame(self, bg="#00bcd4")
         self.fr_control.grid(row=0, column=0, pady=10, padx=10)
 
         # set up serial / PS variables
@@ -39,9 +39,9 @@ class tabPS(ThemedFrame):
         self.ch2_on = False
 
         # set up prompt
-        # self.fr_prompt = tk.Frame(self.frame, bg="gray")
+        # self.fr_prompt = tk.Frame(self, bg="gray")
         # self.fr_prompt
-        self.prompt = guic.Prompt(self.frame, "PS Console Output", height=25, width=140)
+        self.prompt = guic.Prompt(self, "PS Console Output", height=25, width=140)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
@@ -53,7 +53,7 @@ class tabPS(ThemedFrame):
         self.init_fr_control()
 
     def init_fr_port(self):
-        self.fr_port = guic.SerialConnFrame(self.frame,
+        self.fr_port = guic.SerialConnFrame(self,
                                             "Power supply PyVISA",
                                             self.connect_pyvisa,
                                             self.disconnect_pyvisa,

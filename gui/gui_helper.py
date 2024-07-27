@@ -20,10 +20,10 @@ def generate_drop_down(frame, options):
     try:
         clicked_opt.set(options[0])  # initial menu text (CAUSES ISSUES IF NO COM PORTS AVAILABLE)
     except Exception as e:
-        print(f"{e} when running generate_drop_down")
-        clicked_opt.set("COM[DUMMY]")
-        options = ["COM[DUMMY]"]
+        clicked_opt.set("NA")
+        options = ["NA"]
     drop = OptionMenu(frame, clicked_opt, *options)  # create drop down menu of years
+    drop.config(width=10, font=('Arial', 10), bg="#2B2B2B", fg='#F8F8F2') # tag:hardcode
     return drop, clicked_opt
 
 

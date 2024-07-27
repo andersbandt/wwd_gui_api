@@ -64,7 +64,7 @@ def df_float(df, column):
 
 
 # TODO: this function is dogshit. Needs usage evaluated or a ChatGPT improvement. And to get out of here
-def PrettyFloat(self, v):
+def PrettyFloat(v):
     """
         A crude but functional formatter that shows floating
         points in engineering format

@@ -8,33 +8,35 @@
 
 # import modules
 import tkinter as tk
-from tkinter import *
-from tkinter import Text, INSERT, Label
+from tkinter import ttk
+from tkinter import Text, INSERT
 
 import threading
 
 # import user created modules
 from gui import gui_helper as guih
+from gui.guiTab_parent import ThemedFrame
 from common import serial_api
 import class_controller as cc
 
 
-# TODO: let's take all the hex color codes down below and all them to be input as some sort of template
-class Prompt(tk.Frame):
+class Prompt(ThemedFrame):
     def __init__(self, master, title, height, width):
-        super().__init__(master, height=height, width=width, bg="#6272a4")
+        self.theme_file = "config/darcula.json" #tag:hardcode
+        super().__init__(master, self.theme_file, height=height, width=width)
         self.height = height
         self.width = width
+        self.set_bg(self.theme_config["light_4"])
 
         # set up text box for user communication
-        Label(self, text=title, bg="#ff79c6", fg="#282a36").grid(row=0, column=0, pady=3)
-        clear_button = tk.Button(self, text="Clear console", command=self.clear, bg="#f1fa8c", fg="#282a36")
+        ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
+        clear_button = tk.Button(self, text="Clear console", command=self.clear, bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"])
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
         self.prompt = Text(self,
                            height=height,
                            width=width,
-                           bg="#282a36",
-                           fg="#f8f8f2",
+                           bg=self.theme_config["light_2"],
+                           fg=self.theme_config["fg_light"],
                            borderwidth=10)
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
@@ -55,22 +57,25 @@ class Prompt(tk.Frame):
         self.prompt.delete("1.0", "end")  # basically line index from
 
 
-class ConnFrame(tk.Frame):
+class ConnFrame(ThemedFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
         self.master = master
-        super().__init__(self.master, bg=bg)
+        self.theme_file = "config/darcula.json" #tag:hardcode
+        super().__init__(self.master, self.theme_file)
         self.name = name
         self.connect_cmd = connect_cmd
         self.disconnect_cmd = disconnect_cmd
 
         self.status = False
-        self.canvas1 = tk.Canvas(self, width=50, height=50)  # create a Canvas widget
+        self.canvas1 = tk.Canvas(self, width=50, height=50, bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.status_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+
+        self.set_bg(self.theme_config["light_4"])
         self.init_base_fr()
 
     def init_base_fr(self):
-        label = ttk.Label(self, text=self.name, style="BW.TLabel", font=("Arial", 12))
-        label.grid(row=0, column=0)
+        label = ttk.Label(self, text=self.name, style="TPinkLabel.TLabel")
+        label.grid(row=0, column=0, pady=15, padx=10)
 
     def connect(self):
         self.status = self.connect_cmd()
@@ -84,15 +89,12 @@ class ConnFrame(tk.Frame):
 
     def set_status(self, status):
         if status:
-            self.canvas1.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
+            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["dark_2"])  # Fill the circle with GREEN
         else:
-            self.canvas1.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
+            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["dark_1"])  # Fill the circle with RED
 
     def gui_refresh(self):
-        if self.status:
-            self.canvas1.itemconfig(self.status_oval, fill="green")  # Fill the circle with GREEN
-        else:
-            self.canvas1.itemconfig(self.status_oval, fill="red")  # Fill the circle with RED
+        self.set_status(self.status)
 
     def set_color(self, color):
         self.canvas1.itemconfig(self.status_oval, fill=color)
@@ -112,12 +114,11 @@ class SerialConnFrame(ConnFrame):
         # TODO: try an autoconnect here (conditional on me properly saving them)
         self.port = None
 
-
     def initialize_fr(self):
         # Button to refresh the list of COM ports
         refresh_button = tk.Button(self, text="Refresh Ports",
                                    command=self.refresh_ports,
-                                   bg="green", fg="white")
+                                   bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
         refresh_button.grid(row=1, column=2, columnspan=1, pady=1)
 
         # initialize port list
@@ -140,13 +141,13 @@ class SerialConnFrame(ConnFrame):
 
         # Button to refresh the list of COM ports
         # TARGET - BUTTON/STATUS
-        btn_connect_serial = Button(self, text="Connect to COM",
+        btn_connect_serial = tk.Button(self, text="Connect to COM",
                                     command=self.connect,
-                                    bg="green", fg="white", height=1, width=15)
+                                    bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=1, width=15)
         btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
-        btn_disconnect_serial = Button(self, text="Disconnect COM",
+        btn_disconnect_serial = tk.Button(self, text="Disconnect COM",
                                        command=self.disconnect,
-                                       bg="orange", fg="black", height=1, width=15)
+                                       bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1, width=15)
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 
         # place CONNECT button and STATUS indicator
@@ -184,16 +185,15 @@ class AutoConnFrame(ConnFrame):
     def init_fr(self):
         self.canvas1.grid(row=1, column=2, padx=15, pady=22)
 
-        Button(
-            self, text=f"Auto-connect", bg="purple", fg="black", command=self.connect_cmd
+        tk.Button(
+            self, text=f"Auto-connect", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"], command=self.connect_cmd
         ).grid(row=0, column=1, padx=5, pady=5)
 
         # RELAY STATUS INDICATOR
-        Label(self, text=f"{self.name} status").grid(row=1, column=1, padx=5, pady=5)
-        Label(self, text=f"{self.name} config").grid(row=2, column=1, padx=5, pady=5)
+        ttk.Label(self, text=f"{self.name} status", style="TLabel").grid(row=1, column=1, padx=5, pady=5)
+        ttk.Label(self, text=f"{self.name} config", style="TLabel").grid(row=2, column=1, padx=5, pady=5)
 
         self.gui_refresh()
-
 
 
 

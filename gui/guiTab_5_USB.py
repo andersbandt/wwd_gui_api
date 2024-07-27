@@ -25,7 +25,7 @@ class tabUSB(ThemedFrame):
         super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
-        self.frame.grid(row=0, column=0)
+        self.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
         # serial Object
@@ -33,23 +33,23 @@ class tabUSB(ThemedFrame):
         self.ser_status = False
 
         # print welcome text
-        l1 = ttk.Label(self.frame, text="USB (COM) connection", style="BW.TLabel",
+        l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel",
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
 
-        self.prompt1 = guic.Prompt(self.frame, "Debug serial", height=14, width=140)
+        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=140)
         self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-        # self.fr_prompt2 = tk.Frame(self.frame, bg="purple")
+        # self.fr_prompt2 = tk.Frame(self, bg="purple")
         # self.fr_prompt2.grid(row=0, column=2, rowspan=5, columnspan=1, padx=12, pady=12)
         # self.prompt2 = guic.Prompt(self.fr_prompt2, "Serial output", "black", height=30, width=100)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self.frame, "USB serial", self.connect_serial, lambda: self.serial_close(), bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(self, "USB serial", self.connect_serial, lambda: self.serial_close(), bg="#00bcd4")
         self.fr_port.initialize_fr()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
         # init state frame
-        self.fr_state = tk.Frame(self.frame, bg="#00bcd4")
+        self.fr_state = tk.Frame(self, bg="#00bcd4")
         self.fr_state.grid(row=2, column=0, padx=30, pady=12)
         self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
         self.test_drop = None  # fr_state

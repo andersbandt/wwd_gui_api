@@ -67,12 +67,12 @@ class MainApplication(ThemedApp):
         self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json")
         self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json")
 
-        self.nb.add(self.tab1.frame, text="MAIN")
-        self.nb.add(self.tab2.frame, text="IMU Analysis")
-        self.nb.add(self.tab3.frame, text="DMM Control")
-        self.nb.add(self.tab4.frame, text="XDS110 JTAG")
-        self.nb.add(self.tab5.frame, text="USB COMM")
-        self.nb.add(self.tab6.frame, text="PS Control")
+        self.nb.add(self.tab1, text="MAIN")
+        self.nb.add(self.tab2, text="IMU Analysis")
+        self.nb.add(self.tab3, text="DMM Control")
+        self.nb.add(self.tab4, text="XDS110 JTAG")
+        self.nb.add(self.tab5, text="USB COMM")
+        self.nb.add(self.tab6, text="PS Control")
 
         self.nb.grid(column=0, row=0)
         return True

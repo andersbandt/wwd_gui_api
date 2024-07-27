@@ -34,7 +34,7 @@ from gui import guiTab_6_PS
 
 
 class MainApplication(ThemedApp):
-    def __init__(self, window, height, width, theme_file): # TODO: consider changing "window" to "root" (seems proper)
+    def __init__(self, window, height, width, theme_file):
         super().__init__(window, theme_file)
 
         self.nb = ttk.Notebook(window, height=height, width=width)
@@ -83,7 +83,8 @@ class MainApplication(ThemedApp):
         if selected_tab == "MAIN":
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1, "auto")
         elif selected_tab == "PS Control":
-            guiTab_6_PS.tabPS.gui_refresh_channel_state(self.tab6)
+            guiTab_6_PS.tabPS.gui_refresh(self.tab6)
+
 
 ###########################################################
 ######################### MAIN ############################
@@ -101,11 +102,23 @@ def main():
     # sv_ttk.set_theme("dark")
 
     # place main app
-    MainApplication(window, 1800, 1800, "config/darcula.json")
+    app = MainApplication(window, 1800, 1800, "config/darcula.json")
 
     # run application
     window.mainloop()
 
+    # perform shutdown activities
     print("TKINTER is shutting down!")
-    print("Anders you should put some graceful exit stuff here!")
-    # TODO: now that I'm adding all these pieces of test equipment I need some way to have a "graceful exit" (shutting off all supplies, etc)
+    if app.controller.ps is not None:
+        try:
+            app.controller.ps.output_off(1)
+            app.controller.ps.output_off(2)
+        except Exception as e:
+            raise e
+
+    # close any open serial ports
+    app.tab3.port_close()
+    app.tab5.port_close()
+    app.tab6.port_close()
+
+

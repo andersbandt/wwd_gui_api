@@ -1,11 +1,11 @@
 
 # import needed packages
 import tkinter as tk
-from tkinter import *
-
+from tkinter import ttk
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
+from EEequipment.usbrelay.usbrelay_controller import NUM_RELAY
 from gui import gui_class as guic
 from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
@@ -58,11 +58,11 @@ class tabMainDashboard(ThemedFrame):
         fr_m = self.fr_relay_control
 
         # add button for GUI refresh of relay states
-        btn2 = tk.Button(fr_m, text=f"Refresh states", bg=self.theme_config["light_4"], command=lambda: self.gui_refresh_relay_state("call"))
+        btn2 = tk.Button(fr_m, text=f"Refresh states", bg=self.theme_config["dark_2"], command=lambda: self.gui_refresh_relay_state("call"))
         btn2.grid(row=0, column=1, padx=10, pady=10)
 
         # Create and place individual relay control buttons
-        for i in range(4): # TODO: this integer should come from the `config.ini` number
+        for i in range(NUM_RELAY):
             name = self.cc.relay.get_relay_mapping(i+1)
             btn = tk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i+1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)
@@ -83,11 +83,9 @@ class tabMainDashboard(ThemedFrame):
         if self.fr_main_status.status:
             for i, btn in enumerate(self.relay_btns):
                 if self.cc.relay.get_state_state(i+1):
-                    # btn.config(style="TButtonOn.TButton") # TODO: when relay is connected experiment with this style?
-                    btn.config(bg="green")
+                    btn.config(style="TButtonOn.TButton")
                 else:
-                    # btn.config(style="TButtonOff.TButton")
-                    btn.config(bg="red")
+                    btn.config(style="TButtonOff.TButton")
         else:
             print("Can't refresh relay state with inactive relay!!!")
             if event == "call":

@@ -9,7 +9,6 @@
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
-import tkinter.font as tkFont  # TODO: let's figure out how to use this
 
 # import needed packages
 import threading
@@ -21,6 +20,7 @@ from datetime import datetime
 
 # import user defined modules
 from data.csv_helper import CSVHelper
+from data import data_helper as datah
 from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
 from EEequipment.xdm1041 import xdm1041helper
 from gui import gui_helper as guih
@@ -76,8 +76,8 @@ class tabDMM(ThemedFrame):
     def init_fr_port(self):
         self.fr_port = guic.SerialConnFrame(self,
                                             "DMM Serial",
-                                            self.connect_serial,
-                                            self.serial_close,
+                                            self.port_init,
+                                            self.port_close,
                                             bg="#00bcd4")
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
         self.fr_port.initialize_fr()
@@ -128,20 +128,20 @@ class tabDMM(ThemedFrame):
         self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
 
-
     def init_fr_rec(self):
         fr_m = self.fr_rec
+        ttk.Label(fr_m, text="Record DMM", style="TPinkLabel.TLabel").grid(row=0, column=0, pady=10, padx=15)
 
-        self.labelRNums = tk.Label(fr_m, text='', width=8, relief='sunken')
-        self.labelRecFn = tk.Label(fr_m, text='{:24s}'.format(self.recName), width=40, relief='sunken')
-        self.labelRNums.grid(row=0, column=0, padx=10, pady=10, sticky='W')
-        self.labelRecFn.grid(row=0, column=1, sticky='E')
+        self.labelRNums = ttk.Label(fr_m, text='', width=8, relief='sunken')
+        self.labelRecFn = ttk.Label(fr_m, text='{:24s}'.format(self.recName), width=40, relief='sunken')
+        self.labelRNums.grid(row=1, column=0, padx=10, pady=10, sticky='W')
+        self.labelRecFn.grid(row=1, column=1, sticky='E')
 
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
-        self.btn_record = tk.Button(fr_m, text='RECORD THIS', bd=5, command=self.record_DMM, width=12)
-        self.optRecSpd.grid(row=1, column=0, padx=3, sticky='W')
-        self.btn_record.grid(row=1, column=3, pady=5, padx=3, sticky='W')
+        self.btn_record = ttk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
+        self.optRecSpd.grid(row=2, column=0, padx=3, sticky='W')
+        self.btn_record.grid(row=2, column=3, pady=5, padx=3, sticky='W')
 
     def init_fr_PT100(self):
             #        (8)      (10)   (10)   (10)   (10)        = 48
@@ -235,7 +235,6 @@ class tabDMM(ThemedFrame):
                 self.PT100_On = False
                 self.buttonPT100.config(relief='raised')
 
-
     ##############################################################################
     ####      RECORDING FUNCTIONS        #########################################
     ##############################################################################
@@ -305,16 +304,16 @@ class tabDMM(ThemedFrame):
     def gui_refresh(self):
         self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
         self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-        self.valueMeas1.config(text=self.PrettyFloat(self.dmm_Meas1))
+        self.valueMeas1.config(text=datah.PrettyFloat(self.dmm_Meas1))
         self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
-        self.valueMeas1.config(text=self.PrettyFloat(self.dmm_Meas2))
+        self.valueMeas1.config(text=datah.PrettyFloat(self.dmm_Meas2))
 
 
     #################################
     #### SERIAL (COM)  ##############
     #################################
 
-    def connect_serial(self, event=None):
+    def port_init(self, event=None):
         port = self.fr_port.get_port()
 
         self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
@@ -338,7 +337,7 @@ class tabDMM(ThemedFrame):
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
 
-    def serial_close(self):
+    def port_close(self):
         self.prompt.print(f"Serial close!")
         self.dmm.disconnect()
         self.ser_status = False

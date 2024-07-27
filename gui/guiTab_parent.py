@@ -78,6 +78,13 @@ class ThemedFrame(tk.Frame):
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
+        self.style.configure('TYellowButton.TButton',
+                             background="#F1FA8C",
+                             foreground=self.theme_config["fg_dark"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]))
+
         self.style.map('TButton',
                        background=[('active', self.theme_config["button"]["active_background"])],
                        foreground=[('active', self.theme_config["button"]["active_foreground"])])
@@ -90,12 +97,19 @@ class ThemedFrame(tk.Frame):
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
-        self.style.configure('TPinkLabel.TLabel',
-                             background=self.theme_config["light_1"],
-                             foreground="white",
+        self.style.configure('TSpunkLabel.TLabel',
+                             background=self.theme_config["dark_1"],
+                             foreground=self.theme_config["fg_light"],
                              font=(self.theme_config["font"]["family"],
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
+
+        self.style.configure('TPinkLabel.TLabel',
+                             background=self.theme_config["light_1"],
+                             foreground="white",
+                             font=(self.theme_config["h1"]["family"],
+                                   self.theme_config["h1"]["size"],
+                                   self.theme_config["h1"]["style"]))
 
 
     def update_theme(self, new_theme_file):

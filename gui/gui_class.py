@@ -20,6 +20,15 @@ from common import serial_api
 import class_controller as cc
 
 
+class ColorCircle(tk.Canvas):
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+
+    def set_color(self, color):
+        self.canvas1.itemconfig(self.status_oval, fill=color)
+
+
 class Prompt(ThemedFrame):
     def __init__(self, master, title, height, width):
         self.theme_file = "config/darcula.json" #tag:hardcode
@@ -30,7 +39,7 @@ class Prompt(ThemedFrame):
 
         # set up text box for user communication
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
-        clear_button = tk.Button(self, text="Clear console", command=self.clear, bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"])
+        clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
         self.prompt = Text(self,
                            height=height,
@@ -42,6 +51,7 @@ class Prompt(ThemedFrame):
 
     # gui_print: prints a message on a Tkinter frame
     def print(self, message, print_type=None):
+        # TODO: would be cool if I could figure out how to print errors as red
         if print_type == "error":
             fg_color = "red"
         else:
@@ -105,7 +115,6 @@ class SerialConnFrame(ConnFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, port_func=2, bg=None):
         self.master = master
         super().__init__(self.master, name, connect_cmd, disconnect_cmd, bg=bg)
-
 
         self.port_func = port_func # NOTE: this tracks what method is used to populate array of ports
         self.com_drop = None

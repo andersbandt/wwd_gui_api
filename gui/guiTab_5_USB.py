@@ -206,7 +206,7 @@ class tabUSB(ThemedFrame):
     #### SERIAL (COM)  ##############
     #################################
 
-    def serial_init(self, serial_port):
+    def port_init(self, serial_port):
         self.prompt1.print(f"Init with port: {serial_port}")
         try:
             self.ser_obj = SerialReader(serial_port, 115200)
@@ -220,7 +220,7 @@ class tabUSB(ThemedFrame):
         self.ser_status = True
         return True
 
-    def serial_close(self):
+    def port_close(self):
         self.prompt1.print(f"Serial close!")
         self.ser_obj.stop_process()
         self.ser_status = False

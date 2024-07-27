@@ -9,6 +9,11 @@
     "tab_foreground": "#A9B7C6",
     "selected_tab_background": "#3C3F41",
     "selected_tab_foreground": "#FFFFFF",
+    "h1": {
+        "family": "Helvetica",
+        "size": 16,
+        "style": "bold"
+    },
     "font": {
         "family": "Arial",
         "size": 12,

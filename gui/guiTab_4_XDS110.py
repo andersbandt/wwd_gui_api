@@ -20,6 +20,7 @@ from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
 from gui import gui_helper as guih
 from gui import gui_class as guic
+from gui.gui_class import *
 from gui.guiTab_parent import ThemedFrame
 
 
@@ -67,8 +68,7 @@ class tabXDS110(ThemedFrame):
         # add some other variables
         self.canvas1 = tk.Canvas(self.fr_xds110, width=50, height=50)  # fr_xds110
         self.canvas2 = tk.Canvas(self.fr_target, width=50, height=50)  # fr_target
-        self.canvas3 = tk.Canvas(self.fr_firmware, width=50, height=50)  # fr_firmware
-        self.canvas4 = tk.Canvas(self.fr_firmware, width=50, height=50)  # fr_firmware
+
         self.toggle_drop = None  # fr_target
         self.lbl_target_v = None  # fr_target
         self.targetConfig_drop = None  # fr_firmware
@@ -86,9 +86,6 @@ class tabXDS110(ThemedFrame):
 
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
-        # btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check",
-        #                           command=lambda: threading.Thread(target=self.check_xds110).start(),
-        #                           bg="green", fg="white", height=2, width=15)
         btn_check_xds110 = ttk.Button(self.fr_xds110, text="XDS110 Check", style="TGreenButton.TButton",
                                   command=lambda: threading.Thread(target=self.check_xds110).start())
         btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
@@ -99,12 +96,12 @@ class tabXDS110(ThemedFrame):
         # TARGET - BUTTON/STATUS
         btn_check_target = Button(self.fr_target, text="Target check",
                                   command=lambda: threading.Thread(target=self.check_target).start(),
-                                  bg="green", fg="white", height=2, width=15)
+                                  bg=self.theme_config["dark_2"], fg=self.theme_config["fg_light"], height=2, width=15)
         btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
         self.canvas2.grid(row=1, column=2, rowspan=2, padx=15, pady=22)
 
         # TARGET VOLTAGE
-        self.lbl_target_v = Label(self.fr_target)
+        self.lbl_target_v = ttk.Label(self.fr_target, style="TSpunkLabel.TLabel")
         self.lbl_target_v.config(text="x.xx V")
         self.lbl_target_v.grid(row=1, column=3, padx=15, pady=22)
 
@@ -118,7 +115,7 @@ class tabXDS110(ThemedFrame):
         # ROW 3
         btn_toggle_target = Button(self.fr_target, text="Toggle target",
                                    command=lambda: threading.Thread(target=self.toggle_target).start(),
-                                   bg="orange", fg="black", height=2, width=15)
+                                   bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"], height=2, width=15)
         btn_toggle_target.grid(row=3, column=2, padx=15, pady=22)
         self.toggle_drop = guih.generate_drop_down(
             self.fr_target,
@@ -129,37 +126,43 @@ class tabXDS110(ThemedFrame):
     def init_fr_firmware(self):
         fr_m = self.fr_firmware
 
+        # set up all the usable objects
         btn_build_firmware = Button(fr_m, text="Build firmware",
                                     command=lambda: threading.Thread(target=self.build_firmware).start(),
-                                    bg="purple", fg="white", height=2, width=20)
-        btn_build_firmware.grid(row=1, column=2, padx=15, pady=22)
-        self.canvas3.grid(row=1, column=3, padx=15, pady=22)
+                                    bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"], height=2, width=20)
 
         btn_flash_firmware = Button(fr_m, text="Load firmware",
                                     command=lambda: threading.Thread(target=self.flash_firmware).start(),
-                                    bg="green", fg="white", height=2, width=20)
-        btn_flash_firmware.grid(row=2, column=2, padx=15, pady=22)
-
-        Label(fr_m, text="Time delay to flash (seconds)").grid(row=3,  column=2)
+                                    bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"], height=2, width=20)
         self.entry_timesleep = Entry(fr_m, textvariable="seconds")
-        self.entry_timesleep.grid(row=3, column=3)
-
-        Label(fr_m, text="Auto off (seconds)").grid(row=4,  column=2)
         self.entry_timeautoff = Entry(fr_m)
-        self.entry_timeautoff.grid(row=4, column=3)
-        self.var_autooff = tk.IntVar()
-        ttk.Checkbutton(self.fr_target,
-                        text="Auto off?",
-                        variable=self.var_autooff,
-                        onvalue=1,
-                        offvalue=0).grid(row=2, column=3)
-
+        self.buildStatus = ColorCircle(fr_m, width=50, height=50)
         self.targetConfig_drop = guih.generate_drop_down(
             fr_m,
             ["target_power", "probe_power", "supply_power"]
         )
-        self.targetConfig_drop[0].grid(row=2, column=3, padx=3, pady=10)
-        self.canvas4.grid(row=2, column=4, padx=15, pady=22)
+
+        self.var_autooff = tk.IntVar()
+        self.checkAutoOff = ttk.Checkbutton(fr_m,
+                        text="Auto off?",
+                        variable=self.var_autooff,
+                        onvalue=1,
+                        offvalue=0)
+        self.flashStatus = ColorCircle(fr_m, width=60, height=60)
+
+        # place the usable objects
+        btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
+        self.buildStatus.grid(row=1, column=1)
+
+        ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2,  column=0, padx=10, pady=15)
+        self.entry_timesleep.grid(row=2, column=1)
+        ttk.Label(fr_m, text="Auto off (seconds)", style="TLabel").grid(row=3,  column=0)
+        self.entry_timeautoff.grid(row=3, column=1)
+        self.checkAutoOff.grid(row=3, column=2)
+        self.targetConfig_drop[0].grid(row=2, column=2, padx=6, pady=10)
+
+        btn_flash_firmware.grid(row=4, column=0, padx=15, pady=22)
+        self.flashStatus.grid(row=4, column=1, padx=15, pady=22)
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -245,47 +248,15 @@ class tabXDS110(ThemedFrame):
             self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             return False
 
-
     def flash_firmware(self):
         print("... executing loadti to flash firmware ...")
-        my_oval = self.canvas4.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
 
         # BUILD FIRMWARE
         self.build_firmware()
 
-        # PERFORM TARGET CHECK
+        # TURN POWER ON
         flash_option = self.targetConfig_drop[1].get()
-
-        # CONFIG POWER
-        if flash_option == "target_power" or flash_option == "probe_power":
-            try:
-                self.cc.ps.output_off(1)
-            except AttributeError:
-                res = guih.promptYesNo("Can't access power supply!", "Can't access supply to turn off. Continue with flash?")
-                if not res:
-                    self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
-                    return False
-
-        if flash_option == "target_power":
-            try:
-                dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
-                self.cc.relay.set_state(dut_vdd1_channel, 1)
-            except AttributeError:
-                res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
-                if not res:
-                    self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
-                    return False
-        elif flash_option == "probe_power":
-            self.cc.relay.open_all()
-        elif flash_option == "supply_power":
-            self.cc.relay.open_all()
-            try:
-                self.cc.ps.set_voltage(ps_channel, device_vdds)
-                self.cc.ps.output_on(1)
-            except AttributeError:
-                guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
-                self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
-                return
+        self.turn_power_on(flash_option)
 
         # FLASH FIRMWARE
         # apply time delay (if added)
@@ -296,22 +267,22 @@ class tabXDS110(ThemedFrame):
             guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
 
         # perform flashing according to debug API
-        self.canvas4.itemconfig(my_oval, fill="yellow")
+        self.flashStatus.set_color(self.theme_config["#F1FA8C"])  # RED
         [firmware_status, packet] = xds110.flash_firmware(
             flash_option
         )
 
         self.prompt.print(packet.get_string())
         if firmware_status:
-            self.canvas4.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+            self.flashStatus.set_color(self.theme_config["#50FA7B"]) # RED
         else:
-            self.canvas4.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
 
         # auto shut off of target
         if self.var_autooff.get():
             wait_seconds = self.entry_timeautoff.get()
             if guih.is_float(wait_seconds):
-                # time.sleep(float(wait_seconds)) # TODO: I need to actually figure out how to implement a non-blocking auto-off call
+                self.after(wait_seconds * 1000, self.turn_power_off(flash_option))
                 return True
             else:
                 return False
@@ -319,4 +290,45 @@ class tabXDS110(ThemedFrame):
     ##############################################################################
     ####      HELPER FUNCTIONS        ############################################
     ##############################################################################
+
+    def turn_power_on(self, flash_option):
+        # CONFIG POWER
+        if flash_option == "target_power" or flash_option == "probe_power":
+            try:
+                self.cc.ps.output_off(ps_channel)
+            except AttributeError:
+                res = guih.promptYesNo("Can't access power supply!", "Can't access supply to turn off. Continue with flash?")
+                if not res:
+                    self.flashStatus.set_color(self.theme_config["#FF5555"]) # RED
+                    return False
+
+        if flash_option == "target_power":
+            try:
+                dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
+                self.cc.relay.set_state(dut_vdd1_channel, 1)
+            except AttributeError:
+                res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
+                if not res:
+                    self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
+                    return False
+        elif flash_option == "probe_power":
+            self.cc.relay.open_all()
+        elif flash_option == "supply_power":
+            self.cc.relay.open_all()
+            try:
+                self.cc.ps.set_voltage(ps_channel, device_vdds)
+                self.cc.ps.output_on(ps_channel)
+            except AttributeError:
+                guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
+                self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
+                return
+
+    def turn_power_off(self, flash_option):
+        if flash_option == "target_power":
+            self.cc.relay.open_all()
+        elif flash_option == "probe_power":
+            return
+        elif flash_option == "supply_power":
+            self.cc.ps.output_off(ps_channel)
+
 

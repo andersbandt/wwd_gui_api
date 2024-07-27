@@ -1,5 +1,6 @@
 
 
+import xml.etree.ElementTree as ET
 
 
 class ClassController:
@@ -23,6 +24,19 @@ class ClassController:
         self.ports_used[port] = usage
         print(f"Debug print of cc ports used: {self.ports_used}")
 
-        # TODO: complete function here to write to some file with ports used (XML?)
-        #   or could keep things consistent and use that same config.ini filetype?
+        # TODO: complete function below to use XML to store ports used
+        # Create the root element
+        root = ET.Element("PortsUsed")
+
+        # Add each port and its usage as a child element
+        for port, usage in self.ports_used.items():
+            port_element = ET.SubElement(root, "Port", name=str(port))
+            port_element.text = usage
+
+        # Write to an XML file
+        tree = ET.ElementTree(root)
+        with open("ports_used.xml", "wb") as xml_file:
+            tree.write(xml_file)
+
+        print("Ports used have been saved to ports_used.xml")
 

@@ -15,6 +15,7 @@ import tkinter.messagebox as tkmb
 import time
 from time import localtime, strftime, perf_counter_ns
 
+import pyvisa.errors
 
 # import user defined modules
 from EEequipment.spd3303x import SPD3303X
@@ -33,6 +34,7 @@ class tabPS(ThemedFrame):
         self.grid(row=0, column=0)
 
         self.fr_port = guic.SerialConnFrame(self,
+                                            self.cc,
                                             "Power supply PyVISA",
                                             self.port_init,
                                             self.port_close,
@@ -42,9 +44,9 @@ class tabPS(ThemedFrame):
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
 
-
         # set up serial / PS variables
         self.ps = None
+        self.id = None
         self.ch1_on = False
         self.ch2_on = False
 
@@ -174,7 +176,6 @@ class tabPS(ThemedFrame):
         else:
             self.ch2_toggle_btn.config(bg="red")
 
-
     def gui_refresh_channel_mode(self):
         if self.ps is not None:
             status_decode = self.ps.check_status()
@@ -190,7 +191,6 @@ class tabPS(ThemedFrame):
             self.ch1_mode.set_color(self.theme_config["light_3"])
         else:
             self.ch1_mode.set_color(self.theme_config["dark_3"])
-
 
     def gui_refresh(self):
         self.gui_refresh_channel_mode()
@@ -233,13 +233,16 @@ class tabPS(ThemedFrame):
     #### SERIAL (COM)  ##############
     #################################
 
-
     def port_init(self, event=None):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
         self.ps = SPD3303X.SPD3303X(port)
-        self.id = self.ps.test_conn()
+        try:
+            self.id = self.ps.test_conn()
+        except pyvisa.errors.VisaIOError:
+            guih.alert_user("Can't connect to VISA", "Visa connect error (likely timeout)", "error")
+            self.fr_port.set_status(False)
         if self.id is not False:
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)

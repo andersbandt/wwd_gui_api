@@ -27,11 +27,6 @@ from gui import guiTab_5_USB
 from gui import guiTab_6_PS
 
 
-# TODO: an alternative method to threads. Could possibly be better for GUI updates? Check performance somehow
-# elapsed = (perf_counter_ns() - self.ProgStart) // 1000000  # time in ms since start
-# time2sleep = 1000 - (elapsed % 1000)
-# self.frame.after(time2sleep, self.PollMiniBM)
-
 
 class MainApplication(ThemedApp):
     def __init__(self, window, height, width, theme_file):
@@ -57,7 +52,6 @@ class MainApplication(ThemedApp):
         self.tab6 = None
         self.setTabs()
 
-    # set up tab control
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
         self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath, "config/darcula.json")
@@ -79,7 +73,6 @@ class MainApplication(ThemedApp):
 
     def on_tab_changed(self, event):
         selected_tab = event.widget.tab(event.widget.select(), "text")
-        print(selected_tab)
         if selected_tab == "MAIN":
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1, "auto")
         elif selected_tab == "PS Control":

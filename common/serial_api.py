@@ -6,10 +6,17 @@ import serial
 from serial.tools import list_ports
 import pyvisa
 import glob
+import platform
 
 
+def get_ports(method=None):
+    if method is None:
+        os_name = platform.system()
+        if os_name == "Windows":
+            method = 1
+        elif os_name == "Linux":
+            method = 2
 
-def get_ports(method=2):
     # METHOD 1: worked best on windows
     if method == 1:
         ports = [port.device for port in list_ports.comports()]

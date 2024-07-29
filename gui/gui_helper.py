@@ -23,7 +23,7 @@ def generate_drop_down(frame, options):
         clicked_opt.set("NA")
         options = ["NA"]
     drop = OptionMenu(frame, clicked_opt, *options)  # create drop down menu of years
-    drop.config(width=10, font=('Arial', 10), bg="#2B2B2B", fg='#F8F8F2') # tag:hardcode
+    drop.config(width=15, font=('Arial', 10), bg="#2B2B2B", fg='#F8F8F2') # tag:hardcode
     return drop, clicked_opt
 
 

@@ -8,17 +8,17 @@
 
 # import modules
 import tkinter as tk
+import xml.etree.ElementTree
 from tkinter import ttk
 from tkinter import Text, INSERT
 
 import threading
+import xml.etree.ElementTree as ET
 
 # import user created modules
 from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
 from common import serial_api
-import class_controller as cc
-
 
 class ColorCircle(tk.Canvas):
     def __init__(self, master, *args, **kwargs):
@@ -69,12 +69,14 @@ class Prompt(ThemedFrame):
 
 class ConnFrame(ThemedFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
-        self.master = master
         self.theme_file = "config/darcula.json" #tag:hardcode
-        super().__init__(self.master, self.theme_file)
+        super().__init__(master, self.theme_file)
+        self.master = master
         self.name = name
         self.connect_cmd = connect_cmd
         self.disconnect_cmd = disconnect_cmd
+
+        self.port = None
 
         self.status = False
         self.canvas1 = tk.Canvas(self, width=50, height=50, bg=self.theme_config["bg_dark"])  # create a Canvas widget
@@ -88,7 +90,7 @@ class ConnFrame(ThemedFrame):
         label.grid(row=0, column=0, pady=15, padx=10)
 
     def connect(self):
-        self.status = self.connect_cmd()
+        self.status = self.connect_cmd(self.port)
         self.gui_refresh()
         return self.status
 
@@ -112,16 +114,16 @@ class ConnFrame(ThemedFrame):
 
 # SerialConnFrame: just a basic serial connection frame
 class SerialConnFrame(ConnFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd, port_func=2, bg=None):
-        self.master = master
-        super().__init__(self.master, name, connect_cmd, disconnect_cmd, bg=bg)
+    def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None, bg=None):
+        super().__init__(master, name, connect_cmd, disconnect_cmd, bg=bg)
+        self.cc = class_controller
 
-        self.port_func = port_func # NOTE: this tracks what method is used to populate array of ports
+        # NOTE: port_func is for tracking what method is used for populating array of ports
+        self.port_func = port_func # NONE defaults to OS detection method. 1=Windows, 2=Linux, 3=PyVISA
         self.com_drop = None
         self.baud_drop = None
 
-        # TODO: try an autoconnect here (conditional on me properly saving them)
-        self.port = None
+        self.initialize_fr()
 
     def initialize_fr(self):
         # Button to refresh the list of COM ports
@@ -133,7 +135,7 @@ class SerialConnFrame(ConnFrame):
         # initialize port list
         self.com_drop = guih.generate_drop_down(
             self,
-            serial_api.get_ports()
+            serial_api.get_ports(method=self.port_func)
         )
         self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
 
@@ -162,9 +164,9 @@ class SerialConnFrame(ConnFrame):
         # place CONNECT button and STATUS indicator
         self.canvas1.grid(row=5, column=2, padx=15, pady=3)
 
-    def serial_connect(self):
-        status = self.connect()
-        if status:
+    def connect(self):
+        super().connect()
+        if self.status:
             self.port = self.get_port()
             self.cc.set_used_port(self.port, self.name)
 
@@ -175,7 +177,10 @@ class SerialConnFrame(ConnFrame):
         # update port list
         ports = serial_api.get_ports(method=self.port_func)
 
-        # TODO: add a check here for used ports (look in cc dictionary)
+        # TODO: figure out how to add the previous port as the first option
+        prev_port = self.get_previous_port()
+        if prev_port in ports:
+            pass
 
         # add each port name to the drop down menu
         for string in ports:
@@ -185,6 +190,24 @@ class SerialConnFrame(ConnFrame):
     def get_port(self):
         return self.com_drop[1].get()
 
+
+    def get_previous_port(self):
+        # Create the root element
+        root = ET.Element("PortsUsed")
+        try:
+            tree = ET.ElementTree(root, file="config/ports_used.xml")
+        except xml.etree.ElementTree.ParseError:
+            return False
+
+        port_elem = tree.find(self.name)
+        return port_elem.text
+
+
+    def connect_previous_port(self):
+        self.port = self.get_previous_port()
+        if self.port is not None:
+            self.connect()
+        return self.status
 
 class AutoConnFrame(ConnFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):

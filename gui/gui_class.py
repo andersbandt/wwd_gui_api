@@ -11,6 +11,7 @@ import tkinter as tk
 import xml.etree.ElementTree
 from tkinter import ttk
 from tkinter import Text, INSERT
+from tkinter import scrolledtext
 
 import threading
 import xml.etree.ElementTree as ET
@@ -26,7 +27,7 @@ class ColorCircle(tk.Canvas):
         self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
 
     def set_color(self, color):
-        self.canvas1.itemconfig(self.status_oval, fill=color)
+        self.itemconfig(self.status_oval, fill=color)
 
 
 
@@ -46,7 +47,7 @@ class Prompt(ThemedFrame):
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
         clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
-        self.prompt = Text(self,
+        self.prompt = scrolledtext.ScrolledText(self,
                            height=height,
                            width=width,
                            bg=self.theme_config["light_2"],

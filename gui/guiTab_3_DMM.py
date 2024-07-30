@@ -20,7 +20,6 @@ from datetime import datetime
 
 # import user defined modules
 from data.csv_helper import CSVHelper
-from data import data_helper as datah
 from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
 from EEequipment.xdm1041 import xdm1041helper
 from gui import gui_helper as guih

@@ -8,13 +8,11 @@
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.scrolledtext as tkst
 import tkinter.messagebox as tkmb
 
 # import needed packages
 import time
-from time import localtime, strftime, perf_counter_ns
-
+from datetime import datetime
 import pyvisa.errors
 
 # import user defined modules
@@ -189,17 +187,15 @@ class tabPS(ThemedFrame):
         else:
             return
 
-        print(f"Status decode from power supply: [{status_decode}]")
-
         if status_decode["ch1_mode"] == "CV":
-            self.ch1_mode.set_color(self.theme_config["light_3"])
+            self.ch1_mode.set_color("green")
         else:
-            self.ch1_mode.set_color(self.theme_config["dark_3"])
+            self.ch1_mode.set_color("red")
 
         if status_decode["ch2_mode"] == "CV":
-            self.ch1_mode.set_color(self.theme_config["light_3"])
+            self.ch2_mode.set_color("green")
         else:
-            self.ch1_mode.set_color(self.theme_config["dark_3"])
+            self.ch2_mode.set_color("red")
 
     def gui_refresh(self):
         self.gui_refresh_channel_mode()
@@ -225,9 +221,10 @@ class tabPS(ThemedFrame):
                 self.ps.output_on(channel)
                 self.ch2_on = True
         else:
-            raise Exception("Wrong channel input")
+            raise ValueError("Wrong channel input")
 
-        self.gui_refresh_channel_state()
+        time.sleep(0.5)
+        self.gui_refresh()
 
     def set_voltage(self, channel, voltage_str):
         if self.ps is not None:
@@ -257,6 +254,9 @@ class tabPS(ThemedFrame):
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)
             self.labelIDValue.config(text=self.id)
+            self.labelTimeConnectedValue.config(
+                text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            )
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
             self.ps.output_off(1)

@@ -64,7 +64,7 @@ class tabMainDashboard(ThemedFrame):
         # Create and place individual relay control buttons
         for i in range(NUM_RELAY):
             name = self.cc.relay.get_relay_mapping(i+1)
-            btn = tk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i+1))
+            btn = ttk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i+1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)
             self.relay_btns.append(btn)
 

@@ -29,6 +29,11 @@ class ColorCircle(tk.Canvas):
         self.canvas1.itemconfig(self.status_oval, fill=color)
 
 
+
+##########################################
+### FRAMES (VARIOUS)     #################
+##########################################
+
 class Prompt(ThemedFrame):
     def __init__(self, master, title, height, width):
         self.theme_file = "config/darcula.json" #tag:hardcode
@@ -67,6 +72,13 @@ class Prompt(ThemedFrame):
         self.prompt.delete("1.0", "end")  # basically line index from
 
 
+# TODO: add a class for an Equipment information frame (ID, connect time, etc)
+
+
+##########################################
+### CONNECTION FRAMES    #################
+##########################################
+
 class ConnFrame(ThemedFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
         self.theme_file = "config/darcula.json" #tag:hardcode
@@ -90,7 +102,8 @@ class ConnFrame(ThemedFrame):
         label.grid(row=0, column=0, pady=15, padx=10)
 
     def connect(self):
-        self.status = self.connect_cmd(self.port)
+        self.status = self.connect_cmd()
+        print(f"\nConnect with {self.port} had status: {self.status} !\n")
         self.gui_refresh()
         return self.status
 
@@ -167,7 +180,6 @@ class SerialConnFrame(ConnFrame):
     def connect(self):
         super().connect()
         if self.status:
-            self.port = self.get_port()
             self.cc.set_used_port(self.port, self.name)
 
     def refresh_ports(self):
@@ -188,8 +200,8 @@ class SerialConnFrame(ConnFrame):
                              command=lambda value=string: self.com_drop[1].set(value))
 
     def get_port(self):
-        return self.com_drop[1].get()
-
+        self.port = self.com_drop[1].get() # NOTE: this used to just be a proper get, no setting. However, it didn't work with auto-connect
+        return self.port
 
     def get_previous_port(self):
         # Create the root element
@@ -200,14 +212,21 @@ class SerialConnFrame(ConnFrame):
             return False
 
         port_elem = tree.find(self.name)
-        return port_elem.text
-
+        if port_elem is not False:
+            if port_elem is not None:
+                return port_elem.text
+        else:
+            return None
 
     def connect_previous_port(self):
         self.port = self.get_previous_port()
+        self.com_drop[1].set(self.port)
         if self.port is not None:
-            self.connect()
+            if self.port is not False:  # TODO: phase this check out
+                print(f"Connect to previous port started for {self.name} @ {self.port}")
+                self.connect()
         return self.status
+
 
 class AutoConnFrame(ConnFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
@@ -228,7 +247,11 @@ class AutoConnFrame(ConnFrame):
         self.gui_refresh()
 
 
+##########################################
+### THREADS#######      ##################
+##########################################
 
+# TODO: I think I should move this guy out of here?
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""

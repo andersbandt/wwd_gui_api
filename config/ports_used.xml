@@ -1,1 +1,1 @@
-<PortsUsed><USB_serial>COM5</USB_serial></PortsUsed>
+<PortsUsed><DMM_Serial>/dev/ttyUSB0</DMM_Serial><PS_PyVISA>USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA></PortsUsed>

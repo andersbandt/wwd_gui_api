@@ -43,6 +43,8 @@ class tabDMM(ThemedFrame):
         self.fr_rec.grid(row=1, column=0, pady=10, padx=10)
 
         # set up serial / DMM variables
+        self.dmm = None
+        self.dmm_id = None
         self.ser_status = False
 
         # set up recording information
@@ -62,41 +64,39 @@ class tabDMM(ThemedFrame):
 
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")
-        self.init_fr_port()
         self.init_fr_info()
         self.init_fr_rec()
         self.init_fr_PT100()
+        self.init_fr_port()
 
         # remaining initialisation and start of main loop
         # self.entryPort.focus_set()
-        self.PollCount = 0
-        self.ProgStart = perf_counter_ns()
-        # self.PollMiniBM()
 
     def init_fr_port(self):
         self.fr_port = guic.SerialConnFrame(self,
                                             self.cc,
-                                            "DMM Serial",
+                                            "DMM_Serial",
                                             self.port_init,
                                             self.port_close,
                                             bg="#00bcd4")
-        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
+        self.fr_port.connect_previous_port()
         self.fr_port.initialize_fr()
+        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
     def init_fr_info(self):
-        self.labelInfo = ttk.Label(self.fr_info, text='DMM Info', style="TPinkLabel.TLabel", width=15)
+        self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
         # Add labels for device information
-        self.labelDeviceID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
-        self.labelDeviceIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
+        self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
+        self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
 
         self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
         # Position the device information labels
-        self.labelDeviceID.grid(row=1, column=0, sticky='W', padx=5, pady=2)
-        self.labelDeviceIDValue.grid(row=1, column=1, sticky='W', padx=5, pady=2)
+        self.labelID.grid(row=1, column=0, sticky='W', padx=5, pady=2)
+        self.labelIDValue.grid(row=1, column=1, sticky='W', padx=5, pady=2)
 
         self.labelTimeConnected.grid(row=2, column=0, sticky='W', padx=5, pady=2)
         self.labelTimeConnectedValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
@@ -301,20 +301,24 @@ class tabDMM(ThemedFrame):
 
         print("DMM record thread exiting.")
 
-
     def gui_refresh(self):
+        # refresh DMM information
+        self.update_DMM()
+
+        # update Label
         self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
         self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-        self.valueMeas1.config(text=datah.PrettyFloat(self.dmm_Meas1))
+        self.valueMeas1.config(text=self.dmm_Meas1) # TODO: figure out how to use PrettyFloat on this (in data helper)
         self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
-        self.valueMeas1.config(text=datah.PrettyFloat(self.dmm_Meas2))
+        self.valueMeas2.config(text=self.dmm_Meas2)
 
 
     #################################
     #### SERIAL (COM)  ##############
     #################################
 
-    def port_init(self, event=None):
+    # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
+    def port_init(self):
         port = self.fr_port.get_port()
 
         self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
@@ -324,19 +328,25 @@ class tabDMM(ThemedFrame):
         self.prompt.print(f"Got id: {self.dmm_id}")
 
         # BAD ID received
-        if self.dmm_id == '' or len(self.id) < 3:
+        if self.dmm_id == '' or len(self.dmm_id) < 3:
             self.dmm = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
+            return False
         # GOOD ID received
         else:
             self.cc.set_dmm(self.dmm)
+            self.cc.dmm.set_mode_dcv()
             self.cc.dmm.set_sample_speed_fast()
             self.gui_refresh()
-            self.labelId.config(text=self.dmm_id)
+            self.labelTimeConnectedValue.config(
+                text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+            )
+            self.labelIDValue.config(text=self.dmm_id)
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
+            return True
 
     def port_close(self):
         self.prompt.print(f"Serial close!")
@@ -348,6 +358,16 @@ class tabDMM(ThemedFrame):
     #################################
     #### HELPER        ##############
     #################################
+
+    def update_DMM(self):
+        # TODO: complete these DMM functions to get operating state information
+        self.dmm_Auto = self.dmm.get_range_auto()
+        self.dmm_Range = ''
+        self.dmm_Fu1 = ''
+        self.dmm_Meas1 = self.dmm.read_val1_str()
+        self.dmm_Fu2 = ''
+        self.dmm_Meas2 = self.dmm.read_val2_str()
+
 
     def parse_time_to_seconds(self, time_str):
         """Convert a time string to seconds.

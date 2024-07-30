@@ -33,13 +33,7 @@ class tabPS(ThemedFrame):
         self.basefilepath = basefilepath
         self.grid(row=0, column=0)
 
-        self.fr_port = guic.SerialConnFrame(self,
-                                            self.cc,
-                                            "Power supply PyVISA",
-                                            self.port_init,
-                                            self.port_close,
-                                            port_func=3,
-                                            bg="#00bcd4")
+        self.fr_port = None
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
@@ -51,11 +45,11 @@ class tabPS(ThemedFrame):
         self.ch2_on = False
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "PS Console Output", height=18, width=140)
+        self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=140)
 
         # place everything in grid
+        # self.fr_port is placed in `init_fr_port`
         self.fr_info.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
         self.fr_control.grid(row=1, column=0, pady=15, padx=15)
         self.fr_status.grid(row=1, column=1, pady=15, padx=15)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
@@ -66,17 +60,17 @@ class tabPS(ThemedFrame):
     def initTabContent(self):
         print("Initializing tab 6 (PS) content")
         self.init_fr_info()
-        self.init_fr_port()
         self.init_fr_control()
         self.init_fr_status()
+        self.init_fr_port()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
         # Add labels for device information
-        self.labelDeviceID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
-        self.labelDeviceIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
+        self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
+        self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
 
         self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
@@ -85,8 +79,8 @@ class tabPS(ThemedFrame):
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
         # Position the device information labels
-        self.labelDeviceID.grid(row=1, column=0, sticky='W', padx=5, pady=2)
-        self.labelDeviceIDValue.grid(row=1, column=1, sticky='W', padx=5, pady=2)
+        self.labelID.grid(row=1, column=0, sticky='W', padx=5, pady=2)
+        self.labelIDValue.grid(row=1, column=1, sticky='W', padx=5, pady=2)
         self.labelTimeConnected.grid(row=2, column=0, sticky='W', padx=5, pady=2)
         self.labelTimeConnectedValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
 
@@ -115,7 +109,17 @@ class tabPS(ThemedFrame):
         self.valueI2.grid(row=6, column=1, sticky='E', padx=5, pady=2)
 
     def init_fr_port(self):
+        self.fr_port = guic.SerialConnFrame(self,
+                                            self.cc,
+                                            "PS_PyVISA",
+                                            self.port_init,
+                                            self.port_close,
+                                            port_func=3,
+                                            bg="#00bcd4")
+        self.fr_port.connect_previous_port() # TODO: phase the need to perform this here out (perform in SerialConnFrame upon __init__ )
         self.fr_port.initialize_fr()
+        self.fr_port.connect_previous_port()
+        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -162,7 +166,10 @@ class tabPS(ThemedFrame):
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
         if self.ps is not None:
-            status_decode = self.ps.check_status()
+            try:
+                status_decode = self.ps.check_status()
+            except pyvisa.errors.VisaIOError:  # TODO: this except shouldn't be here !
+                return
         else:
             return
 
@@ -181,6 +188,8 @@ class tabPS(ThemedFrame):
             status_decode = self.ps.check_status()
         else:
             return
+
+        print(f"Status decode from power supply: [{status_decode}]")
 
         if status_decode["ch1_mode"] == "CV":
             self.ch1_mode.set_color(self.theme_config["light_3"])
@@ -233,7 +242,8 @@ class tabPS(ThemedFrame):
     #### SERIAL (COM)  ##############
     #################################
 
-    def port_init(self, event=None):
+    # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
+    def port_init(self):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
@@ -246,7 +256,7 @@ class tabPS(ThemedFrame):
         if self.id is not False:
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)
-            self.labelId.config(text=self.id)
+            self.labelIDValue.config(text=self.id)
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
             self.ps.output_off(1)
@@ -254,13 +264,14 @@ class tabPS(ThemedFrame):
             self.ch1_on = 0
             self.ch2_on = 0
             self.gui_refresh_channel_state()
-
+            return True
         else: # BAD ID received
         # if self.id == '' or len(self.id) < 3:
             self.ps = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
+            return False
 
 
     def port_close(self):

@@ -42,8 +42,7 @@ class tabUSB(ThemedFrame):
 
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close, bg="#00bcd4")
-        auto_status = self.fr_port.connect_previous_port()
-        print(f"Connect status is: {auto_status}")
+        self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
         # init state frame
@@ -204,6 +203,7 @@ class tabUSB(ThemedFrame):
     #### SERIAL (COM)  ##############
     #################################
 
+    # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self, serial_port):
         self.prompt1.print(f"Init with port: {serial_port}")
         try:

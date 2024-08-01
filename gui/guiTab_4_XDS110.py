@@ -222,8 +222,7 @@ class tabXDS110(ThemedFrame):
             guih.alert_user("Can't toggle target!", "XDS110 connection is not valid", "error")
 
     def build_firmware(self):
-        my_oval = self.canvas3.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.canvas3.itemconfig(my_oval, fill="yellow")
+        self.buildStatus.set_color("yellow")
         exec_path = base_project_path + "Debug/"
         packet = subp.execute_Popen(
             exec_path,
@@ -236,16 +235,16 @@ class tabXDS110(ThemedFrame):
         self.prompt.print(packet.get_string())
 
         if len(packet.stderr) < 2:
-            self.canvas3.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+            self.buildStatus.set_color("green")
             return True
         elif "error" in packet.stderr.lower():
-            self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            self.buildStatus.set_color("red")
             return False
         elif "warning" in packet.stderr.lower():
-            self.canvas3.itemconfig(my_oval, fill="orange")  # Fill the circle with RED
+            self.buildStatus.set_color("orange")
             return True
         else:
-            self.canvas3.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            self.buildStatus.set_color("red")
             return False
 
     def flash_firmware(self):
@@ -267,22 +266,22 @@ class tabXDS110(ThemedFrame):
             guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
 
         # perform flashing according to debug API
-        self.flashStatus.set_color(self.theme_config["#F1FA8C"])  # RED
+        self.flashStatus.set_color("#F1FA8C") # YELLOW ?
         [firmware_status, packet] = xds110.flash_firmware(
             flash_option
         )
 
         self.prompt.print(packet.get_string())
         if firmware_status:
-            self.flashStatus.set_color(self.theme_config["#50FA7B"]) # RED
+            self.flashStatus.set_color("#50FA7B") # GREEN
         else:
-            self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
+            self.flashStatus.set_color("#FF5555") # RED
 
         # auto shut off of target
         if self.var_autooff.get():
-            wait_seconds = self.entry_timeautoff.get()
+            wait_seconds = int(self.entry_timeautoff.get())
             if guih.is_float(wait_seconds):
-                self.after(wait_seconds * 1000, self.turn_power_off(flash_option))
+                self.after(wait_seconds * 1000, lambda: self.turn_power_off(flash_option))
                 return True
             else:
                 return False

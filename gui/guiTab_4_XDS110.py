@@ -278,6 +278,7 @@ class tabXDS110(ThemedFrame):
             self.flashStatus.set_color("#FF5555") # RED
 
         # auto shut off of target
+        # TODO: this will not get reset if a new flash command is issued.
         if self.var_autooff.get():
             wait_seconds = int(self.entry_timeautoff.get())
             if guih.is_float(wait_seconds):

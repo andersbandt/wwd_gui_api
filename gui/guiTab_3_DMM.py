@@ -132,21 +132,18 @@ class tabDMM(ThemedFrame):
         fr_m = self.fr_rec
         ttk.Label(fr_m, text="Record DMM", style="TPinkLabel.TLabel").grid(row=0, column=0, pady=10, padx=15)
 
-        self.labelRNums = ttk.Label(fr_m, text='', width=8, relief='sunken')
+        self.labelRNums = ttk.Label(fr_m, text='', width=8, relief='sunken') # TODO: this is not properly incrementing during recording
         self.labelRecFn = ttk.Label(fr_m, text='{:24s}'.format(self.recName), width=40, relief='sunken')
         self.labelRNums.grid(row=1, column=0, padx=10, pady=10, sticky='W')
         self.labelRecFn.grid(row=1, column=1, sticky='E')
 
-        options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h']
+        options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
         self.btn_record = ttk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
         self.optRecSpd.grid(row=2, column=0, padx=3, sticky='W')
         self.btn_record.grid(row=2, column=3, pady=5, padx=3, sticky='W')
 
     def init_fr_PT100(self):
-            #        (8)      (10)   (10)   (10)   (10)        = 48
-            #         0        1      2      3       4
-            #   0   PT100Unit PT100
             self.optframe = tk.Frame(self)
 
             self.PT100UnitList = ('C', 'F', 'K')
@@ -247,13 +244,17 @@ class tabDMM(ThemedFrame):
                 # SETUP DMM
                 self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
 
+                # PERFORM CHECK ON DMM
+                res = self.dmm.test_conn()
+                guih.alert_user("DMM info", f"Found dmm with info: {res}", "error")
+
                 # START RECORDING
                 self.change_record_speed()
                 self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
                 self.prompt.print(f"Starting DMM record every {self.record_speed} seconds ...")
                 self.csvh = CSVHelper(self.data_dir + self.recName)
                 self.csvh.initialize_file(["Time", "Range", "Func1", "Meas1"])
-                self.btn_record.config(relief='sunken')
+                # self.btn_record.config(relief='sunken') # TODO: figure out how to make the relief be sunken when recording
                 self.labelRecFn.config(text='{:24s}'.format(self.recName))
                 self.recCnt = 0
                 self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
@@ -267,7 +268,7 @@ class tabDMM(ThemedFrame):
             # STOP RECORDING
             self.prompt.print("Stopped DMM record !")
             self.labelRNums.config(text='')
-            self.btn_record.config(relief='raised')
+            # self.btn_record.config(relief='raised') # NOTE: figure this out when previous TODO on relief is handled
             self.record_status = False
 
         # successful exit of record function
@@ -289,9 +290,14 @@ class tabDMM(ThemedFrame):
         while self.record_status and self.ser_status:
             print("Taking DMM measurement ...")
             val_str = self.cc.dmm.read_val1_str()
+
+            # add row to data file
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             self.csvh.add_row([timestamp, "xxx_range", "xxx_func", xdm1041helper.parse_voltage_str(val_str)])
+
+            # update value counter
             self.recCnt += 1
+            self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
             time.sleep(self.record_speed)
 
         # if serial disconnect caused termination, call the start/stop record function

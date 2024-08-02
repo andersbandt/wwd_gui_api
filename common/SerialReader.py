@@ -34,13 +34,15 @@ class SerialReader(SerialGeneral.SerialGeneral):
                         print(ser_bytes)
 
                     # Decode bytes to string if needed
-                    serStrDat = ser_bytes.decode('utf-8').strip()  # removed .strip() from this method
+                    try:
+                        serStrDat = ser_bytes.decode('utf-8')
+                    except UnicodeDecodeError:
+                        print(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                     self.r_buf.append([timestamp, serStrDat])
             except (serial.serialutil.SerialException, OSError) as e:  # (Windows, Linux)
                 self.serStatus = False
                 print(e)
-                # Log the exception if needed
                 break  # Exit the loop on serial exception
 
     def process_data(self, basefilepath, name_ext, data_mode, data_type=None, parameters=None):
@@ -61,7 +63,6 @@ class SerialReader(SerialGeneral.SerialGeneral):
         while self.procStatus:
             if self.r_buf:
                 data = self.r_buf.pop()
-                print(data)  # Process the data as needed
 
                 # VARIABLE RETURN BASED ON @data_mode
                 if data_mode == "timestamp":

@@ -30,7 +30,7 @@ class tabUSB(ThemedFrame):
 
         # serial Object
         self.ser_obj = None
-        self.ser_status = False
+        self.ser_status = False # TODO: phase this out (use the one in the port Frame instead)
 
         # print welcome text
         l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel",
@@ -94,18 +94,6 @@ class tabUSB(ThemedFrame):
     ##############################################################################
     ####      BUTTON ACTION FUNCTIONS        #####################################
     ##############################################################################
-
-    def connect_serial(self):
-        error_flag = 0
-        serial_port = self.fr_port.get_port()
-        error_flag |= self.serial_init(serial_port)
-
-        if self.ser_status:
-            self.prompt1.print(f"Starting print threading")
-            # threading.Thread(target=self.thread_print_display).start()
-            threading.Timer(1.0, self.thread_print_display).start()
-
-        self.fr_port.set_status(self.ser_status)
 
     def activate_test_mode(self):
         command = "DAGA"
@@ -178,25 +166,20 @@ class tabUSB(ThemedFrame):
 
 # TODO: performance of the application is unusable after a few "connect" and "disconnect" cycles. Need to improve handling of THREADS
     def thread_print_display(self):
-        print("Thread print!")
-        # self.prompt2.clear()
+        self.prompt1.print("Thread prints started !!")
 
-        print("Starting thread 1 (gui refresh)")
         t1 = threading.Thread(target=self.gui_refresh, daemon=True)
         t1.start()
 
-        print("Starting thread 3 (get_data)")
         self.t3 = guic.StoppableThread(target=self.ser_obj.get_data, kwargs={'printmode': False})
         self.t3.start()
 
-        print("Starting thread 2 (process_data)")
         self.t2 = guic.StoppableThread(
             target=self.ser_obj.process_data,
             args=(self.basefilepath, None, "raw")
         )
         self.t2.start()
 
-        print("Done with thread creation! Successful exit hopefully!")
         return True
 
     #################################
@@ -204,16 +187,20 @@ class tabUSB(ThemedFrame):
     #################################
 
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
-    def port_init(self, serial_port):
-        self.prompt1.print(f"Init with port: {serial_port}")
+    def port_init(self):
+        port = self.fr_port.get_port()
+
+        self.prompt1.print(f"Init with port: {port}")
         try:
-            self.ser_obj = SerialReader(serial_port, 115200)
+            self.ser_obj = SerialReader(port, 115200)
         except serial.serialutil.SerialException as e:
             self.prompt1.print(f"ERROR: {e}")
             self.prompt1.print(f"Can't init with port\n")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
+        threading.Thread(target=self.thread_print_display).start()
+        # threading.Timer(1.0, self.thread_print_display).start() # NOTE: I possiblyy had this 1 second delayyy in there for a reason?
         self.prompt1.print("Init successful!\n")
         self.ser_status = True
         return True

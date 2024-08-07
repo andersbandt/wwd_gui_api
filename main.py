@@ -9,6 +9,9 @@
 from gui import gui_driver
 
 
+## TODO: somehow add some command line switch when calling to enable / disable auto-connect
+
+
 ##############################################################
 ################   MAIN     ##################################
 ##############################################################

@@ -287,6 +287,8 @@ class tabDMM(ThemedFrame):
 
     def thread_record_dmm(self):
         print("Starting DMM record!")
+        # TODO: add a check for the validity of my DMM connection here
+
         while self.record_status and self.ser_status:
             print("Taking DMM measurement ...")
             val_str = self.cc.dmm.read_val1_str()

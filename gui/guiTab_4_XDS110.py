@@ -54,16 +54,16 @@ class tabXDS110(ThemedFrame):
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "XDS110 Comms", height=25, width=140)
+        self.prompt = guic.Prompt(self, "XDS110 Comms", height=22, width=140)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
         self.fr_xds110 = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_xds110.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_firmware = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_firmware.grid(row=1, column=2, padx=30, pady=12, rowspan=2)
         self.fr_target = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_target.grid(row=2, column=0, padx=30, pady=12)
-        self.fr_firmware = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_firmware.grid(row=2, column=1, padx=30, pady=12)
 
         # add some other variables
         self.canvas1 = tk.Canvas(self.fr_xds110, width=50, height=50)  # fr_xds110
@@ -251,7 +251,10 @@ class tabXDS110(ThemedFrame):
         print("... executing loadti to flash firmware ...")
 
         # BUILD FIRMWARE
-        self.build_firmware()
+        build_status = self.build_firmware()
+        if not build_status:
+            self.flashStatus.set_color("black")  # RED
+            return False
 
         # TURN POWER ON
         flash_option = self.targetConfig_drop[1].get()

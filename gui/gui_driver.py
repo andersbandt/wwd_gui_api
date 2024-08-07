@@ -110,6 +110,7 @@ def main():
             raise e
 
     # close any open serial ports
+    # TODO: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated
     app.tab3.port_close()
     app.tab5.port_close()
     app.tab6.port_close()

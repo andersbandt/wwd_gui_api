@@ -164,11 +164,11 @@ class tabUSB(ThemedFrame):
             if self.ser_status is False:
                 status = False
 
-# TODO: performance of the application is unusable after a few "connect" and "disconnect" cycles. Need to improve handling of THREADS
-    def thread_print_display(self):
-        self.prompt1.print("Thread prints started !!")
 
-        t1 = threading.Thread(target=self.gui_refresh, daemon=True)
+    def thread_print_display(self):
+        print("Thread prints started") # NOTE: can't use prompt print because this is called on auto-connect
+
+        t1 = threading.Timer(45.0, self.gui_refresh)
         t1.start()
 
         self.t3 = guic.StoppableThread(target=self.ser_obj.get_data, kwargs={'printmode': False})

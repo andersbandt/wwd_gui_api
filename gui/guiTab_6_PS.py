@@ -206,22 +206,25 @@ class tabPS(ThemedFrame):
     #################################
 
     def toggle_channel(self, channel):
-        if channel == 1:
-            if self.ch1_on is True:
-                self.ps.output_off(channel)
-                self.ch1_on = False
+        try:
+            if channel == 1:
+                if self.ch1_on is True:
+                    self.ps.output_off(channel)
+                    self.ch1_on = False
+                else:
+                    self.ps.output_on(channel)
+                    self.ch1_on = True
+            elif channel == 2:
+                if self.ch2_on is True:
+                    self.ps.output_off(channel)
+                    self.ch2_on = False
+                else:
+                    self.ps.output_on(channel)
+                    self.ch2_on = True
             else:
-                self.ps.output_on(channel)
-                self.ch1_on = True
-        elif channel == 2:
-            if self.ch2_on is True:
-                self.ps.output_off(channel)
-                self.ch2_on = False
-            else:
-                self.ps.output_on(channel)
-                self.ch2_on = True
-        else:
-            raise ValueError("Wrong channel input")
+                raise ValueError("Wrong channel input")
+        except ValueError as e:
+            guih.alert_user("Can't toggle channel", "Error: {e}", "error")
 
         time.sleep(0.5)
         self.gui_refresh()
@@ -244,9 +247,18 @@ class tabPS(ThemedFrame):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
-        self.ps = SPD3303X.SPD3303X(port)
+        try:
+            self.ps = SPD3303X.SPD3303X(port)
+        except ValueError:
+            self.ps = None
+
+
         try:
             self.id = self.ps.test_conn()
+        except AttributeError:
+            guih.alert_user("Can't connect to VISA", "Best guess is the port is not active", "warning")
+            self.fr_port.set_status(False)
+            return False
         except pyvisa.errors.VisaIOError:
             guih.alert_user("Can't connect to VISA", "Visa connect error (likely timeout)", "error")
             self.fr_port.set_status(False)

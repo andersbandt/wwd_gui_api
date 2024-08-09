@@ -70,6 +70,7 @@ def open_text(filename, log_start_msg):
     with open(filename, mode='a', newline='') as file:
         file.write(log_start_msg)
 
+
 def append_text(filename, data):
     with open(filename, mode='a', newline='') as file:
         file.write(data)

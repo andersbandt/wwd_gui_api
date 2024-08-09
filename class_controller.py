@@ -18,6 +18,7 @@ class ClassController:
     def set_relay(self, relay):
         self.relay = relay
 
+# TODO: this function still gets called through my auto-connect function. Remove that. Will be some levels higher than this logic has to be placed
 # TODO: this still won't properly keep onle one unique XML entry per SerialPort
     def set_used_port(self, port, usage):
         self.ports_used[port] = usage

@@ -27,7 +27,7 @@ class tabIMU(ThemedFrame):
         self.basefilepath = basefilepath
         self.data_folder = "/data/imu_data"
 
-        # print welcome text
+        # print welcome text_data
         l1 = ttk.Label(self, text="IMU Control Center", style="BW.TLabel",
                        font=("Arial", 16))
         l1.grid(column=0, row=0)
@@ -53,7 +53,7 @@ class tabIMU(ThemedFrame):
         self.init_fr_analysis()
 
     def init_fr_prompt(self):
-        # set up text box for user communication
+        # set up text_data box for user communication
         Label(self.fr_prompt, text="Console Output").grid(row=0, column=0, pady=10)
         self.prompt = Text(self.fr_prompt, padx=10, pady=10, height=20, width=100)
         self.prompt.grid(row=1, column=0, padx=10, pady=10)

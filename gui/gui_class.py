@@ -43,7 +43,7 @@ class Prompt(ThemedFrame):
         self.width = width
         self.set_bg(self.theme_config["light_4"])
 
-        # set up text box for user communication
+        # set up text_data box for user communication
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
         clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
@@ -64,7 +64,7 @@ class Prompt(ThemedFrame):
             fg_color = "white"  # Default color
 
         message = ">>>" + message
-        self.prompt.configure(fg=fg_color)  # Configure text color
+        self.prompt.configure(fg=fg_color)  # Configure text_data color
         self.prompt.insert(INSERT, message + "\n")
         self.prompt.see("end")  # auto-scroll to the end
         return True
@@ -252,7 +252,6 @@ class AutoConnFrame(ConnFrame):
 ### THREADS#######      ##################
 ##########################################
 
-# TODO: I think I should move this guy out of here?
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""
@@ -260,6 +259,13 @@ class StoppableThread(threading.Thread):
     def __init__(self, *args, **kwargs):
         super(StoppableThread, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
+        self.args = args
+        self.kwargs = kwargs
+
+    # def run(self):
+    #     while not self.stopped():
+    #         self.function(*self.args, **self.kwargs)
+    #         break  # If you want to run only once, remove this if you need continuous execution
 
     def stop(self):
         self._stop_event.set()

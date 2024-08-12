@@ -21,6 +21,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
         super().__init__(port, baudrate)
         self.procStatus = False
         self.r_buf = collections.deque(maxlen=200)  # read circular buffer
+        self.logfile = None
 
     def get_data(self, printmode=False):
         while self.serStatus:  # Loop until serial status becomes False
@@ -45,15 +46,16 @@ class SerialReader(SerialGeneral.SerialGeneral):
                 print(e)
                 break  # Exit the loop on serial exception
 
-    def process_data(self, basefilepath, name_ext, data_mode, data_type=None, parameters=None):
+
+    def process_data(self, basefilepath, name_ext, data_mode, data_folder, parameters=None):
         print(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True
 
         # INIT OF LOG FILE
         if data_mode == "data":
-            log_csv = logger.init_csv(basefilepath, data_type, name_ext, parameters)
+            log_csv = logger.init_csv(basefilepath, data_folder, name_ext, parameters)
         elif data_mode == "raw" or data_mode == "timestamp":
-            log_text = logger.init_text("log/", "\n\n\n===================================\n"
+            log_text = logger.init_text(basefilepath, data_folder, "\n\n\n===================================\n"
                                                 "=======INFO: USB LOG START=========\n"
                                                 "===================================\n")
             self.logfile = log_text
@@ -79,6 +81,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
                     raise BaseException("ERROR: undefined data mode for SerialReader")
         print("Stop processing data.")
 
+    # TODO: this really shouldn't have things specific to text processing in it ...
     def stop_process(self):
         self.procStatus = False
         self.close()

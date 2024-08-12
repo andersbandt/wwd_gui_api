@@ -116,7 +116,7 @@ class tabPS(ThemedFrame):
                                             bg="#00bcd4")
         self.fr_port.connect_previous_port() # TODO: phase the need to perform this here out (perform in SerialConnFrame upon __init__ )
         self.fr_port.initialize_fr()
-        self.fr_port.connect_previous_port()
+        # self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
     def init_fr_control(self):
@@ -231,7 +231,7 @@ class tabPS(ThemedFrame):
 
     def set_voltage(self, channel, voltage_str):
         if self.ps is not None:
-            # have to format input text box into float
+            # have to format input text_data box into float
             voltage = float(voltage_str)
             self.ps.set_voltage(channel, voltage)
         else:

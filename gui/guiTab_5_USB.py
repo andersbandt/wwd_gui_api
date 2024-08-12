@@ -20,6 +20,7 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
+
 class tabUSB(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file):
         super().__init__(master, theme_file)
@@ -30,9 +31,8 @@ class tabUSB(ThemedFrame):
 
         # serial Object
         self.ser_obj = None
-        self.ser_status = False # TODO: phase this out (use the one in the port Frame instead)
 
-        # print welcome text
+        # print welcome text_data
         l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel",
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
@@ -41,7 +41,8 @@ class tabUSB(ThemedFrame):
         self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close, bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close,
+                                            bg="#00bcd4")
         self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
@@ -51,6 +52,11 @@ class tabUSB(ThemedFrame):
         self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
         self.test_drop = None  # fr_state
         self.output_file_name = None  # fr_state
+
+        # initialize threads (actual init is in thread_print) or something
+        self.t1 = None
+        self.t2 = None
+        self.t3 = None
 
         # initialize tab content
         self.initTabContent()
@@ -99,7 +105,7 @@ class tabUSB(ThemedFrame):
         command = "DAGA"
         my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         self.prompt1.print(f"INFO: issuing command {command} ...")
-        if self.ser_status:
+        if self.ser_obj.serStatus:
             # send the TEST MODE command for ACTIVATION
             self.ser_obj.send_data(command)
             self.prompt1.print(f"INFO: issued command!\n")
@@ -120,14 +126,14 @@ class tabUSB(ThemedFrame):
         elif test_type_command == "imu-graph":
             command = "IG85"
         elif test_type_command == "clock-test":
-            self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
             command = "CR81"
+            self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
         else:
             print("Fuck man no known test command")
             return False
 
         self.prompt1.print(f"INFO: issuing command {command} ...")
-        if self.ser_status:
+        if self.ser_obj.serStatus:
             self.ser_obj.send_data(command)
             self.prompt1.print(f"INFO: issued command!\n")
             return True
@@ -139,15 +145,13 @@ class tabUSB(ThemedFrame):
     #### THREADS SHIT    ############
     #################################
 
+# TODO: would this be a good candidate to move away from threads and towards self.frame_after() ? would also apply to other things
     def gui_refresh(self):
         while True:
             if self.ser_obj.serStatus is False:
-                if self.ser_status:
-                    self.ser_obj.stop_process()
-                    self.ser_status = False
-                    self.fr_port.set_status(self.ser_status)
-                    my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-                    self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                self.ser_obj.stop_process()
+                self.fr_port.set_status(False)
+                self.t1.stop()
             else:
                 self.fr_port.set_status(True)
             time.sleep(5)
@@ -161,24 +165,23 @@ class tabUSB(ThemedFrame):
                 self.ser_obj.reopen()
                 time.sleep(3)
 
-            if self.ser_status is False:
-                status = False
-
-
     def thread_print_display(self):
-        print("Thread prints started") # NOTE: can't use prompt print because this is called on auto-connect
+        print("Thread prints started")  # NOTE: can't use prompt print because this is called on auto-connect
 
-        t1 = threading.Timer(45.0, self.gui_refresh)
-        t1.start()
-
-        self.t3 = guic.StoppableThread(target=self.ser_obj.get_data, kwargs={'printmode': False})
-        self.t3.start()
+        self.t1 = guic.StoppableThread(
+            target=self.gui_refresh)
+        self.t1.start()
 
         self.t2 = guic.StoppableThread(
-            target=self.ser_obj.process_data,
-            args=(self.basefilepath, None, "raw")
-        )
+            target=self.ser_obj.get_data,
+            kwargs={'printmode': False})
         self.t2.start()
+
+        self.t3 = guic.StoppableThread(
+            target=self.ser_obj.process_data,
+            args=(self.basefilepath, None, "raw", "text_data")
+        )
+        self.t3.start()
 
         return True
 
@@ -202,18 +205,17 @@ class tabUSB(ThemedFrame):
         threading.Thread(target=self.thread_print_display).start()
         # threading.Timer(1.0, self.thread_print_display).start() # NOTE: I possiblyy had this 1 second delayyy in there for a reason?
         self.prompt1.print("Init successful!\n")
-        self.ser_status = True
         return True
 
     def port_close(self):
-        self.prompt1.print(f"Serial close!")
+        print("xxxx seial cclose")
+        self.prompt1.print("Serial close!")
         self.ser_obj.stop_process()
-        self.ser_status = False
-        self.fr_port.set_status(self.ser_status)
+        self.fr_port.set_status(False)
         self.t2.stop()
 
     def start_process(self, data_subfolder, file_ext, parameters):
-        self.stop_process()
+        self.t3.stop()
 
         current_datetime = datetime.now()
         formatted_datetime = current_datetime.strftime("_%H%M%S")
@@ -225,7 +227,8 @@ class tabUSB(ThemedFrame):
 
         threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath,
                                                                   f"{formatted_datetime}_{file_ext}_{file_str_ext}",
-                                                                  "data",  # data MODE {raw, timestamp, data}
+                                                                  "data",
+                                                                  data_subfolder,
                                                                   parameters=parameters)
                          ).start()
 

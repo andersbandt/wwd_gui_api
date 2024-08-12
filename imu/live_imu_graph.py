@@ -48,7 +48,7 @@ def imu_live_graph():
         while imuSer.inWaiting() == 0:   #Wait here until there is data
             pass #do nothing
 
-        # read line of text from serial and format into array
+        # read line of text_data from serial and format into array
         imuStrDat = imuSer.readline()
 
         # dataArray = imuStrDat.strip().strip('\n')  #Split into an array

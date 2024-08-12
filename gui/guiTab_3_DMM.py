@@ -13,13 +13,13 @@ import tkinter.messagebox as tkmb
 # import needed packages
 import threading
 import time
-from time import localtime, strftime, perf_counter_ns
+from time import localtime, strftime
 import math
 from datetime import datetime
 
 
 # import user defined modules
-from data.csv_helper import CSVHelper
+from analysis.csv_helper import CSVHelper
 from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
 from EEequipment.xdm1041 import xdm1041helper
 from gui import gui_helper as guih

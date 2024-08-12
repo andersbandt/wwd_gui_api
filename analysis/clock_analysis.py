@@ -15,12 +15,11 @@ import shutil
 from matplotlib import pyplot as plt
 
 # import user created modules
-from analysis import least_squares
+from analysis import least_squares, data_helper as datah
 from analysis import time_analysis
 from analysis import stats_analysis
 from analysis import temp_analysis
 from common import plotter
-from data import data_helper as datah
 from common import logger
 
 

@@ -21,7 +21,7 @@ class tabMainDashboard(ThemedFrame):
         self.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
-        # print welcome text
+        # print welcome text_data
         l1 = ttk.Label(self, text="Welcome to the WWD program!!!!", style="BW.TLabel",
                        font=("Arial", 16))
         l1.grid(column=0, row=0, columnspan=2)

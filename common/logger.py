@@ -5,25 +5,25 @@
 @brief    handle logging of application to output files
 """
 
-
 # import needed modules
 import logging
 import csv
 import os
 from fpdf import FPDF
-from matplotlib import pyplot as plt
-
 from datetime import datetime
 
 
-def get_filename(basefilepath, name_type, name_ext, extension):
+log_folder = "data" # master program folder for all output data. tag:hardcode
+
+
+def get_filename(basefilepath, folder, name_ext, extension):
     current_datetime = datetime.now()
     # date_strf = "%Y%m%d_%H%M%S"
     date_strf = "%Y%m%d"
     formatted_datetime = current_datetime.strftime(date_strf)
     if name_ext is None:
         name_ext = ""
-    filename = f"{basefilepath}/{name_type}/_{formatted_datetime}_{name_ext}.{extension}"
+    filename = f"{basefilepath}/{log_folder}/{folder}/_{formatted_datetime}_{name_ext}.{extension}"
     return filename
 
 
@@ -52,12 +52,12 @@ def append_debug(logger, line):
 
 
 #################################
-#### .log (text)  ###############
+#### .log (text_data)  ###############
 #################################
 
-def init_text(basefilepath, start_msg):
+def init_text(basefilepath, data_folder, start_msg):
     filename = get_filename(basefilepath, # basefilepath
-                            "text", # name_type (output folder)
+                            data_folder, # (output folder)
                             None, # name_ext
                             "log") # .extension
     open_text(filename, start_msg)
@@ -82,7 +82,7 @@ def append_text(filename, data):
 
 def init_csv(basefilepath, name_type, name_ext, parameters):
     filename = get_filename(basefilepath,  # basefilepath
-                            f"data/{name_type}",  # name_type (output folder)
+                            name_type,  # name_type (output folder)
                             name_ext,  # name_ext
                             "csv")  # .extension
 
@@ -90,7 +90,7 @@ def init_csv(basefilepath, name_type, name_ext, parameters):
     return filename
 
 
-# open_csv: basically opens a .csv file with text in header columns
+# open_csv: basically opens a .csv file with text_data in header columns
 def open_csv(filename, headers):
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)

@@ -42,7 +42,7 @@ def filter_data(data):
     # "Noisy" data.  We want to recover the 1.2 Hz signal from this.
     # data = np.sin(1.2*2*np.pi*t) + 1.5*np.cos(9*2*np.pi*t) + 0.5*np.sin(12.0*2*np.pi*t)
 
-    # Filter the data, and plot both the original and filtered signals.
+    # Filter the data, and plot both the original_b1 and filtered signals.
     y = butter_lowpass_filter(data, cutoff, fs, order)
 
 

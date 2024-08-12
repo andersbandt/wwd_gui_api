@@ -16,9 +16,9 @@ import math
 ##############################################################################
 
 def generate_drop_down(frame, options):
-    clicked_opt = StringVar()  # datatype of menu text
+    clicked_opt = StringVar()  # datatype of menu text_data
     try:
-        clicked_opt.set(options[0])  # initial menu text (CAUSES ISSUES IF NO COM PORTS AVAILABLE)
+        clicked_opt.set(options[0])  # initial menu text_data (CAUSES ISSUES IF NO COM PORTS AVAILABLE)
     except Exception as e:
         clicked_opt.set("NA")
         options = ["NA"]

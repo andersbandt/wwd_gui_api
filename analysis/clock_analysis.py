@@ -23,6 +23,10 @@ from common import plotter
 from common import logger
 
 
+# TODO: plots have y-axis labeled but add some TITLES
+# TODO: is there something wrong with my verification data method? I get a large residual
+
+
 # TODO: another cleaning method I realized is my erroneous data has two entries for the same timestamp
 def clean_data(df, column, column2=None):
     print("INFO: Cleaning data ....")
@@ -143,21 +147,20 @@ def train_model(train_file, ver_file):
     # LOAD IN AND FORMAT TRAIN DATA
     for tr_file in train_file:
         if ".csv" in tr_file:
-            if tr_file not in ver_file:
-                df_tmp = df_ver = get_total_data(tr_file, ["timestamp", "ms", "temp"], ["temp"], ["ms"])
-                # df_tmp = datah.load_csv_pandas(tr_file, ["timestamp", "ms", "temp"])
-                # df_tmp = datah.df_float(df_tmp, "temp")
-                # df_tmp = clean_data(df_tmp, "ms", "temp")
-                # df_tmp = get_filtered_data(df_tmp, "ms")
-                dt_tmp = time_analysis.create_datetime(df_tmp["timestamp"])
-                dt_seconds = [date.timestamp() for date in dt_tmp]
-                time_offset.extend(
-                    create_time_offset(
-                        np.array(df_tmp["ms"]),
-                        dt_seconds)
-                )
-                # filtered_data_arr = pd.concat(filtered_data_arr, df_tmp)
-                train_df = train_df.append(df_tmp)
+            print(f"Loading in file: {tr_file}")
+            df_tmp = get_total_data(tr_file, ["timestamp", "ms", "temp"], ["temp"], ["ms"])
+            dt_tmp = time_analysis.create_datetime(df_tmp["timestamp"])
+            dt_seconds = [date.timestamp() for date in dt_tmp]
+
+            # extend training time offset array ?
+            time_offset.extend(
+                create_time_offset(
+                    np.array(df_tmp["ms"]),
+                    dt_seconds)
+            )
+
+            # concatenate new DataFrame into training data
+            train_df = pd.concat([train_df, df_tmp], ignore_index=True)
 
     datetime_f_arr = time_analysis.create_datetime(train_df["timestamp"])
 
@@ -251,15 +254,17 @@ if __name__ == "__main__":
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
     # get filepath
-    basefilepath = "C:/Users/ander/OneDrive/Code/python/WWD/wwd_gui_api/data/clock_data/"
-    basefilepath_train = basefilepath + "temp/"
+    basefilepath = os.getcwd() + "/../data/clock_data/"
+
+    # basefilepath_train = basefilepath + "temp/"
+    basefilepath_train = basefilepath
     training_file = []
-    for file in os.listdir(basefilepath_train):
+    for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
         training_file.append(basefilepath_train + file)
 
     # ver_file_full_path = basefilepath + "_20240417__235411_clock_test_.csv" # slope=7.20e-3
     # ver_file_full_path = basefilepath + "_20240418__000513_clock_test_.csv" # slope=7.193e-3
-    ver_file_full_path = basefilepath + "_20240418__080531_clock_test_.csv"  # slope=7.193e-3
+    ver_file_full_path = basefilepath + "_20240812__165145_clock_test_.csv"  # slope=7.193e-3
 
     ### TRAIN MODEL
     train_dataframe = train_model(training_file, ver_file_full_path)

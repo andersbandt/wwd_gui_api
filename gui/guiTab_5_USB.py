@@ -65,6 +65,7 @@ class tabUSB(ThemedFrame):
         print("\n\nInitializing tab 5 (USB) content")
         self.init_fr_state()
 
+# TODO: when I'm running a test there is no way to stop processing. Also no follow-up command to WWD device (that will take some work though)
     def init_fr_state(self):
         # TARGET - BUTTON/STATUS
         btn_act_test = Button(self.fr_state, text="Activate test mode",
@@ -213,6 +214,7 @@ class tabUSB(ThemedFrame):
         self.ser_obj.stop_process()
         self.fr_port.set_status(False)
         self.t2.stop()
+        self.t3.stop()
 
     def start_process(self, data_subfolder, file_ext, parameters):
         self.t3.stop()

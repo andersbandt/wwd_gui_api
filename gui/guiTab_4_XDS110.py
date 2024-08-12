@@ -274,7 +274,9 @@ class tabXDS110(ThemedFrame):
             flash_option
         )
 
+
         self.prompt.print(packet.get_string())
+        print("You should see the packet now in the prompt. Hopefully not CLI")
         if firmware_status:
             self.flashStatus.set_color("#50FA7B") # GREEN
         else:

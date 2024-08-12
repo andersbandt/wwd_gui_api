@@ -90,7 +90,16 @@ def main():
     # setup window
     window = tk.Tk()
     window.title("WWD GUI API")
-    window.geometry('1280x900')
+
+    w = 1280  # width for the Tk root
+    h = 900  # height for the Tk root
+    # get screen width and height
+    ws = window.winfo_screenwidth()  # width of the screen
+    hs = window.winfo_screenheight()  # height of the screen
+    # set the dimensions of the screen and where is it placed
+    x = (ws / 2) - (w / 4)
+    y = (hs / 2) - (h / 2) - 20
+    window.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
     # sv_ttk.set_theme("dark")
 

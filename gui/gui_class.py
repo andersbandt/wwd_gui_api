@@ -263,9 +263,9 @@ class StoppableThread(threading.Thread):
         self.kwargs = kwargs
 
     # def run(self):
-    #     while not self.stopped():
-    #         self.function(*self.args, **self.kwargs)
-    #         break  # If you want to run only once, remove this if you need continuous execution
+        # while not self.stopped():
+            # self.function(*self.args, **self.kwargs)
+            # break  # If you want to run only once, remove this if you need continuous execution
 
     def stop(self):
         self._stop_event.set()

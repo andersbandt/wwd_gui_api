@@ -9,7 +9,7 @@
 import pandas as pd
 import numpy as np
 from pprint import pprint
-
+import subprocess
 import os
 import shutil
 from matplotlib import pyplot as plt
@@ -253,18 +253,17 @@ if __name__ == "__main__":
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-    # get filepath
-    basefilepath = os.getcwd() + "/../data/clock_data/"
-
-    # basefilepath_train = basefilepath + "temp/"
-    basefilepath_train = basefilepath
+    # set up training data
+    basefilepath_train = os.getcwd() + "/../data/clock_data/"
     training_file = []
     for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
         training_file.append(basefilepath_train + file)
+    # training_file = ["/home/anders/Documents/GitHub/wwd_gui_api/data/clock_data/original_b1/_20240418__000513_clock_test_.csv"]
 
+    # set up verification data
     # ver_file_full_path = basefilepath + "_20240417__235411_clock_test_.csv" # slope=7.20e-3
     # ver_file_full_path = basefilepath + "_20240418__000513_clock_test_.csv" # slope=7.193e-3
-    ver_file_full_path = basefilepath + "_20240812__165145_clock_test_.csv"  # slope=7.193e-3
+    ver_file_full_path = training_file[0]
 
     ### TRAIN MODEL
     train_dataframe = train_model(training_file, ver_file_full_path)
@@ -280,18 +279,19 @@ if __name__ == "__main__":
 
     ### LINEAR FIT TRAIN
     # TODO: the end slope is wildly different than least squares analysis
-    train_time_offset = full_create_time_offset(train_dataframe)
-    linear_fit_train(train_dataframe["ms"], train_time_offset)
+    #  HINT: (ONLY WHEN I USE AN ARRAY OF TRAINING DATA) one for one trainning / verification works ...!!!
+    # train_time_offset = full_create_time_offset(train_dataframe)
+    # linear_fit_train(train_dataframe["ms"], train_time_offset)
 
     # SHOW PLOTS
     print("Plot show!")
     plt.show()
 
     # generate pdf file AND open
+    # TODO: could easily be filepath related but this isn't working on Linux anymore
     print("\nGenerating .pdf ...")
     image_folder = "tmp"
     output_pdf = "tmp/summary_document.pdf"
     logger.generate_summary_pdf(image_folder, output_pdf)
 
-    basefilepath = "C:/Users/ander/OneDrive/Code/python/WWD/wwd_gui_api/analysis/"
-    # subprocess.Popen([basefilepath + output_pdf], shell=True)
+    subprocess.Popen([basefilepath + output_pdf], shell=True)

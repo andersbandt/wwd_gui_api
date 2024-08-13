@@ -5,12 +5,8 @@
 @brief    handles OS commands
 """
 
-
 # import needed modules
 import subprocess
-import os
-import pandas as pd
-from time import sleep
 
 
 class CommandPacket:
@@ -50,7 +46,6 @@ def execute_command(base_command, flags):
         result.stderr.decode(),
         not result.returncode,  # returncode=0 when SUCCESSFUL. Inverting for clarity
     )
-    print(packet)
     return packet
 
 
@@ -72,7 +67,6 @@ def execute_Popen(exec_path, base_command, flags):
         stderr.decode(),
         False,
     )
-    print(packet)
     return packet
 
 

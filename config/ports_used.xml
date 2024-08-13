@@ -1,1 +1,1 @@
-<PortsUsed><PS_PyVISA>USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA><USB_serial>/dev/ttyUSB1</USB_serial><DMM_Serial>/dev/ttyUSB0</DMM_Serial><USB_serial>/dev/ttyUSBCustom</USB_serial></PortsUsed>
+<PortsUsed><PS_PyVISA>USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA><USB_serial>/dev/ttyUSB1</USB_serial><DMM_Serial>/dev/ttyUSB0</DMM_Serial><USB_serial>/dev/ttyUSBCustom</USB_serial><USB_serial>/dev/ttyUSB2</USB_serial></PortsUsed>

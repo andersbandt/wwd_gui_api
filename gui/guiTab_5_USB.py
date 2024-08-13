@@ -150,7 +150,7 @@ class tabUSB(ThemedFrame):
     def gui_refresh(self):
         while True:
             if self.ser_obj.serStatus is False:
-                self.ser_obj.stop_process()
+                # self.ser_obj.stop_process()
                 self.fr_port.set_status(False)
                 self.t1.stop()
             else:

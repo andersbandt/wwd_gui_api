@@ -23,8 +23,6 @@ from gui import gui_class as guic
 from gui.gui_class import *
 from gui.guiTab_parent import ThemedFrame
 
-
-
 # initialize the config parser
 config_file_path = "config/target.ini"
 if os.path.exists(config_file_path):
@@ -34,11 +32,11 @@ else:
     print(f"Configuration file {config_file_path} does not exist.")
     raise BaseException
 
-
 # read in parameters from the config file
 ps_channel = int(config["Target"]["ps_channel"])
 device_vdds = float(config["Target"]["vdds"])
 print("Yepppp")
+
 
 class tabXDS110(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file):
@@ -87,7 +85,7 @@ class tabXDS110(ThemedFrame):
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
         btn_check_xds110 = ttk.Button(self.fr_xds110, text="XDS110 Check", style="TGreenButton.TButton",
-                                  command=lambda: threading.Thread(target=self.check_xds110).start())
+                                      command=lambda: threading.Thread(target=self.check_xds110).start())
         btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
         self.canvas1.grid(row=3, column=2, padx=15, pady=22)
 
@@ -129,11 +127,13 @@ class tabXDS110(ThemedFrame):
         # set up all the usable objects
         btn_build_firmware = Button(fr_m, text="Build firmware",
                                     command=lambda: threading.Thread(target=self.build_firmware).start(),
-                                    bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"], height=2, width=20)
+                                    bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"], height=2,
+                                    width=20)
 
         btn_flash_firmware = Button(fr_m, text="Load firmware",
                                     command=lambda: threading.Thread(target=self.flash_firmware).start(),
-                                    bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"], height=2, width=20)
+                                    bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"], height=2,
+                                    width=20)
         self.entry_timesleep = Entry(fr_m, textvariable="seconds")
         self.entry_timeautoff = Entry(fr_m)
         self.buildStatus = ColorCircle(fr_m, width=50, height=50)
@@ -144,19 +144,19 @@ class tabXDS110(ThemedFrame):
 
         self.var_autooff = tk.IntVar()
         self.checkAutoOff = ttk.Checkbutton(fr_m,
-                        text="Auto off?",
-                        variable=self.var_autooff,
-                        onvalue=1,
-                        offvalue=0)
+                                            text="Auto off?",
+                                            variable=self.var_autooff,
+                                            onvalue=1,
+                                            offvalue=0)
         self.flashStatus = ColorCircle(fr_m, width=60, height=60)
 
         # place the usable objects
         btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
         self.buildStatus.grid(row=1, column=1)
 
-        ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2,  column=0, padx=10, pady=15)
+        ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2, column=0, padx=10, pady=15)
         self.entry_timesleep.grid(row=2, column=1)
-        ttk.Label(fr_m, text="Auto off (seconds)", style="TLabel").grid(row=3,  column=0)
+        ttk.Label(fr_m, text="Auto off (seconds)", style="TLabel").grid(row=3, column=0)
         self.entry_timeautoff.grid(row=3, column=1)
         self.checkAutoOff.grid(row=3, column=2)
         self.targetConfig_drop[0].grid(row=2, column=2, padx=6, pady=10)
@@ -269,18 +269,16 @@ class tabXDS110(ThemedFrame):
             guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
 
         # perform flashing according to debug API
-        self.flashStatus.set_color("#F1FA8C") # YELLOW ?
+        self.flashStatus.set_color("#F1FA8C")  # YELLOW ?
         [firmware_status, packet] = xds110.flash_firmware(
             flash_option
         )
 
-
         self.prompt.print(packet.get_string())
-        print("You should see the packet now in the prompt. Hopefully not CLI")
         if firmware_status:
-            self.flashStatus.set_color("#50FA7B") # GREEN
+            self.flashStatus.set_color("#50FA7B")  # GREEN
         else:
-            self.flashStatus.set_color("#FF5555") # RED
+            self.flashStatus.set_color("#FF5555")  # RED
 
         # auto shut off of target
         # TODO: this will not get reset if a new flash command is issued.
@@ -302,9 +300,10 @@ class tabXDS110(ThemedFrame):
             try:
                 self.cc.ps.output_off(ps_channel)
             except AttributeError:
-                res = guih.promptYesNo("Can't access power supply!", "Can't access supply to turn off. Continue with flash?")
+                res = guih.promptYesNo("Can't access power supply!",
+                                       "Can't access supply to turn off. Continue with flash?")
                 if not res:
-                    self.flashStatus.set_color(self.theme_config["#FF5555"]) # RED
+                    self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
                     return False
 
         if flash_option == "target_power":
@@ -325,7 +324,7 @@ class tabXDS110(ThemedFrame):
                 self.cc.ps.output_on(ps_channel)
             except AttributeError:
                 guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
-                self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
+                self.flashStatus.set_color("#FF5555")  # RED
                 return
 
     def turn_power_off(self, flash_option):
@@ -335,5 +334,3 @@ class tabXDS110(ThemedFrame):
             return
         elif flash_option == "supply_power":
             self.cc.ps.output_off(ps_channel)
-
-

@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import *
 from tkinter import ttk
 import threading
+# import asyncio
 import serial
 import time
 from datetime import datetime
@@ -146,16 +147,16 @@ class tabUSB(ThemedFrame):
     #### THREADS SHIT    ############
     #################################
 
-# TODO: would this be a good candidate to move away from threads and towards self.frame_after() ? would also apply to other things
+    # TODO: if frame.after() workss here conduct audit of usage of gui_refresh() in another tabs
     def gui_refresh(self):
-        while True:
-            if self.ser_obj.serStatus is False:
-                # self.ser_obj.stop_process()
-                self.fr_port.set_status(False)
-                self.t1.stop()
-            else:
-                self.fr_port.set_status(True)
-            time.sleep(5)
+        if self.ser_obj.serStatus is False:
+            self.ser_obj.stop_process()
+            self.fr_port.set_status(False)
+            # self.t1.stop()
+        else:
+            self.fr_port.set_status(True)
+
+        self.after(5*1000, self.gui_refresh)
 
     # TODO: try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
     def manage_connection(self):
@@ -169,9 +170,9 @@ class tabUSB(ThemedFrame):
     def thread_print_display(self):
         print("Thread prints started")  # NOTE: can't use prompt print because this is called on auto-connect
 
-        self.t1 = guic.StoppableThread(
-            target=self.gui_refresh)
-        self.t1.start()
+        # self.t1 = guic.StoppableThread(
+        #     target=self.gui_refresh)
+        # self.t1.start()
 
         self.t2 = guic.StoppableThread(
             target=self.ser_obj.get_data,

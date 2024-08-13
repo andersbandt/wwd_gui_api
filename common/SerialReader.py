@@ -4,7 +4,7 @@
 @date     March 2024
 @brief    read data from serial (COM) port
 """
-
+import queue
 # import needed modules
 from datetime import datetime
 import serial
@@ -20,7 +20,8 @@ class SerialReader(SerialGeneral.SerialGeneral):
     def __init__(self, port, baudrate):
         super().__init__(port, baudrate)
         self.procStatus = False
-        self.r_buf = collections.deque(maxlen=200)  # read circular buffer
+        self.r_buf = collections.deque(maxlen=200)  # read circular buffer # TODO: the key to allowing print in my main allocation is to process this there
+        # self.r_buf = queue.Queue()  # TODO: is this better option (thread-safe ?????)
         self.logfile = None
 
     def get_data(self, printmode=False):
@@ -46,14 +47,13 @@ class SerialReader(SerialGeneral.SerialGeneral):
                 print(e)
                 break  # Exit the loop on serial exception
 
-
     def process_data(self, basefilepath, name_ext, data_mode, data_folder, parameters=None):
         print(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True
 
         # INIT OF LOG FILE
         if data_mode == "data":
-            log_csv = logger.init_csv(basefilepath, data_folder, name_ext, parameters)
+            log_text = logger.init_csv(basefilepath, data_folder, name_ext, parameters)
         elif data_mode == "raw" or data_mode == "timestamp":
             log_text = logger.init_text(basefilepath, data_folder, "\n\n\n===================================\n"
                                                 "=======INFO: USB LOG START=========\n"
@@ -74,17 +74,19 @@ class SerialReader(SerialGeneral.SerialGeneral):
                     data_array = [data[0]]
                     split = data[1].split(',')
                     data_array.extend(split)
-                    logger.append_csv(log_csv, data_array)
+                    logger.append_csv(log_text, data_array)
                 elif data_mode == "raw":
                     logger.append_text(log_text, data[1])
                 else:
                     raise BaseException("ERROR: undefined data mode for SerialReader")
         print("Stop processing data.")
 
+
     # TODO: this really shouldn't have things specific to text processing in it ...
     def stop_process(self):
-        self.procStatus = False
-        self.close()
-        logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
+        if self.procStatus:
+            self.procStatus = False
+            self.close()
+            logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
 
 

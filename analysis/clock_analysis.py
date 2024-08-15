@@ -258,7 +258,7 @@ if __name__ == "__main__":
     training_file = []
     for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
         training_file.append(basefilepath_train + file)
-    # training_file = ["/home/anders/Documents/GitHub/wwd_gui_api/data/clock_data/original_b1/_20240418__000513_clock_test_.csv"]
+    training_file = ["/home/anders/Documents/GitHub/wwd_gui_api/data/clock_data/_20240814__170148_clock_test_.csv"]
 
     # set up verification data
     # ver_file_full_path = basefilepath + "_20240417__235411_clock_test_.csv" # slope=7.20e-3

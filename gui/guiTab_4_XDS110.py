@@ -258,7 +258,9 @@ class tabXDS110(ThemedFrame):
 
         # TURN POWER ON
         flash_option = self.targetConfig_drop[1].get()
-        self.turn_power_on(flash_option)
+        power_status = self.turn_power_on(flash_option)
+        if power_status is False:
+            return False
 
         # FLASH FIRMWARE
         # apply time delay (if added)
@@ -325,7 +327,7 @@ class tabXDS110(ThemedFrame):
             except AttributeError:
                 guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
                 self.flashStatus.set_color("#FF5555")  # RED
-                return
+                return False
 
     def turn_power_off(self, flash_option):
         if flash_option == "target_power":

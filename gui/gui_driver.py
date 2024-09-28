@@ -115,11 +115,12 @@ def main():
         try:
             app.controller.ps.output_off(1)
             app.controller.ps.output_off(2)
-        except Exception as e:
-            raise e
+        except Exception:
+            print("UNABLE TO TURN OFF POWER SUPPLY CHANNELS!")
 
     # close any open serial ports
     # TODO: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated
+    print("\nClosing serial oports")
     app.tab3.port_close()
     app.tab5.port_close()
     app.tab6.port_close()

@@ -23,6 +23,10 @@ from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
 
+# TODO: there is lots of thematic red/green updates to be made here
+
+# TODO: I have a suspicion that calls to PyVISA refresh ports are very slow in here .... longer startup time ...
+
 class tabPS(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file):
         super().__init__(master, theme_file)

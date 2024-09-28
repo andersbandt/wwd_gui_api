@@ -35,7 +35,6 @@ else:
 # read in parameters from the config file
 ps_channel = int(config["Target"]["ps_channel"])
 device_vdds = float(config["Target"]["vdds"])
-print("Yepppp")
 
 
 class tabXDS110(ThemedFrame):
@@ -141,11 +140,21 @@ class tabXDS110(ThemedFrame):
             fr_m,
             ["target_power", "probe_power", "supply_power"]
         )
+        self.serialNumber_drop = guih.generate_drop_down(
+            fr_m,
+            ["Any", "ORANGE12", "PURPLE47"]
+        )
 
         self.var_autooff = tk.IntVar()
         self.checkAutoOff = ttk.Checkbutton(fr_m,
                                             text="Auto off?",
                                             variable=self.var_autooff,
+                                            onvalue=1,
+                                            offvalue=0)
+        self.var_toggle= tk.IntVar()
+        self.checkToggle = ttk.Checkbutton(fr_m,
+                                            text="Toggle?",
+                                            variable=self.var_toggle,
                                             onvalue=1,
                                             offvalue=0)
         self.flashStatus = ColorCircle(fr_m, width=60, height=60)
@@ -156,13 +165,15 @@ class tabXDS110(ThemedFrame):
 
         ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2, column=0, padx=10, pady=15)
         self.entry_timesleep.grid(row=2, column=1)
-        ttk.Label(fr_m, text="Auto off (seconds)", style="TLabel").grid(row=3, column=0)
-        self.entry_timeautoff.grid(row=3, column=1)
-        self.checkAutoOff.grid(row=3, column=2)
+        ttk.Label(fr_m, text="Auto off (seconds)", style="TLabel").grid(row=4, column=0)
+        self.entry_timeautoff.grid(row=4, column=1)
+        self.checkAutoOff.grid(row=4, column=2, pady=6)
+        self.checkToggle.grid(row=5, column=2)
         self.targetConfig_drop[0].grid(row=2, column=2, padx=6, pady=10)
+        self.serialNumber_drop[0].grid(row=3, column=2, pady=2)
 
-        btn_flash_firmware.grid(row=4, column=0, padx=15, pady=22)
-        self.flashStatus.grid(row=4, column=1, padx=15, pady=22)
+        btn_flash_firmware.grid(row=6, column=0, padx=15, pady=22)
+        self.flashStatus.grid(row=6, column=1, padx=15, pady=22)
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -256,8 +267,13 @@ class tabXDS110(ThemedFrame):
             self.flashStatus.set_color("black")  # RED
             return False
 
-        # TURN POWER ON
+        # HANDLE POWER
         flash_option = self.targetConfig_drop[1].get()
+        # toggle power
+        if self.var_toggle.get():
+            self.turn_power_off(flash_option)
+            time.sleep(1)
+        # turn on power
         power_status = self.turn_power_on(flash_option)
         if power_status is False:
             return False
@@ -271,9 +287,10 @@ class tabXDS110(ThemedFrame):
             guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
 
         # perform flashing according to debug API
+        serial_option = self.serialNumber_drop[1].get()
         self.flashStatus.set_color("#F1FA8C")  # YELLOW ?
         [firmware_status, packet] = xds110.flash_firmware(
-            flash_option
+            flash_option, serial_option
         )
 
         self.prompt.print(packet.get_string())
@@ -301,11 +318,11 @@ class tabXDS110(ThemedFrame):
         if flash_option == "target_power" or flash_option == "probe_power":
             try:
                 self.cc.ps.output_off(ps_channel)
-            except AttributeError:
+            except (AttributeError, ValueError):
                 res = guih.promptYesNo("Can't access power supply!",
                                        "Can't access supply to turn off. Continue with flash?")
                 if not res:
-                    self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
+                    self.flashStatus.set_color("#FF5555")  # RED
                     return False
 
         if flash_option == "target_power":
@@ -315,7 +332,7 @@ class tabXDS110(ThemedFrame):
             except AttributeError:
                 res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
                 if not res:
-                    self.flashStatus.set_color(self.theme_config["#FF5555"])  # RED
+                    self.flashStatus.set_color("#FF5555")  # RED
                     return False
         elif flash_option == "probe_power":
             self.cc.relay.open_all()
@@ -324,7 +341,7 @@ class tabXDS110(ThemedFrame):
             try:
                 self.cc.ps.set_voltage(ps_channel, device_vdds)
                 self.cc.ps.output_on(ps_channel)
-            except AttributeError:
+            except (AttributeError, ValueError): # AttributeError covers PS not init case. ValueError covers disconnect case.
                 guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
                 self.flashStatus.set_color("#FF5555")  # RED
                 return False

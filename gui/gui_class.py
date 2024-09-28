@@ -127,6 +127,7 @@ class ConnFrame(ThemedFrame):
 
 
 # SerialConnFrame: just a basic serial connection frame
+# TODO: auto-connect not properly leaving the drop down with the correct option selected
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None, bg=None):
         super().__init__(master, name, connect_cmd, disconnect_cmd, bg=bg)

@@ -82,6 +82,7 @@ class tabDMM(ThemedFrame):
         self.fr_port.initialize_fr()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
+# TODO: basically to make this useful need to add a REFRESH feature
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)

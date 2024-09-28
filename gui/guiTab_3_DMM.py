@@ -78,8 +78,8 @@ class tabDMM(ThemedFrame):
                                             self.port_init,
                                             self.port_close,
                                             bg="#00bcd4")
-        self.fr_port.connect_previous_port()
         self.fr_port.initialize_fr()
+        self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
 # TODO: basically to make this useful need to add a REFRESH feature

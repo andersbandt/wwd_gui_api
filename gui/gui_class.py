@@ -104,7 +104,7 @@ class ConnFrame(ThemedFrame):
 
     def connect(self):
         self.status = self.connect_cmd()
-        print(f"\nConnect with {self.port} had status: {self.status} !\n")
+        print(f"Connect with {self.port} had status: {self.status} !\n")
         self.gui_refresh()
         return self.status
 
@@ -127,7 +127,6 @@ class ConnFrame(ThemedFrame):
 
 
 # SerialConnFrame: just a basic serial connection frame
-# TODO: auto-connect not properly leaving the drop down with the correct option selected
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None, bg=None):
         super().__init__(master, name, connect_cmd, disconnect_cmd, bg=bg)
@@ -139,6 +138,9 @@ class SerialConnFrame(ConnFrame):
         self.baud_drop = None
 
         self.initialize_fr()
+
+        # self.connect_previous_port()
+        # TODO: figure out how to implement this in here. Main challenge is my `connect_cmd` typically requires frame to be fully initialized
 
     def initialize_fr(self):
         # Button to refresh the list of COM ports
@@ -179,9 +181,9 @@ class SerialConnFrame(ConnFrame):
         # place CONNECT button and STATUS indicator
         self.canvas1.grid(row=5, column=2, padx=15, pady=3)
 
-    def connect(self):
+    def connect(self, set_used_port):
         super().connect()
-        if self.status:
+        if self.status and set_used_port:
             self.cc.set_used_port(self.port, self.name)
 
     def refresh_ports(self):
@@ -191,7 +193,6 @@ class SerialConnFrame(ConnFrame):
         # update port list
         ports = serial_api.get_ports(method=self.port_func)
 
-        # TODO: figure out how to add the previous port as the first option
         prev_port = self.get_previous_port()
         if prev_port in ports:
             pass
@@ -202,7 +203,7 @@ class SerialConnFrame(ConnFrame):
                              command=lambda value=string: self.com_drop[1].set(value))
 
     def get_port(self):
-        self.port = self.com_drop[1].get() # NOTE: this used to just be a proper get, no setting. However, it didn't work with auto-connect
+        self.port = self.com_drop[1].get()
         return self.port
 
     def get_previous_port(self):
@@ -223,10 +224,11 @@ class SerialConnFrame(ConnFrame):
     def connect_previous_port(self):
         self.port = self.get_previous_port()
         self.com_drop[1].set(self.port)
+        self.com_drop[0].grid_forget()
+        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
         if self.port is not None:
-            if self.port is not False:  # TODO: phase this check out
-                print(f"Connect to previous port started for {self.name} @ {self.port}")
-                self.connect()
+            print(f"Connect to previous port for {self.name} @ {self.port}")
+            self.connect(False)
         return self.status
 
 

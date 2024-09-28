@@ -118,9 +118,9 @@ class tabPS(ThemedFrame):
                                             self.port_close,
                                             port_func=3,
                                             bg="#00bcd4")
-        self.fr_port.connect_previous_port() # TODO: phase the need to perform this here out (perform in SerialConnFrame upon __init__ )
         self.fr_port.initialize_fr()
-        # self.fr_port.connect_previous_port()
+        self.fr_port.connect_previous_port()
+        self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
     def init_fr_control(self):

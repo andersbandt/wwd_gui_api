@@ -224,8 +224,6 @@ class SerialConnFrame(ConnFrame):
     def connect_previous_port(self):
         self.port = self.get_previous_port()
         self.com_drop[1].set(self.port)
-        self.com_drop[0].grid_forget()
-        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
         if self.port is not None:
             print(f"Connect to previous port for {self.name} @ {self.port}")
             self.connect(False)

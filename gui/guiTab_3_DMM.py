@@ -82,7 +82,7 @@ class tabDMM(ThemedFrame):
         self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
-# TODO: basically to make this useful need to add a REFRESH feature
+
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
@@ -129,6 +129,10 @@ class tabDMM(ThemedFrame):
         self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
 
+        # ADD A REFRESH
+        self.btn_record = ttk.Button(self.fr_info, text='RECORD THIS', command=self.update_DMM)
+        self.btn_record.grid(row=7, column=2, pady=5, padx=3, sticky='W')
+
     def init_fr_rec(self):
         fr_m = self.fr_rec
         ttk.Label(fr_m, text="Record DMM", style="TPinkLabel.TLabel").grid(row=0, column=0, pady=10, padx=15)
@@ -140,8 +144,8 @@ class tabDMM(ThemedFrame):
 
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
-        self.btn_record = ttk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
         self.optRecSpd.grid(row=2, column=0, padx=3, sticky='W')
+        self.btn_record = ttk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
         self.btn_record.grid(row=2, column=3, pady=5, padx=3, sticky='W')
 
     def init_fr_PT100(self):
@@ -170,7 +174,7 @@ class tabDMM(ThemedFrame):
     def update_DMM(self):
         self.dmm_Auto = self.dmm.get_range_auto()
         self.dmm_Range = None
-        self.dmm_Fu1 = None
+        self.dmm_Fu1 = None # TODO: splice in functions to get range and function
         self.dmm_Fu2 = None
         self.dmm_Meas1 = self.dmm.read_val1_str()
         self.dmm_Meas2 = self.dmm.read_val2_str()

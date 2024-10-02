@@ -98,7 +98,7 @@ def main():
     hs = window.winfo_screenheight()  # height of the screen
     # set the dimensions of the screen and where is it placed
     x = (ws / 2) - (w / 4)
-    y = (hs / 2) - (h / 2) - 20
+    y = 70
     window.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
     # sv_ttk.set_theme("dark")
@@ -121,8 +121,11 @@ def main():
     # close any open serial ports
     # TODO: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated
     print("\nClosing serial oports")
-    app.tab3.port_close()
-    app.tab5.port_close()
-    app.tab6.port_close()
+    try:
+        app.tab3.port_close()
+        app.tab5.port_close()
+        app.tab6.port_close()
+    except Exception:
+        print("FUCK man I can't close the serial ports either!")
 
 

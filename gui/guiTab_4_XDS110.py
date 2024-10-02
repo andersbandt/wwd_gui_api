@@ -272,7 +272,7 @@ class tabXDS110(ThemedFrame):
         # toggle power
         if self.var_toggle.get():
             self.turn_power_off(flash_option)
-            time.sleep(1)
+            time.sleep(4) # wait seconds before powerup again
         # turn on power
         power_status = self.turn_power_on(flash_option)
         if power_status is False:

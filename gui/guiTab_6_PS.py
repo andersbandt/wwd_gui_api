@@ -23,6 +23,8 @@ from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
 
+# TODO: add some console output when I turn on/off a supply
+
 # TODO: there is lots of thematic red/green updates to be made here
 
 # TODO: I have a suspicion that calls to PyVISA refresh ports are very slow in here .... longer startup time ...

@@ -80,6 +80,7 @@ class Prompt(ThemedFrame):
 ### CONNECTION FRAMES    #################
 ##########################################
 
+# TODO: have an auto-connect          option where I can disable the error message popup ... then could call SPD330X init perfect by blocking first one
 class ConnFrame(ThemedFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
         self.theme_file = "config/darcula.json" #tag:hardcode
@@ -181,7 +182,7 @@ class SerialConnFrame(ConnFrame):
         # place CONNECT button and STATUS indicator
         self.canvas1.grid(row=5, column=2, padx=15, pady=3)
 
-    def connect(self, set_used_port):
+    def connect(self, set_used_port=True):
         super().connect()
         if self.status and set_used_port:
             self.cc.set_used_port(self.port, self.name)
@@ -226,7 +227,7 @@ class SerialConnFrame(ConnFrame):
         self.com_drop[1].set(self.port)
         if self.port is not None:
             print(f"Connect to previous port for {self.name} @ {self.port}")
-            self.connect(False)
+            self.connect(set_used_port=False)
         return self.status
 
 

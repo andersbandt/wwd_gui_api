@@ -25,6 +25,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
         self.logfile = None
 
     def get_data(self, printmode=False):
+        serStrDat = 0
         while self.serStatus:  # Loop until serial status becomes False
             try:
                 bytes_to_read = self.serObj.inWaiting()

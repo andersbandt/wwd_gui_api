@@ -14,9 +14,13 @@ import tkinter.messagebox as tkmb
 import time
 from datetime import datetime
 import pyvisa.errors
+from sympy.physics.units import current
 
 # import user defined modules
+from common import plotter
 from EEequipment.spd3303x import SPD3303X
+
+# import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
@@ -145,7 +149,7 @@ class tabPS(ThemedFrame):
         self.ch2_label = ttk.Label(fr_m, text="Channel 2", style="TLabel")
         self.ch2_voltage = tk.Entry(fr_m)
         self.ch2_set_btn = ttk.Button(fr_m, text="Set Voltage", style="TButton",
-                                      command=lambda: self.set_voltage(2,self.ch2_voltage.get())
+                                      command=lambda: self.set_voltage(2, self.ch2_voltage.get())
                                       )
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
         self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
@@ -153,19 +157,26 @@ class tabPS(ThemedFrame):
         self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
         self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
+        # MISC CONTROL
+        self.plot_current_btn = ttk.Button(fr_m, text="Live Plot current", style="TButton",
+                                           command=lambda: self.plot_current(),
+                                           )
+        self.plot_current_btn.grid(row=2, column=0, padx=10, pady=10)
+
     def init_fr_status(self):
         # channel 1 CV/CC mode
         self.labelCh1Mode = ttk.Label(self.fr_status, width=10, text='Ch 1 Mode', style="TLabel", anchor='w')
-        self.ch1_mode = ColorCircle(self.fr_status, width=50, height=50, bg=self.theme_config["bg_dark"])  # create a Canvas widget
+        self.ch1_mode = ColorCircle(self.fr_status, width=50, height=50,
+                                    bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelCh1Mode.grid(row=0, column=0, pady=15, padx=15)
         self.ch1_mode.grid(row=1, column=0, pady=15, padx=15)
 
         # channel 2 CV/CC mode
         self.labelCh2Mode = ttk.Label(self.fr_status, width=10, text='Ch 2 Mode', style="TLabel", anchor='w')
-        self.ch2_mode = ColorCircle(self.fr_status, width=50, height=50, bg=self.theme_config["bg_dark"])  # create a Canvas widget
+        self.ch2_mode = ColorCircle(self.fr_status, width=50, height=50,
+                                    bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelCh2Mode.grid(row=0, column=1, pady=15, padx=15)
         self.ch2_mode.grid(row=1, column=1, pady=15, padx=15)
-
 
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
@@ -243,6 +254,22 @@ class tabPS(ThemedFrame):
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "alert")
 
+    def plot_current(self):
+        currentLivePlot = plotter.LivePlot()
+
+        def animate(i):
+            for j in range(0, 10):
+                # Retrieve the current reading and the timestamp
+                reading = self.ps.get_current(1)
+                currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
+                currentLivePlot.ys.append(reading)
+
+            # Clear and plot again, but avoid clearing the entire plot for better visual
+            currentLivePlot.ax.clear()
+            currentLivePlot.ax.plot(currentLivePlot.xs[-2000:], currentLivePlot.ys[-2000:], label="Current (A)")
+
+        # Start the animation with a 200 ms interval
+        currentLivePlot.show_animation(animate, interval=200)
 
     #################################
     #### SERIAL (COM)  ##############
@@ -257,7 +284,6 @@ class tabPS(ThemedFrame):
             self.ps = SPD3303X.SPD3303X(port)
         except ValueError:
             self.ps = None
-
 
         try:
             self.id = self.ps.test_conn()
@@ -283,18 +309,16 @@ class tabPS(ThemedFrame):
             self.ch2_on = 0
             self.gui_refresh_channel_state()
             return True
-        else: # BAD ID received
-        # if self.id == '' or len(self.id) < 3:
+        else:  # BAD ID received
+            # if self.id == '' or len(self.id) < 3:
             self.ps = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
             return False
 
-
     def port_close(self):
         self.prompt.print(f"Close PYVISA resource!")
         self.ps.close()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
-

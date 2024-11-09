@@ -14,6 +14,7 @@ import tkinter.messagebox as tkmb
 import time
 from datetime import datetime
 import pyvisa.errors
+from analysis.csv_helper import CSVHelper
 from sympy.physics.units import current
 
 # import user defined modules
@@ -51,6 +52,10 @@ class tabPS(ThemedFrame):
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
+
+        # set up recording / data information
+        self.recName = False
+        self.data_dir = "data/ps_data/"
 
         # set up prompt
         self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=140)
@@ -158,10 +163,16 @@ class tabPS(ThemedFrame):
         self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
         # MISC CONTROL
+        self.var_record = tk.IntVar()
+        ttk.Checkbutton(fr_m,
+                        text="Record current",
+                        variable=self.var_record,
+                        onvalue=1,
+                        offvalue=0).grid(row=2, column=0)
         self.plot_current_btn = ttk.Button(fr_m, text="Live Plot current", style="TButton",
                                            command=lambda: self.plot_current(),
                                            )
-        self.plot_current_btn.grid(row=2, column=0, padx=10, pady=10)
+        self.plot_current_btn.grid(row=2, column=1, padx=10, pady=10)
 
     def init_fr_status(self):
         # channel 1 CV/CC mode
@@ -254,21 +265,34 @@ class tabPS(ThemedFrame):
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "alert")
 
+    # plot_current: starts a live plot and (optionally) records data to .csv
     def plot_current(self):
+        # set up .csv recording
+        recording = self.var_record.get()
+        if recording:
+            self.recName = 'AREC_' + time.strftime('%Y%m%d%H%M%S', time.localtime()) + '.csv'
+            self.csvh = CSVHelper(self.data_dir + self.recName)
+            self.csvh.initialize_file(["Time", "Current"])
+
         currentLivePlot = plotter.LivePlot()
 
         def animate(i):
             for j in range(0, 10):
                 # Retrieve the current reading and the timestamp
                 reading = self.ps.get_current(1)
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
                 currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
                 currentLivePlot.ys.append(reading)
+
+                # add row to data file
+                if recording:
+                    self.csvh.add_row([timestamp, reading])
 
             # Clear and plot again, but avoid clearing the entire plot for better visual
             currentLivePlot.ax.clear()
             currentLivePlot.ax.plot(currentLivePlot.xs[-2000:], currentLivePlot.ys[-2000:], label="Current (A)")
 
-        # Start the animation with a 200 ms interval
         currentLivePlot.show_animation(animate, interval=200)
 
     #################################

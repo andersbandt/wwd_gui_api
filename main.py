@@ -22,14 +22,16 @@ def main():
     args = parser.parse_args()
 
     # Use the arguments to determine behavior
-    # TODO; finish implementing function control based on arguments
+    autoconnect = True
     if args.auto_connect:
         print("Auto-connect enabled.")
+        autoconnect = True
     if args.disable_auto:
         print("Auto-connect disabled")
+        autoconnect = False
 
     # Call the main function of your GUI driver
-    gui_driver.main()
+    gui_driver.main(autoconnect)
 
 
 ##############################################################

@@ -6,7 +6,6 @@
 """
 
 # import needed modules
-from datetime import datetime
 import serial
 
 

@@ -5,13 +5,10 @@
 @brief    critical GUI code to launch Tkinter notebook
 """
 
-
 # import needed packages
 import tkinter as tk
 from tkinter import ttk
-import sv_ttk
 import os
-import time
 
 # import ClassController
 from class_controller import ClassController
@@ -27,16 +24,13 @@ from gui import guiTab_5_USB
 from gui import guiTab_6_PS
 
 
-
 class MainApplication(ThemedApp):
-    def __init__(self, window, height, width, theme_file):
+    def __init__(self, window, height, width, theme_file, autoconnect):
         super().__init__(window, theme_file)
-
+        self.autoconnect = autoconnect
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
-
         self.basefilepath = os.getcwd()
-
         self.controller = ClassController()
 
         usb_dev = usbrelay_controller.find()
@@ -54,12 +48,13 @@ class MainApplication(ThemedApp):
 
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
-        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath, "config/darcula.json")
+        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath,
+                                                            "config/darcula.json")
         self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath, "config/darcula.json")
-        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json")
+        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json")
+        self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+        self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
 
         self.nb.add(self.tab1, text="MAIN")
         self.nb.add(self.tab2, text="IMU Analysis")
@@ -84,7 +79,7 @@ class MainApplication(ThemedApp):
 ###########################################################
 
 # main function
-def main():
+def main(autoconnect):
     print("Executing main function of gui_driver.py")
 
     # setup window
@@ -101,13 +96,17 @@ def main():
     y = 70
     window.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
-    # sv_ttk.set_theme("dark")
-
     # place main app
-    app = MainApplication(window, 1800, 1800, "config/darcula.json")
+    app = MainApplication(window,
+                          1800,
+                          1800,
+                          "config/darcula.json",
+                          autoconnect)
 
     # run application
     window.mainloop()
+
+    #### USER HAS CLOSED APPLICATION WHEN CODE REACHES PAST THIS POINT ####
 
     # perform shutdown activities
     print("TKINTER is shutting down!")
@@ -127,5 +126,3 @@ def main():
         app.tab6.port_close()
     except Exception:
         print("FUCK man I can't close the serial ports either!")
-
-

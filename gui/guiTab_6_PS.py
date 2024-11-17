@@ -35,7 +35,7 @@ from gui.guiTab_parent import ThemedFrame
 # TODO: I have a suspicion that calls to PyVISA refresh ports are very slow in here .... longer startup time ...
 
 class tabPS(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file):
+    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
@@ -60,8 +60,21 @@ class tabPS(ThemedFrame):
         # set up prompt
         self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=140)
 
+        # set up serial port
+        self.fr_port = guic.SerialConnFrame(self,
+                                            self.cc,
+                                            "PS_PyVISA",
+                                            self.port_init,
+                                            self.port_close,
+                                            port_func=3,
+                                            bg="#00bcd4")
+        self.fr_port.initialize_fr()
+        if autoconnect:
+            self.fr_port.connect_previous_port()
+            self.fr_port.connect_previous_port()
+        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+
         # place everything in grid
-        # self.fr_port is placed in `init_fr_port`
         self.fr_info.grid(row=0, column=0, pady=15, padx=15)
         self.fr_control.grid(row=1, column=0, pady=15, padx=15)
         self.fr_status.grid(row=1, column=1, pady=15, padx=15)
@@ -75,7 +88,6 @@ class tabPS(ThemedFrame):
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()
-        self.init_fr_port()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
@@ -120,19 +132,6 @@ class tabPS(ThemedFrame):
         self.valueI1.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueV2.grid(row=5, column=1, sticky='E', padx=5, pady=2)
         self.valueI2.grid(row=6, column=1, sticky='E', padx=5, pady=2)
-
-    def init_fr_port(self):
-        self.fr_port = guic.SerialConnFrame(self,
-                                            self.cc,
-                                            "PS_PyVISA",
-                                            self.port_init,
-                                            self.port_close,
-                                            port_func=3,
-                                            bg="#00bcd4")
-        self.fr_port.initialize_fr()
-        self.fr_port.connect_previous_port()
-        self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -211,7 +210,11 @@ class tabPS(ThemedFrame):
 
     def gui_refresh_channel_mode(self):
         if self.ps is not None:
-            status_decode = self.ps.check_status()
+            try:
+                status_decode = self.ps.check_status()
+            except ValueError:
+                self.ps = None
+                return
         else:
             return
 

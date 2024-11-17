@@ -23,7 +23,7 @@ from gui.guiTab_parent import ThemedFrame
 
 
 class tabUSB(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file):
+    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
@@ -44,7 +44,8 @@ class tabUSB(ThemedFrame):
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close,
                                             bg="#00bcd4")
-        self.fr_port.connect_previous_port()
+        if autoconnect:
+            self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
         # init state frame

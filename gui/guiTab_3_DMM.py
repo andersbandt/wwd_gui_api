@@ -27,8 +27,11 @@ from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
 
+# TODO: there is a general problem with connection order. When I connect serial log vs. dmm backwards, I can't connect properly to the DMM after.
+
+
 class tabDMM(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file):
+    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
         self.cc = class_controller
@@ -58,6 +61,18 @@ class tabDMM(ThemedFrame):
         self.prompt = guic.Prompt(self, "DMM Console Output", height=21, width=140)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
+        # set up port
+        self.fr_port = guic.SerialConnFrame(self,
+                                            self.cc,
+                                            "DMM_Serial",
+                                            self.port_init,
+                                            self.port_close,
+                                            bg="#00bcd4")
+        self.fr_port.initialize_fr()
+        if autoconnect:
+            self.fr_port.connect_previous_port()
+        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
+
         # initialize tab content
         self.initTabContent()
 
@@ -66,22 +81,8 @@ class tabDMM(ThemedFrame):
         self.init_fr_info()
         self.init_fr_rec()
         self.init_fr_PT100()
-        self.init_fr_port()
-
         # remaining initialisation and start of main loop
         # self.entryPort.focus_set()
-
-    def init_fr_port(self):
-        self.fr_port = guic.SerialConnFrame(self,
-                                            self.cc,
-                                            "DMM_Serial",
-                                            self.port_init,
-                                            self.port_close,
-                                            bg="#00bcd4")
-        self.fr_port.initialize_fr()
-        self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
-
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)

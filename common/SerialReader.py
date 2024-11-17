@@ -41,7 +41,6 @@ class SerialReader(SerialGeneral.SerialGeneral):
                         serStrDat = ser_bytes.decode('utf-8')
                     except UnicodeDecodeError:
                         print(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
-                        # TODO: should I somehow edit procStatus to be like yellow in the main application for a bit if this happens?
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                     self.r_buf.append([timestamp, serStrDat])
             except (serial.serialutil.SerialException, OSError) as e:  # (Windows, Linux)

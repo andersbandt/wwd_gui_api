@@ -70,14 +70,12 @@ class tabMainDashboard(ThemedFrame):
 
         self.gui_refresh_relay_state("auto")
 
-
     def toggle_relay(self, relay_num):
         if self.cc.relay is not None:
             self.cc.relay.toggle_state(relay_num)
             self.gui_refresh_relay_state("call")
         else:
             guih.alert_user("Can't toggle relay", "Relay not connected!", "error")
-
 
     def gui_refresh_relay_state(self, event):
         if self.fr_main_status.status:
@@ -90,7 +88,6 @@ class tabMainDashboard(ThemedFrame):
             print("Can't refresh relay state with inactive relay!!!")
             if event == "call":
                 guih.alert_user("Can't refresh relay!", "Relay is not connected", "error")
-
 
     def relay_autoconnect(self):
         usb_dev = usbrelay_controller.find()

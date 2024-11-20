@@ -28,10 +28,7 @@ from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: add some console output when I turn on/off a supply
-
 # TODO: there is lots of thematic red/green updates to be made here
-
 # TODO: I have a suspicion that calls to PyVISA refresh ports are very slow in here .... longer startup time ...
 
 class tabPS(ThemedFrame):
@@ -60,7 +57,16 @@ class tabPS(ThemedFrame):
         # set up prompt
         self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=140)
 
-        # set up serial port
+        # initialize tab content
+        self.initTabContent()
+
+        # place everything in grid
+        self.fr_info.grid(row=0, column=0, pady=15, padx=15)
+        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
+        self.fr_status.grid(row=1, column=1, pady=15, padx=15)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+
+        # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
                                             self.cc,
                                             "PS_PyVISA",
@@ -74,14 +80,8 @@ class tabPS(ThemedFrame):
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
-        # place everything in grid
-        self.fr_info.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_status.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
-        # initialize tab content
-        self.initTabContent()
+
 
     def initTabContent(self):
         print("Initializing tab 6 (PS) content")
@@ -237,6 +237,10 @@ class tabPS(ThemedFrame):
     #################################
 
     def toggle_channel(self, channel):
+        if self.ps is None:
+            guih.alert_user("Can't toggle channel", "No PS connection!", "error")
+            return False
+
         try:
             if channel == 1:
                 if self.ch1_on is True:
@@ -256,6 +260,13 @@ class tabPS(ThemedFrame):
                 raise ValueError("Wrong channel input")
         except ValueError as e:
             guih.alert_user("Can't toggle channel", "Error: {e}", "error")
+        else:
+            state = None
+            if channel == 1:
+                state = self.ch1_on
+            elif channel == 2:
+                state = self.ch2_on
+            self.prompt.print(f"Toggled channel {channel} to state {state}")
 
         time.sleep(0.5)
         self.gui_refresh()
@@ -265,8 +276,9 @@ class tabPS(ThemedFrame):
             # have to format input text_data box into float
             voltage = float(voltage_str)
             self.ps.set_voltage(channel, voltage)
+            self.prompt.print(f"Set voltage on channel {channel} to {voltage} V")
         else:
-            guih.alert_user("Can't set voltage", "No PS connection!", "alert")
+            guih.alert_user("Can't set voltage", "No PS connection!", "error")
 
     # plot_current: starts a live plot and (optionally) records data to .csv
     def plot_current(self):
@@ -277,6 +289,7 @@ class tabPS(ThemedFrame):
             self.csvh = CSVHelper(self.data_dir + self.recName)
             self.csvh.initialize_file(["Time", "Current"])
 
+        self.prompt.print("Starting live current plot ...")
         currentLivePlot = plotter.LivePlot()
 
         def animate(i):

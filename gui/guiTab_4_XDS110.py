@@ -335,9 +335,9 @@ class tabXDS110(ThemedFrame):
                     self.flashStatus.set_color("#FF5555")  # RED
                     return False
         elif flash_option == "probe_power":
-            self.cc.relay.open_all()
+            pass
         elif flash_option == "supply_power":
-            self.cc.relay.open_all()
+            # self.cc.relay.open_all() # TODO: need a special relay method for opening only something labeled "DUT" or something
             try:
                 self.cc.ps.set_voltage(ps_channel, device_vdds)
                 self.cc.ps.output_on(ps_channel)

@@ -33,6 +33,9 @@ def main():
     # Call the main function of your GUI driver
     gui_driver.main(autoconnect)
 
+    # quit if we reach this point
+    quit()
+
 
 ##############################################################
 ################   MAIN     ##################################

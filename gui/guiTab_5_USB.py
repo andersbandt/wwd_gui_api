@@ -64,7 +64,7 @@ class tabUSB(ThemedFrame):
         self.initTabContent()
 
     def initTabContent(self):
-        print("\n\nInitializing tab 5 (USB) content")
+        print("Initializing tab 5 (USB) content")
         self.init_fr_state()
 
 # TODO: when I'm running a test there is no way to stop processing. Also no follow-up command to WWD device (that will take some work though)
@@ -105,7 +105,7 @@ class tabUSB(ThemedFrame):
     ##############################################################################
 
     def activate_test_mode(self):
-        command = "DAGA"
+        command = "DAGA"  # tag:HARDCODE
         my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         self.prompt1.print(f"INFO: issuing command {command} ...")
         if self.ser_obj.serStatus:

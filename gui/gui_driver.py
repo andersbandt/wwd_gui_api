@@ -22,6 +22,7 @@ from gui import guiTab_3_DMM
 from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
 from gui import guiTab_6_PS
+from gui import guiTab_7_ATE
 
 
 class MainApplication(ThemedApp):
@@ -44,17 +45,19 @@ class MainApplication(ThemedApp):
         self.tab4 = None
         self.tab5 = None
         self.tab6 = None
+        self.tab7 = None
         self.setTabs()
 
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
         self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath,
-                                                            "config/darcula.json")
+                                                            "config/darcula.json", self.autoconnect)
         self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath, "config/darcula.json")
         self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
         self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+        self.tab7 = guiTab_7_ATE.tabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
 
         self.nb.add(self.tab1, text="MAIN")
         self.nb.add(self.tab2, text="IMU Analysis")
@@ -62,6 +65,7 @@ class MainApplication(ThemedApp):
         self.nb.add(self.tab4, text="XDS110 JTAG")
         self.nb.add(self.tab5, text="USB COMM")
         self.nb.add(self.tab6, text="PS Control")
+        self.nb.add(self.tab7, text="ATE")
 
         self.nb.grid(column=0, row=0)
         return True
@@ -69,7 +73,7 @@ class MainApplication(ThemedApp):
     def on_tab_changed(self, event):
         selected_tab = event.widget.tab(event.widget.select(), "text")
         if selected_tab == "MAIN":
-            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh_relay_state(self.tab1, "auto")
+            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
         elif selected_tab == "PS Control":
             guiTab_6_PS.tabPS.gui_refresh(self.tab6)
 
@@ -126,3 +130,5 @@ def main(autoconnect):
         app.tab6.port_close()
     except Exception:
         print("FUCK man I can't close the serial ports either!")
+
+    return

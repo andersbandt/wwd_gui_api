@@ -5,7 +5,6 @@
 @brief    contains Class objects for the Tkinter GUI
 """
 
-
 # import modules
 import tkinter as tk
 import xml.etree.ElementTree
@@ -21,6 +20,7 @@ from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
 from common import serial_api
 
+
 class ColorCircle(tk.Canvas):
     def __init__(self, master, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
@@ -30,14 +30,13 @@ class ColorCircle(tk.Canvas):
         self.itemconfig(self.status_oval, fill=color)
 
 
-
 ##########################################
 ### FRAMES (VARIOUS)     #################
 ##########################################
 
 class Prompt(ThemedFrame):
     def __init__(self, master, title, height, width):
-        self.theme_file = "config/darcula.json" #tag:hardcode
+        self.theme_file = "config/darcula.json"  #tag:hardcode
         super().__init__(master, self.theme_file, height=height, width=width)
         self.height = height
         self.width = width
@@ -48,11 +47,11 @@ class Prompt(ThemedFrame):
         clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
         self.prompt = scrolledtext.ScrolledText(self,
-                           height=height,
-                           width=width,
-                           bg=self.theme_config["light_2"],
-                           fg=self.theme_config["fg_light"],
-                           borderwidth=10)
+                                                height=height,
+                                                width=width,
+                                                bg=self.theme_config["light_2"],
+                                                fg=self.theme_config["fg_light"],
+                                                borderwidth=10)
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
     # gui_print: prints a message on a Tkinter frame
@@ -83,7 +82,7 @@ class Prompt(ThemedFrame):
 # TODO: have an auto-connect          option where I can disable the error message popup ... then could call SPD330X init perfect by blocking first one
 class ConnFrame(ThemedFrame):
     def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
-        self.theme_file = "config/darcula.json" #tag:hardcode
+        self.theme_file = "config/darcula.json"  #tag:hardcode
         super().__init__(master, self.theme_file)
         self.master = master
         self.name = name
@@ -134,7 +133,7 @@ class SerialConnFrame(ConnFrame):
         self.cc = class_controller
 
         # NOTE: port_func is for tracking what method is used for populating array of ports
-        self.port_func = port_func # NONE defaults to OS detection method. 1=Windows, 2=Linux, 3=PyVISA
+        self.port_func = port_func  # NONE defaults to OS detection method. 1=Windows, 2=Linux, 3=PyVISA
         self.com_drop = None
         self.baud_drop = None
 
@@ -171,12 +170,14 @@ class SerialConnFrame(ConnFrame):
         # Button to refresh the list of COM ports
         # TARGET - BUTTON/STATUS
         btn_connect_serial = tk.Button(self, text="Connect to COM",
-                                    command=self.connect,
-                                    bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=1, width=15)
+                                       command=self.connect,
+                                       bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=1,
+                                       width=15)
         btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
         btn_disconnect_serial = tk.Button(self, text="Disconnect COM",
-                                       command=self.disconnect,
-                                       bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1, width=15)
+                                          command=self.disconnect,
+                                          bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1,
+                                          width=15)
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 
         # place CONNECT button and STATUS indicator
@@ -240,7 +241,8 @@ class AutoConnFrame(ConnFrame):
         self.canvas1.grid(row=1, column=2, padx=15, pady=22)
 
         tk.Button(
-            self, text=f"Auto-connect", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"], command=self.connect_cmd
+            self, text=f"Auto-connect", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+            command=self.connect_cmd
         ).grid(row=0, column=1, padx=5, pady=5)
 
         # RELAY STATUS INDICATOR
@@ -265,9 +267,9 @@ class StoppableThread(threading.Thread):
         self.kwargs = kwargs
 
     # def run(self):
-        # while not self.stopped():
-            # self.function(*self.args, **self.kwargs)
-            # break  # If you want to run only once, remove this if you need continuous execution
+    # while not self.stopped():
+    # self.function(*self.args, **self.kwargs)
+    # break  # If you want to run only once, remove this if you need continuous execution
 
     def stop(self):
         self._stop_event.set()

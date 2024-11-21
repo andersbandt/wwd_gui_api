@@ -12,7 +12,6 @@ import serial
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
-from EEequipment.usbrelay.usbrelay_controller import NUM_RELAY
 from common.SerialReader import SerialReader
 
 # import GUI modules
@@ -70,7 +69,7 @@ class tabMainDashboard(ThemedFrame):
         # init serial port
         # TODO: standardize this stuff in the serial frame parent class
         self.ser_obj = None
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "ATE_serial", self.port_init, lambda: self.port_close,
+        self.fr_port = guic.SerialConnFrame(self, self.cc, "ATE_serial", self.port_init, self.port_close,
                                             bg="#00bcd4")
         if autoconnect:
             self.fr_port.connect_previous_port()
@@ -97,7 +96,7 @@ class tabMainDashboard(ThemedFrame):
         btn2.grid(row=0, column=1, padx=10, pady=10)
 
         # Create and place individual relay control buttons
-        for i in range(NUM_RELAY):
+        for i in range(self.cc.relay.num_relays):
             name = self.cc.relay.get_relay_mapping(i + 1)
             btn = ttk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i + 1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)
@@ -168,13 +167,17 @@ class tabMainDashboard(ThemedFrame):
     def send_command(self, command):
         try:
             if self.ser_obj.serStatus:
-                self.ser_obj.send_data(command)
+                try:
+                    self.ser_obj.send_data(command)
+                except serial.serialutil.SerialException:
+                    self.prompt1.print("ERROR: self.ser_obj is defined but status is FALSE\n")
+                    guih.alert_user("Can't send serial data", "Really can't send any shit. Probably I/O error?", "error")
                 self.prompt1.print(f"INFO: issued command {command} ...")
             else:
-                self.prompt1.print("ERROR: self.ser_obj is defined but status is FALSE\n")
+                self.prompt1.print(f"ERROR: self.ser_obj exists but serStatus is false")
+
         except AttributeError:
             self.prompt1.print("ERROR: probably self.ser_obj is None\n")
-
 
     #################################
     #### SERIAL (COM)  ##############
@@ -186,7 +189,8 @@ class tabMainDashboard(ThemedFrame):
 
         self.prompt1.print(f"Init with port: {port}")
         try:
-            self.ser_obj = SerialReader(port, 9600) # TODO: make this a drop down in the seriaal frame. Also save it with my autconnect preferences???
+            self.ser_obj = SerialReader(port,
+                                        9600)  # TODO: make this a drop down in the seriaal frame. Also save it with my autconnect preferences???
         except serial.serialutil.SerialException as e:
             self.prompt1.print(f"ERROR: {e}")
             self.prompt1.print(f"Can't init with port\n")
@@ -196,6 +200,7 @@ class tabMainDashboard(ThemedFrame):
         self.prompt1.print("Init successful!\n")
         return True
 
+    # TODO: I don't think this printout is working
     def port_close(self):
         self.prompt1.print("Serial close!")
         self.ser_obj.stop_process()

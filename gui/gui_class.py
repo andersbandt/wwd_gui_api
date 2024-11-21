@@ -46,6 +46,7 @@ class Prompt(ThemedFrame):
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
         clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
+        # TODO: can I set font size here?
         self.prompt = scrolledtext.ScrolledText(self,
                                                 height=height,
                                                 width=width,

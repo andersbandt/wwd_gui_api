@@ -334,7 +334,7 @@ class tabDMM(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC, 1)
+        self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC)
         self.dmm_id = self.dmm.test_conn()
 
         self.prompt.print("Connected to DMM")

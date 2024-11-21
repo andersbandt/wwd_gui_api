@@ -115,11 +115,12 @@ def main(autoconnect):
     # perform shutdown activities
     print("TKINTER is shutting down!")
     if app.controller.ps is not None:
-        try:
-            app.controller.ps.output_off(1)
-            app.controller.ps.output_off(2)
-        except Exception:
-            print("UNABLE TO TURN OFF POWER SUPPLY CHANNELS!")
+        app.controller.ps.output_off(1)
+        app.controller.ps.output_off(2)
+            # print("UNABLE TO TURN OFF POWER SUPPLY CHANNELS!")
+
+    if app.controller.relay is not None:
+        app.controller.relay.open_all()
 
     # close any open serial ports
     # TODO: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated

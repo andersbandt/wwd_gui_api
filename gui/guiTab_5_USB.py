@@ -22,6 +22,8 @@ from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
 
+# TODO: it should be a priority to have the USB log detect when I'm erroring out again
+
 class tabUSB(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)

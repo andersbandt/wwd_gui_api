@@ -9,6 +9,7 @@
 import tkinter as tk
 from tkinter import ttk
 import os
+import time
 
 # import ClassController
 from class_controller import ClassController
@@ -38,6 +39,7 @@ class MainApplication(ThemedApp):
         self.controller.set_relay(
             usbrelay_controller.USBRelayController(usb_dev)
         )
+        time.sleep(2)
 
         self.tab1 = None
         self.tab2 = None

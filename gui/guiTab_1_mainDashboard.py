@@ -20,7 +20,6 @@ from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: on power up how can I pick what relays to have on ?
 # TODO: make a subclass of ThemedFrame if there is a serial port for the tab? Can handle the `autoconnect` variable more elegantly?
 
 # TODO: this might be a stretch ... but when I click into the Arduino Button page can I have the keystrokes on the arrow keys be mapped to the button options ?????
@@ -105,6 +104,7 @@ class tabMainDashboard(ThemedFrame):
         # add some text with user information
         note = tk.Label(fr_m,
                         text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
+        # TODO: add a "edit this file" button here to open config.ini
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
 
     def init_fr_control(self):

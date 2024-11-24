@@ -61,6 +61,9 @@ class tabDMM(ThemedFrame):
         self.prompt = guic.Prompt(self, "DMM Console Output", height=21, width=140)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
+        # initialize tab content
+        self.initTabContent()
+
         # set up port
         self.fr_port = guic.SerialConnFrame(self,
                                             self.cc,
@@ -73,8 +76,6 @@ class tabDMM(ThemedFrame):
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
-        # initialize tab content
-        self.initTabContent()
 
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")

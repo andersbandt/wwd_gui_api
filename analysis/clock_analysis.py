@@ -23,11 +23,6 @@ from common import plotter
 from common import logger
 
 
-# TODO: plots have y-axis labeled but add some TITLES
-# TODO: is there something wrong with my verification data method? I get a large residual
-
-
-# TODO: another cleaning method I realized is my erroneous data has two entries for the same timestamp
 def clean_data(df, column, column2=None):
     print("INFO: Cleaning data ....")
     print(f"\tdata starting with row count: {df.shape[0]}")
@@ -55,13 +50,6 @@ def clean_data(df, column, column2=None):
     df[column] = result
 
     return df
-
-
-# def clean_data(df, interest_column):
-#     # Check the number of elements in each row
-#     row_lengths = df[interest_column].astype(str).str.len()
-#     cleaned_df = df[(5 <= row_lengths) & (row_lengths <= 8)]
-#     return cleaned_df
 
 
 def get_filtered_data(data_arr, interest_column):
@@ -278,7 +266,7 @@ if __name__ == "__main__":
 
 
     ### LINEAR FIT TRAIN
-    # TODO: the end slope is wildly different than least squares analysis
+    # NOTE: the end slope is wildly different than least squares analysis
     #  HINT: (ONLY WHEN I USE AN ARRAY OF TRAINING DATA) one for one trainning / verification works ...!!!
     # train_time_offset = full_create_time_offset(train_dataframe)
     # linear_fit_train(train_dataframe["ms"], train_time_offset)
@@ -288,10 +276,9 @@ if __name__ == "__main__":
     plt.show()
 
     # generate pdf file AND open
-    # TODO: could easily be filepath related but this isn't working on Linux anymore
     print("\nGenerating .pdf ...")
     image_folder = "tmp"
     output_pdf = "tmp/summary_document.pdf"
     logger.generate_summary_pdf(image_folder, output_pdf)
 
-    subprocess.Popen([basefilepath + output_pdf], shell=True)
+    subprocess.Popen([basefilepath_train + output_pdf], shell=True)

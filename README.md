@@ -1,6 +1,4 @@
 
-
-
 ## Introduction
 ---
 This project is meant for software controlled testing of an embedded target
@@ -9,11 +7,11 @@ measurement equipment
 
 
 
-
-
-## Installation
+## Installation Instructions
 ---
-### Linux machine
+### Tkinter
+
+#### Linux machine
 
 To get a valid Tkinter install, this command worked for me
 
@@ -21,7 +19,12 @@ To get a valid Tkinter install, this command worked for me
 sudo apt-get install python3-tk
 ```
 
-
-
-### Windows
+#### Windows
 should be more straightforward
+
+
+### VISA
+To use `pyvisa` you will need to configure a backend for the VISA interface.
+You can read good instruction [here](https://pyvisa.readthedocs.io/en/latest/introduction/configuring.html)
+
+

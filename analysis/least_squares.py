@@ -34,7 +34,6 @@ def generate_residual(calculated, truth):
     # max_res = max(residual)  # get residual statistics
     # fullscale_error = (max_res - min_res) * max(inputs) / 100  # compute full scale error
     # print(f"Fullscale error: {fullscale_error} %")
-    # TODO: add a dictionary to track stats
 
     # scale residual
     # scaled_res = datah.scale_array(residual, -1, 1)

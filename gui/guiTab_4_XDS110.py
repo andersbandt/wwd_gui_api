@@ -44,6 +44,8 @@ class tabXDS110(ThemedFrame):
         self.cc = class_controller
         self.grid(row=0, column=0)
         self.basefilepath = basefilepath
+        self.command_active = 0
+        self.after_call_id = None
 
         # print welcome text_data
         l1 = ttk.Label(self, text="XDS110 and target control", style="BW.TLabel",
@@ -62,15 +64,12 @@ class tabXDS110(ThemedFrame):
         self.fr_target = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_target.grid(row=2, column=0, padx=30, pady=12)
 
-        # add some other variables
-        self.canvas1 = tk.Canvas(self.fr_xds110, width=50, height=50)  # fr_xds110
-        self.canvas2 = tk.Canvas(self.fr_target, width=50, height=50)  # fr_target
-
+        # add some other GUI variables
+        self.status_xds110 = ColorCircle(self.fr_xds110, width=50, height=50)
+        self.status_target = ColorCircle(self.fr_target, width=50, height=50)
         self.toggle_drop = None  # fr_target
         self.lbl_target_v = None  # fr_target
         self.targetConfig_drop = None  # fr_firmware
-
-        self.ser_obj = None
 
         # initialize tab content
         self.initTabContent()
@@ -86,7 +85,7 @@ class tabXDS110(ThemedFrame):
         btn_check_xds110 = ttk.Button(self.fr_xds110, text="XDS110 Check", style="TGreenButton.TButton",
                                       command=lambda: threading.Thread(target=self.check_xds110).start())
         btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
-        self.canvas1.grid(row=3, column=2, padx=15, pady=22)
+        self.status_xds110.grid(row=3, column=2, padx=15, pady=22)
 
     def init_fr_target(self):
         # ROW 1 + 2
@@ -95,7 +94,7 @@ class tabXDS110(ThemedFrame):
                                   command=lambda: threading.Thread(target=self.check_target).start(),
                                   bg=self.theme_config["dark_2"], fg=self.theme_config["fg_light"], height=2, width=15)
         btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
-        self.canvas2.grid(row=1, column=2, rowspan=2, padx=15, pady=22)
+        self.status_target.grid(row=1, column=2, rowspan=2, padx=15, pady=22)
 
         # TARGET VOLTAGE
         self.lbl_target_v = ttk.Label(self.fr_target, style="TSpunkLabel.TLabel")
@@ -180,20 +179,19 @@ class tabXDS110(ThemedFrame):
     ##############################################################################
 
     def check_xds110(self):
-        error_flag = 0
-
         [xds110_status, packet] = xds110.get_xds110_status()
-        self.prompt.print(packet.get_string())
+        if packet is False:
+            self.prompt.print("Something went wrong checking XDS110 status", print_type="error")
+            self.status_xds110.set_color("red")
+            return False
+        else:
+            self.prompt.print(packet.get_string())
 
-        if error_flag:
-            self.prompt.print("Something went wrong checking XDS110 status")
 
-        my_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         if xds110_status:
-            self.canvas1.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+            self.status_xds110.set_color("green")
             return True
         else:
-            self.canvas1.itemconfig(my_oval, fill="red")  # Fill the circle with RED
             return False
 
     def check_target(self):
@@ -204,23 +202,22 @@ class tabXDS110(ThemedFrame):
                 print(f"DMM got this for a measurement: {dmm_voltage}")
                 self.lbl_target_v.config(text=f"{dmm_voltage} V")
 
-        my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        # update status of xds110
 
+        # update status of xds110
         xds110_status = self.check_xds110()
         if not xds110_status:
             # IF NO VALID XDS110 PROBE CONNECTION
-            self.canvas2.itemconfig(my_oval, fill="yellow")  # Fill the circle with GREEN
+            self.status_target.set_color("yellow")
         else:
             # get target status
             packet = xds110.get_jtag_integrity()
             self.prompt.print(packet.get_string())
 
             if packet.result:
-                self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+                self.status_target.set_color("green")
                 return True
             else:
-                self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+                self.status_target.set_color("red")
                 return False
 
     def toggle_target(self):
@@ -243,8 +240,15 @@ class tabXDS110(ThemedFrame):
              "8",  # 8 jobs
              "all",
              "-O"])  # Synchronize output of parallel jobs by TYPE (might not be setup right)
-        self.prompt.print(packet.get_string())
 
+        # something went wrong executing subprocess
+        if packet is False:
+            self.prompt.print(f"Probably FileNotFoundError for path {exec_path}", "error")
+            self.prompt.print("Something went wrong executing subprocess.", "error")
+            return
+
+        # otherwise we probably got some response
+        self.prompt.print(packet.get_string())
         if len(packet.stderr) < 2:
             self.buildStatus.set_color("green")
             return True
@@ -261,14 +265,19 @@ class tabXDS110(ThemedFrame):
     def flash_firmware(self):
         print("... executing loadti to flash firmware ...")
 
-        # BUILD FIRMWARE
+        ### BUILD FIRMWARE
         build_status = self.build_firmware()
         if not build_status:
             self.flashStatus.set_color("black")  # RED
             return False
 
-        # HANDLE POWER
+        ### HANDLE POWER
         flash_option = self.targetConfig_drop[1].get()
+
+        # destroy any previous calls to turn off power
+        if self.after_call_id is not None:
+            self.after_cancel(self.after_call_id)
+
         # toggle power
         if self.var_toggle.get():
             self.turn_power_off(flash_option)
@@ -278,7 +287,7 @@ class tabXDS110(ThemedFrame):
         if power_status is False:
             return False
 
-        # FLASH FIRMWARE
+        ### FLASH FIRMWARE
         # apply time delay (if added)
         sleep_second = self.entry_timesleep.get()
         if guih.is_float(sleep_second):
@@ -288,26 +297,27 @@ class tabXDS110(ThemedFrame):
 
         # perform flashing according to debug API
         serial_option = self.serialNumber_drop[1].get()
-        self.flashStatus.set_color("#F1FA8C")  # YELLOW ?
+        self.flashStatus.set_color(self.theme_config["warning"])
         [firmware_status, packet] = xds110.flash_firmware(
             flash_option, serial_option
         )
 
         self.prompt.print(packet.get_string())
         if firmware_status:
-            self.flashStatus.set_color("#50FA7B")  # GREEN
+            self.flashStatus.set_color(self.theme_config["success"])
         else:
-            self.flashStatus.set_color("#FF5555")  # RED
+            self.flashStatus.set_color(self.theme_config["error"])
 
         # auto shut off of target
-        # TODO: this will not get reset if a new flash command is issued.
         if self.var_autooff.get():
             wait_seconds = int(self.entry_timeautoff.get())
             if guih.is_float(wait_seconds):
-                self.after(wait_seconds * 1000, lambda: self.turn_power_off(flash_option))
+                self.after_call_id = self.after(wait_seconds * 1000, lambda: self.turn_power_off(flash_option))
                 return True
             else:
                 return False
+
+        return True
 
     ##############################################################################
     ####      HELPER FUNCTIONS        ############################################
@@ -337,7 +347,7 @@ class tabXDS110(ThemedFrame):
         elif flash_option == "probe_power":
             pass
         elif flash_option == "supply_power":
-            # self.cc.relay.open_all() # TODO: need a special relay method for opening only something labeled "DUT" or something
+            self.cc.relay.set_state(3, 0) # tag:HARDCODE
             try:
                 self.cc.ps.set_voltage(ps_channel, device_vdds)
                 self.cc.ps.output_on(ps_channel)

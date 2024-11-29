@@ -36,9 +36,13 @@ def run_os(base_command):
 def execute_command(base_command, flags):
     command = [base_command] + flags
     print(command)
-    result = subprocess.run(command,
+
+    try:
+        result = subprocess.run(command,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        return False
 
     # Check if the command was successful
     packet = CommandPacket(
@@ -51,12 +55,16 @@ def execute_command(base_command, flags):
 
 def execute_Popen(exec_path, base_command, flags):
     command = [base_command] + flags
-    print(command)
-    process = subprocess.Popen(command,
-                               cwd=exec_path,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate()
+
+    try:
+        process = subprocess.Popen(command,
+                                   cwd=exec_path,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+    except FileNotFoundError:
+        return False
+
     #     process.wait(timeout=10)
     # Check if the command was successful
     #     if process.poll() is None:

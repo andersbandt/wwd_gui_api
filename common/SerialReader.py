@@ -4,11 +4,13 @@
 @date     March 2024
 @brief    read data from serial (COM) port
 """
-import queue
+
+
 # import needed modules
 from datetime import datetime
 import serial
 import collections
+import queue
 import time
 
 # import user created modules
@@ -81,7 +83,6 @@ class SerialReader(SerialGeneral.SerialGeneral):
                     logger.append_text(log_text, data[1])
                 else:
                     raise BaseException("ERROR: undefined data mode for SerialReader")
-        print("Stop processing data.")
 
     # TODO: this really shouldn't have things specific to text processing in it ...
     def stop_process(self):

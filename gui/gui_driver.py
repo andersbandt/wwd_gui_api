@@ -77,7 +77,7 @@ class MainApplication(ThemedApp):
         if selected_tab == "MAIN":
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
         elif selected_tab == "PS Control":
-            guiTab_6_PS.tabPS.gui_refresh(self.tab6)
+            guiTab_6_PS.tabPS.gui_refresh(self.tab6, "auto")
 
 
 ###########################################################
@@ -126,12 +126,9 @@ def main(autoconnect):
 
     # close any open serial ports
     # TODO: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated
-    print("\nClosing serial oports")
-    try:
-        app.tab3.port_close()
-        app.tab5.port_close()
-        app.tab6.port_close()
-    except Exception:
-        print("FUCK man I can't close the serial ports either!")
+    print("\nClosing serial ports")
+    # app.tab3.port_close()
+    # app.tab5.port_close()
+    # app.tab6.port_close()
 
     return

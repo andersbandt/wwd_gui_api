@@ -9,6 +9,7 @@
 import tkinter as tk
 from tkinter import ttk
 import serial
+import os
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
@@ -20,9 +21,8 @@ from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: make a subclass of ThemedFrame if there is a serial port for the tab? Can handle the `autoconnect` variable more elegantly?
 
-# TODO: this might be a stretch ... but when I click into the Arduino Button page can I have the keystrokes on the arrow keys be mapped to the button options ?????
+
 
 class tabMainDashboard(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
@@ -34,7 +34,7 @@ class tabMainDashboard(ThemedFrame):
 
         # print welcome text_data
         l1 = ttk.Label(self, text="Welcome to the WWD program!!!!", style="BW.TLabel",
-                       font=("Arial", 16))
+                       font=(self.theme_config["font"]["family"], 16))
         l1.grid(column=0, row=0, columnspan=2)
 
         # add some other variables
@@ -52,12 +52,6 @@ class tabMainDashboard(ThemedFrame):
         # add some other GUI variables
         self.canvas1 = tk.Canvas(self.fr_main_status, width=50, height=50)
 
-        # Define styles for buttons
-        # TODO: either delete this or implement everywhere?
-        style = ttk.Style(self)
-        style.configure("TButtonOn.TButton", background="green")
-        style.configure("TButtonOff.TButton", background="red")
-
         # setup prompt
         self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=140)
         self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
@@ -66,10 +60,8 @@ class tabMainDashboard(ThemedFrame):
         self.initTabContent()
 
         # init serial port
-        # TODO: standardize this stuff in the serial frame parent class
         self.ser_obj = None
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "ATE_serial", self.port_init, self.port_close,
-                                            bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(self, self.cc, "ATE_serial", self.port_init, self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=1, padx=30, pady=12)
@@ -91,24 +83,30 @@ class tabMainDashboard(ThemedFrame):
 
         # add button for GUI refresh of relay states
         btn2 = tk.Button(fr_m, text=f"Refresh states", bg=self.theme_config["dark_2"],
-                         command=lambda: self.gui_refresh_relay_state("call"))
-        btn2.grid(row=0, column=1, padx=10, pady=10)
+                         command=lambda: self.gui_refresh("call"))
+        btn2.grid(row=0, column=1, padx=10, pady=12)
 
         # Create and place individual relay control buttons
         for i in range(self.cc.relay.num_relays):
             name = self.cc.relay.get_relay_mapping(i + 1)
             btn = ttk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i + 1))
-            btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=10)
+            btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=5)
             self.relay_btns.append(btn)
 
         # add some text with user information
-        note = tk.Label(fr_m,
-                        text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
-        # TODO: add a "edit this file" button here to open config.ini
+        note = tk.Label(fr_m,text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
+        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", bg=self.theme_config["dark_3"],
+                         command=lambda: self.open_config_ini())
+        btn3.grid(row=6, column=1, padx=10, pady=5)
 
     def init_fr_control(self):
         fr_m = self.fr_control
+
+        self.label_control = tk.Label(fr_m,
+                                      text="Focus this frame and type something",
+                                      bg="lightgrey",
+                                      font=("Arial", 14))
 
         btn1 = tk.Button(fr_m, text=f"Button 1", bg=self.theme_config["dark_1"],
                          command=lambda: self.send_command("a"))
@@ -117,11 +115,27 @@ class tabMainDashboard(ThemedFrame):
         btn3 = tk.Button(fr_m, text=f"Both buttons", bg=self.theme_config["dark_3"],
                          command=lambda: self.send_command("c"))
 
-        btn1.grid(row=0, column=0, padx=10, pady=10)
-        btn2.grid(row=0, column=1, padx=10, pady=10)
-        btn3.grid(row=0, column=2, padx=10, pady=10)
+        self.label_control.grid(row=0, column=0, columnspan=3, pady=10, padx=10)
+        btn1.grid(row=1, column=0, padx=10, pady=10)
+        btn2.grid(row=1, column=2, padx=10, pady=10)
+        btn3.grid(row=2, column=1, padx=10, pady=10)
 
-    # TODO: ensure all the other tabs have a `gui_refresh` modeled of this with the "event"
+
+        # set up some specific focus / keystroke stuff to enable keyboard usage
+        fr_m.bind("<FocusIn>", self.fr_control_on_focus)
+        fr_m.bind("<FocusOut>", self.fr_control_on_focus_lost)
+
+        # Bind key press events to the frame
+        fr_m.bind("<KeyPress>", self.on_key_press)
+
+        # Ensure focus is restored when clicking inside the frame or buttons
+        fr_m.bind("<Button-1>", lambda event: fr_m.focus_set())
+        for widget in (btn1, btn2, btn3):
+            widget.bind("<Button-1>", lambda event: fr_m.focus_set())  # Restore focus on button click
+
+        # Set focus
+        fr_m.focus_set()
+
     def gui_refresh(self, event):
         if self.fr_main_status.status:
             for i, btn in enumerate(self.relay_btns):
@@ -130,8 +144,8 @@ class tabMainDashboard(ThemedFrame):
                 else:
                     btn.config(style="TButtonOff.TButton")
         else:
-            print("Can't refresh relay state with inactive relay!!!")
             if event == "call":
+                self.prompt1.print("Can't refresh relay state with disconnected relay", "error")
                 guih.alert_user("Can't refresh relay!", "Relay is not connected", "error")
 
         # update serial status
@@ -144,14 +158,15 @@ class tabMainDashboard(ThemedFrame):
 
     def relay_autoconnect(self):
         usb_dev = usbrelay_controller.find()
-        print(usb_dev)
-        print("Found above for USB device")
         self.cc.set_relay(
             usbrelay_controller.USBRelayController(usb_dev)
         )
         if usb_dev is not None:
             self.fr_main_status.set_status(True)
             self.init_fr_main_status()
+        else:
+            self.fr_main_status.set_status(False)
+            guih.alert_user("Can't autoconnect to relay", f"Only found USB devices: {usb_dev}", "error")
 
     ##############################################################################
     ####      BUTTON ACTION FUNCTIONS        #####################################
@@ -170,14 +185,42 @@ class tabMainDashboard(ThemedFrame):
                 try:
                     self.ser_obj.send_data(command)
                 except serial.serialutil.SerialException:
-                    self.prompt1.print("ERROR: self.ser_obj is defined but status is FALSE\n")
+                    self.prompt1.print("ERROR: self.ser_obj is defined but status is FALSE", "error")
                     guih.alert_user("Can't send serial data", "Really can't send any shit. Probably I/O error?", "error")
                 self.prompt1.print(f"INFO: issued command {command} ...")
             else:
-                self.prompt1.print(f"ERROR: self.ser_obj exists but serStatus is false")
+                self.prompt1.print(f"ERROR: self.ser_obj exists but serStatus is false", "error")
 
         except AttributeError:
-            self.prompt1.print("ERROR: probably self.ser_obj is None\n")
+            self.prompt1.print("ERROR: probably self.ser_obj is None", "error")
+
+    def open_config_ini(self):
+        file_path = os.getcwd() + "/EEequipment/usbrelay/config.ini"  #tag:HARDCODE
+        if os.path.exists(file_path):
+            os.startfile(file_path)  # Opens the file with the default associated application
+        else:
+            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist", "error")
+
+    ##############################################################################
+    ####      GUI KEYSTROKE / FOCUS FUNCTIONS        #############################
+    ##############################################################################
+
+    def fr_control_on_focus(self, event):
+        self.label_control.config(text="Type keys here (frame has focus)")
+
+    def fr_control_on_focus_lost(self, event):
+        self.label_control.config(text="Click to refocus the frame")
+
+    def on_key_press(self, event):
+        # print(f"HEY here is your keystroke: ({event.char},{event.keysym},{event.keycode}")
+        if event.keysym == "Left":
+            self.send_command('a')
+        elif event.keysym == "Right":
+            self.send_command('b')
+        elif event.keysym == "Up":
+            self.send_command('c')
+        elif event.keysym == "Down":
+            self.send_command('c')
 
     #################################
     #### SERIAL (COM)  ##############
@@ -190,18 +233,20 @@ class tabMainDashboard(ThemedFrame):
         self.prompt1.print(f"Init with port: {port}")
         try:
             self.ser_obj = SerialReader(port,
-                                        9600)  # TODO: make this a drop down in the seriaal frame. Also save it with my autconnect preferences???
+                                        9600)
         except serial.serialutil.SerialException as e:
-            self.prompt1.print(f"ERROR: {e}")
-            self.prompt1.print(f"Can't init with port\n")
+            self.prompt1.print(f"Can't init with port: {e}", "error")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
         self.prompt1.print("Init successful!\n")
         return True
 
-    # TODO: I don't think this printout is working
+
     def port_close(self):
         self.prompt1.print("Serial close!")
-        self.ser_obj.stop_process()
+        try:
+            self.ser_obj.stop_process()
+        except AttributeError:
+            pass
         self.fr_port.set_status(False)

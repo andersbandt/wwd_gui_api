@@ -42,31 +42,31 @@ class Prompt(ThemedFrame):
         self.width = width
         self.set_bg(self.theme_config["light_4"])
 
-        # set up text_data box for user communication
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
         clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
-        # TODO: can I set font size here?
+
+        # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
+                                                font = (self.theme_config["font"]["family"], self.theme_config["font"]["size"]),
                                                 height=height,
                                                 width=width,
                                                 bg=self.theme_config["light_2"],
                                                 fg=self.theme_config["fg_light"],
                                                 borderwidth=10)
+        self.prompt.tag_configure("error", foreground="red")
+        self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
     # gui_print: prints a message on a Tkinter frame
     def print(self, message, print_type=None):
-        # TODO: would be cool if I could figure out how to print errors as red
+        message = ">>>" + message + "\n"
         if print_type == "error":
-            fg_color = "red"
+            self.prompt.insert(INSERT, message, "error")  # Apply 'error' tag
         else:
-            fg_color = "white"  # Default color
+            self.prompt.insert(INSERT, message, "normal")  # Apply 'normal' tag
 
-        message = ">>>" + message
-        self.prompt.configure(fg=fg_color)  # Configure text_data color
-        self.prompt.insert(INSERT, message + "\n")
-        self.prompt.see("end")  # auto-scroll to the end
+        self.prompt.see("end")  # Auto-scroll to the end
         return True
 
     def clear(self):
@@ -80,9 +80,8 @@ class Prompt(ThemedFrame):
 ### CONNECTION FRAMES    #################
 ##########################################
 
-# TODO: have an auto-connect          option where I can disable the error message popup ... then could call SPD330X init perfect by blocking first one
 class ConnFrame(ThemedFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
+    def __init__(self, master, name, connect_cmd, disconnect_cmd):
         self.theme_file = "config/darcula.json"  #tag:hardcode
         super().__init__(master, self.theme_file)
         self.master = master
@@ -110,15 +109,15 @@ class ConnFrame(ThemedFrame):
         return self.status
 
     def disconnect(self):
-        self.status = self.disconnect_cmd
+        self.disconnect_cmd()
         self.status = False
         self.gui_refresh()
 
     def set_status(self, status):
         if status:
-            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["dark_2"])  # Fill the circle with GREEN
+            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["green"])  # Fill the circle with GREEN
         else:
-            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["dark_1"])  # Fill the circle with RED
+            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["error"])  # Fill the circle with RED
 
     def gui_refresh(self):
         self.set_status(self.status)
@@ -129,8 +128,8 @@ class ConnFrame(ThemedFrame):
 
 # SerialConnFrame: just a basic serial connection frame
 class SerialConnFrame(ConnFrame):
-    def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None, bg=None):
-        super().__init__(master, name, connect_cmd, disconnect_cmd, bg=bg)
+    def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
+        super().__init__(master, name, connect_cmd, disconnect_cmd)
         self.cc = class_controller
 
         # NOTE: port_func is for tracking what method is used for populating array of ports
@@ -162,6 +161,7 @@ class SerialConnFrame(ConnFrame):
 
         # place baud rate list
         # TODO: this baud rate does nothing. Because my `connect_serial` functions are ambigious, this may be hard to splice in?
+        # TODO: if I do get it working, let's save it with our autoconnect preferences?
         self.baud_drop = guih.generate_drop_down(
             self,
             ["115200", "9600"]
@@ -234,9 +234,9 @@ class SerialConnFrame(ConnFrame):
 
 
 class AutoConnFrame(ConnFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd, bg=None):
+    def __init__(self, master, name, connect_cmd, disconnect_cmd):
         self.master = master
-        super().__init__(self.master, name, connect_cmd, disconnect_cmd, bg=bg)
+        super().__init__(self.master, name, connect_cmd, disconnect_cmd)
 
     def init_fr(self):
         self.canvas1.grid(row=1, column=2, padx=15, pady=22)

@@ -5,7 +5,9 @@
 @brief    control multimeter test equipment
 """
 
+
 # import needed GUI packages
+import tkinter
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -27,9 +29,6 @@ from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: there is a general problem with connection order. When I connect serial log vs. dmm backwards, I can't connect properly to the DMM after.
-
-
 class tabDMM(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
@@ -48,6 +47,12 @@ class tabDMM(ThemedFrame):
         self.dmm = None
         self.dmm_id = None
         self.ser_status = False
+        self.dmm_Auto = ''
+        self.dmm_Range = ''
+        self.dmm_Fu1 = ''
+        self.dmm_Meas1 = ''
+        self.dmm_Fu2 = ''
+        self.dmm_Meas2 = ''
 
         # set up recording information
         self.record_speed = 1
@@ -65,12 +70,13 @@ class tabDMM(ThemedFrame):
         self.initTabContent()
 
         # set up port
-        self.fr_port = guic.SerialConnFrame(self,
-                                            self.cc,
-                                            "DMM_Serial",
-                                            self.port_init,
-                                            self.port_close,
-                                            bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(
+            self,
+            self.cc,
+            "DMM_Serial",
+            self.port_init,
+            self.port_close
+        )
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
@@ -139,7 +145,7 @@ class tabDMM(ThemedFrame):
         fr_m = self.fr_rec
         ttk.Label(fr_m, text="Record DMM", style="TPinkLabel.TLabel").grid(row=0, column=0, pady=10, padx=15)
 
-        self.labelRNums = ttk.Label(fr_m, text='', width=8, relief='sunken') # TODO: this is not properly incrementing during recording
+        self.labelRNums = ttk.Label(fr_m, text='', width=8, relief='sunken')
         self.labelRecFn = ttk.Label(fr_m, text='{:24s}'.format(self.recName), width=40, relief='sunken')
         self.labelRNums.grid(row=1, column=0, padx=10, pady=10, sticky='W')
         self.labelRecFn.grid(row=1, column=1, sticky='E')
@@ -173,13 +179,15 @@ class tabDMM(ThemedFrame):
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
 
-    def update_DMM(self):
-        self.dmm_Auto = self.dmm.get_range_auto()
-        self.dmm_Range = None
-        self.dmm_Fu1 = None # TODO: splice in functions to get range and function
-        self.dmm_Fu2 = None
+    def update_DMM(self, kind="partial"):
         self.dmm_Meas1 = self.dmm.read_val1_str()
         self.dmm_Meas2 = self.dmm.read_val2_str()
+
+        if kind == "full":
+            self.dmm_Auto = self.dmm.get_range_auto()
+            self.dmm_Range = self.dmm.get_range()
+            self.dmm_Fu1 = self.dmm.get_func1()
+            self.dmm_Fu2 = self.dmm.get_func2()
 
 
     ##############################################################################
@@ -275,7 +283,7 @@ class tabDMM(ThemedFrame):
             # STOP RECORDING
             self.prompt.print("Stopped DMM record !")
             self.labelRNums.config(text='')
-            # self.btn_record.config(relief='raised') # NOTE: figure this out when previous TODO on relief is handled
+            # self.btn_record.config(relief='raised')
             self.record_status = False
 
         # successful exit of record function
@@ -294,7 +302,6 @@ class tabDMM(ThemedFrame):
 
     def thread_record_dmm(self):
         print("Starting DMM record!")
-        # TODO: add a check for the validity of my DMM connection here
 
         while self.record_status and self.ser_status:
             print("Taking DMM measurement ...")
@@ -306,7 +313,7 @@ class tabDMM(ThemedFrame):
 
             # update value counter
             self.recCnt += 1
-            self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
+            self.labelRNums.config(text='#{:7n}'.format(self.recCnt)) # TODO: this is not properly icncrement during recording
             time.sleep(self.record_speed)
 
         # if serial disconnect caused termination, call the start/stop record function
@@ -315,16 +322,19 @@ class tabDMM(ThemedFrame):
 
         print("DMM record thread exiting.")
 
-    def gui_refresh(self):
+    def gui_refresh(self, event):
         # refresh DMM information
-        self.update_DMM()
+        if self.ser_status:
+            if event == "auto":
+                self.update_DMM("full")
 
         # update Label
-        self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
-        self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-        self.valueMeas1.config(text=self.dmm_Meas1) # TODO: figure out how to use PrettyFloat on this (in data helper)
-        self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
-        self.valueMeas2.config(text=self.dmm_Meas2)
+        if self.ser_status:
+            self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
+            self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
+            self.valueMeas1.config(text=self.dmm_Meas1) # TODO: figure out how to use PrettyFloat on this (in data helper)
+            self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
+            self.valueMeas2.config(text=self.dmm_Meas2)
 
 
     #################################
@@ -338,11 +348,9 @@ class tabDMM(ThemedFrame):
         self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC)
         self.dmm_id = self.dmm.test_conn()
 
-        self.prompt.print("Connected to DMM")
-        self.prompt.print(f"Got id: {self.dmm_id}")
-
         # BAD ID received
-        if self.dmm_id == '' or len(self.dmm_id) < 3:
+        if self.dmm_id == '' or self.dmm_id is None:
+            self.prompt.print("Connection failed")
             self.dmm = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
@@ -350,6 +358,8 @@ class tabDMM(ThemedFrame):
             return False
         # GOOD ID received
         else:
+            self.prompt.print("Connected to DMM")
+            self.prompt.print(f"Got id: {self.dmm_id}")
             self.cc.set_dmm(self.dmm)
             self.cc.dmm.set_mode_dcv()
             self.cc.dmm.set_sample_speed_fast()
@@ -363,7 +373,12 @@ class tabDMM(ThemedFrame):
             return True
 
     def port_close(self):
-        self.prompt.print(f"Serial close!")
+        # NOTE: added this Exception because we might call this after app is destroyed
+        try:
+            self.prompt.print(f"Serial close!")
+        except tkinter.TclError:
+            pass
+
         self.dmm.disconnect()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
@@ -372,16 +387,6 @@ class tabDMM(ThemedFrame):
     #################################
     #### HELPER        ##############
     #################################
-
-    def update_DMM(self):
-        # TODO: complete these DMM functions to get operating state information
-        self.dmm_Auto = self.dmm.get_range_auto()
-        self.dmm_Range = ''
-        self.dmm_Fu1 = ''
-        self.dmm_Meas1 = self.dmm.read_val1_str()
-        self.dmm_Fu2 = ''
-        self.dmm_Meas2 = self.dmm.read_val2_str()
-
 
     def parse_time_to_seconds(self, time_str):
         """Convert a time string to seconds.

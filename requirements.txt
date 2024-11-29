@@ -10,10 +10,12 @@ pyusb
 future
 setuptools
 PyVISA
+pyvisa-py
+sv_ttk
+libusb
 
 
 #added by anders
-sv_ttk
 tkinter
-libusb
+
 

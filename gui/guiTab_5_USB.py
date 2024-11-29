@@ -22,8 +22,6 @@ from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: it should be a priority to have the USB log detect when I'm erroring out again
-
 class tabUSB(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
@@ -44,8 +42,7 @@ class tabUSB(ThemedFrame):
         self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close,
-                                            bg="#00bcd4")
+        self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
@@ -69,7 +66,6 @@ class tabUSB(ThemedFrame):
         print("Initializing tab 5 (USB) content")
         self.init_fr_state()
 
-# TODO: when I'm running a test there is no way to stop processing. Also no follow-up command to WWD device (that will take some work though)
     def init_fr_state(self):
         # TARGET - BUTTON/STATUS
         btn_act_test = Button(self.fr_state, text="Activate test mode",
@@ -94,7 +90,7 @@ class tabUSB(ThemedFrame):
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
 
         var2 = tk.IntVar()
-        c1 = tk.Checkbutton(self.fr_state, text='Record?', variable=var2, onvalue=1, offvalue=0, command=None)
+        c1 = tk.Checkbutton(self.fr_state, text='Record?', variable=var2, onvalue=1, offvalue=0)
         c1.grid(row=2, column=4, padx=2)
 
         # add output file name box
@@ -150,18 +146,15 @@ class tabUSB(ThemedFrame):
     #### THREADS SHIT    ############
     #################################
 
-    # TODO: if frame.after() workss here conduct audit of usage of gui_refresh() in another tabs
-    def gui_refresh(self):
+    def gui_refresh(self, event):
         if self.ser_obj.serStatus is False:
             self.ser_obj.stop_process()
             self.fr_port.set_status(False)
-            # self.t1.stop()
+            self.t1.stop()
         else:
             self.fr_port.set_status(True)
 
-        self.after(5*1000, self.gui_refresh)
-
-    # TODO: try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
+    # TODO (low-priority with new FTDI module implementation): try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
     def manage_connection(self):
         status = True
         while status:
@@ -171,11 +164,10 @@ class tabUSB(ThemedFrame):
                 time.sleep(3)
 
     def thread_print_display(self):
-        print("Thread prints started")  # NOTE: can't use prompt print because this is called on auto-connect
-
-        # self.t1 = guic.StoppableThread(
-        #     target=self.gui_refresh)
-        # self.t1.start()
+        self.t1 = guic.StoppableThread(
+            target=self.gui_refresh,
+            args=None)
+        self.t1.start()
 
         self.t2 = guic.StoppableThread(
             target=self.ser_obj.get_data,

@@ -1,3 +1,6 @@
+
+
+# import needed modules
 import json
 import tkinter as tk
 from tkinter import ttk
@@ -47,9 +50,11 @@ class ThemedFrame(tk.Frame):
         super().__init__(root, *args, **kwargs)
         self.root = root
         self.style = ttk.Style(self.root)
+        self.style.configure("TButtonOn.TButton", background="green")
+        self.style.configure("TButtonOff.TButton", background="red")
+
         self.theme_config = None
         self.load_theme(theme_file)
-
         self.configure(bg=self.theme_config["bg_dark"])
 
         # Set the theme to use (optional, 'clam' is a common choice for consistency)
@@ -119,3 +124,5 @@ class ThemedFrame(tk.Frame):
     def set_bg(self, bg):
         self.configure(bg=bg)
 
+
+# TODO: make a subclass of ThemedFrame if there is a serial port for the tab? Can handle the `autoconnect` variable more elegantly?

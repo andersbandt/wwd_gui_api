@@ -45,7 +45,6 @@ def graph_afe(x_series, afe_d, vertical_lines=None, title=None):
 
 
 def save_fig():
-    # TODO: random hashes affects .pdf order generation. ChatGPT - "auto increment filenames in Python"
     random_string = secrets.token_hex(16)  # Generate 32 random hexadecimal characters (16 bytes)
     hashed_value = hashlib.sha256(random_string.encode()).hexdigest()  # Hash the random string using SHA-256
     hash_p = hashed_value[:5]  # Extract the first 5 characters of the hash to get a 5-digit hash

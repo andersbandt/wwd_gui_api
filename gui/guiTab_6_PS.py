@@ -15,7 +15,6 @@ import time
 from datetime import datetime
 import pyvisa.errors
 from analysis.csv_helper import CSVHelper
-from sympy.physics.units import current
 
 # import user defined modules
 from common import plotter
@@ -27,9 +26,6 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
-
-# TODO: there is lots of thematic red/green updates to be made here
-# TODO: I have a suspicion that calls to PyVISA refresh ports are very slow in here .... longer startup time ...
 
 class tabPS(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
@@ -72,16 +68,12 @@ class tabPS(ThemedFrame):
                                             "PS_PyVISA",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3,
-                                            bg="#00bcd4")
+                                            port_func=3)
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
-
-
-
 
     def initTabContent(self):
         print("Initializing tab 6 (PS) content")
@@ -191,22 +183,19 @@ class tabPS(ThemedFrame):
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
         if self.ps is not None:
-            try:
-                status_decode = self.ps.check_status()
-            except pyvisa.errors.VisaIOError:  # TODO: this except shouldn't be here !
-                return
+            status_decode = self.ps.check_status()
         else:
             return
 
         if status_decode["ch1_state"] == "ON":
-            self.ch1_toggle_btn.config(bg="green")
+            self.ch1_toggle_btn.config(bg=self.theme_config["success"])
         else:
-            self.ch1_toggle_btn.config(bg="red")
+            self.ch1_toggle_btn.config(bg=self.theme_config["error"])
 
         if status_decode["ch2_state"] == "ON":
-            self.ch2_toggle_btn.config(bg="green")
+            self.ch2_toggle_btn.config(self.theme_config["success"])
         else:
-            self.ch2_toggle_btn.config(bg="red")
+            self.ch2_toggle_btn.config(self.theme_config["error"])
 
     def gui_refresh_channel_mode(self):
         if self.ps is not None:
@@ -228,7 +217,7 @@ class tabPS(ThemedFrame):
         else:
             self.ch2_mode.set_color("red")
 
-    def gui_refresh(self):
+    def gui_refresh(self, event):
         self.gui_refresh_channel_mode()
         self.gui_refresh_channel_state()
 

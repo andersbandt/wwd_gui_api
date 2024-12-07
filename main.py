@@ -10,6 +10,9 @@ import argparse
 from gui import gui_driver
 
 
+# TODO: review my `tag:HARDCODE` items
+
+
 def main():
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="A description of your script.")

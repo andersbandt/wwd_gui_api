@@ -115,9 +115,9 @@ class ConnFrame(ThemedFrame):
 
     def set_status(self, status):
         if status:
-            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["green"])  # Fill the circle with GREEN
+            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["success"])
         else:
-            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["error"])  # Fill the circle with RED
+            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["error"])
 
     def gui_refresh(self):
         self.set_status(self.status)

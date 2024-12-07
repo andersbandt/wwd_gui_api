@@ -24,6 +24,8 @@ from gui.gui_class import *
 from gui.guiTab_parent import ThemedFrame
 
 # initialize the config parser
+# TODO: possibly have all tabs read in this info so they all have it?. I am having to repeat same code in tab 6
+# TODO: also think about having support for multiple targets in the config file .... currently only 1
 config_file_path = "config/target.ini"
 if os.path.exists(config_file_path):
     config = configparser.ConfigParser()
@@ -332,7 +334,7 @@ class tabXDS110(ThemedFrame):
                 res = guih.promptYesNo("Can't access power supply!",
                                        "Can't access supply to turn off. Continue with flash?")
                 if not res:
-                    self.flashStatus.set_color("#FF5555")  # RED
+                    self.flashStatus.set_color(self.theme_config["error"])
                     return False
 
         if flash_option == "target_power":
@@ -342,7 +344,7 @@ class tabXDS110(ThemedFrame):
             except AttributeError:
                 res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
                 if not res:
-                    self.flashStatus.set_color("#FF5555")  # RED
+                    self.flashStatus.set_color(self.theme_config["error"])
                     return False
         elif flash_option == "probe_power":
             pass
@@ -353,7 +355,7 @@ class tabXDS110(ThemedFrame):
                 self.cc.ps.output_on(ps_channel)
             except (AttributeError, ValueError): # AttributeError covers PS not init case. ValueError covers disconnect case.
                 guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
-                self.flashStatus.set_color("#FF5555")  # RED
+                self.flashStatus.set_color(self.theme_config["error"])  # RED
                 return False
 
     def turn_power_off(self, flash_option):

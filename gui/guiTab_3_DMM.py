@@ -363,7 +363,7 @@ class tabDMM(ThemedFrame):
             self.cc.set_dmm(self.dmm)
             self.cc.dmm.set_mode_dcv()
             self.cc.dmm.set_sample_speed_fast()
-            self.gui_refresh()
+            self.gui_refresh("call")
             self.labelTimeConnectedValue.config(
                 text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             )

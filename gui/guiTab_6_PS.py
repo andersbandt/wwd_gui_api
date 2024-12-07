@@ -15,6 +15,8 @@ import time
 from datetime import datetime
 import pyvisa.errors
 from analysis.csv_helper import CSVHelper
+import configparser
+import os
 
 # import user defined modules
 from common import plotter
@@ -25,6 +27,20 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
+
+# read in config file.
+# NOTE: there are some TODO on this code in tab 4
+config_file_path = "config/target.ini"
+if os.path.exists(config_file_path):
+    config = configparser.ConfigParser()
+    config.read(config_file_path)
+else:
+    print(f"Configuration file {config_file_path} does not exist.")
+    raise BaseException
+
+# read in parameters from the config file
+ps_channel = int(config["Target"]["ps_channel"])
+device_vdds = float(config["Target"]["vdds"])
 
 
 class tabPS(ThemedFrame):
@@ -63,6 +79,7 @@ class tabPS(ThemedFrame):
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # set up serial port (has to be done after tab content is initialized)
+        self.ser_status = False # TODO: audit naming of this is the same across tabs
         self.fr_port = guic.SerialConnFrame(self,
                                             self.cc,
                                             "PS_PyVISA",
@@ -72,7 +89,7 @@ class tabPS(ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-            self.fr_port.connect_previous_port()
+            # self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
     def initTabContent(self):
@@ -81,6 +98,7 @@ class tabPS(ThemedFrame):
         self.init_fr_control()
         self.init_fr_status()
 
+    # TODO: I should match the DMM for this function. Need to add a button to refresh / collect stats from the power supply
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
@@ -187,15 +205,17 @@ class tabPS(ThemedFrame):
         else:
             return
 
+        # TODO: add refresh for voltage / current information here
+
         if status_decode["ch1_state"] == "ON":
             self.ch1_toggle_btn.config(bg=self.theme_config["success"])
         else:
             self.ch1_toggle_btn.config(bg=self.theme_config["error"])
 
         if status_decode["ch2_state"] == "ON":
-            self.ch2_toggle_btn.config(self.theme_config["success"])
+            self.ch2_toggle_btn.config(bg=self.theme_config["success"])
         else:
-            self.ch2_toggle_btn.config(self.theme_config["error"])
+            self.ch2_toggle_btn.config(bg=self.theme_config["error"])
 
     def gui_refresh_channel_mode(self):
         if self.ps is not None:
@@ -258,7 +278,7 @@ class tabPS(ThemedFrame):
             self.prompt.print(f"Toggled channel {channel} to state {state}")
 
         time.sleep(0.5)
-        self.gui_refresh()
+        self.gui_refresh("call")
 
     def set_voltage(self, channel, voltage_str):
         if self.ps is not None:
@@ -323,7 +343,7 @@ class tabPS(ThemedFrame):
         except pyvisa.errors.VisaIOError:
             guih.alert_user("Can't connect to VISA", "Visa connect error (likely timeout)", "error")
             self.fr_port.set_status(False)
-        if self.id is not False:
+        if self.id is not False:  # CONNECTION SUCCESS
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)
             self.labelIDValue.config(text=self.id)
@@ -332,14 +352,19 @@ class tabPS(ThemedFrame):
             )
             self.ser_status = True
             self.fr_port.set_status(self.ser_status)
+
+            # turn channels off and set voltages
             self.ps.output_off(1)
             self.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
+            self.ps.set_voltage(1, device_vdds)
+            self.ps.set_voltage(2, device_vdds)
+
+            # gui refresh
             self.gui_refresh_channel_state()
             return True
         else:  # BAD ID received
-            # if self.id == '' or len(self.id) < 3:
             self.ps = None
             self.ser_status = False
             self.fr_port.set_status(self.ser_status)
@@ -351,3 +376,5 @@ class tabPS(ThemedFrame):
         self.ps.close()
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
+
+        # TODO: somehow set class control ps back to None here

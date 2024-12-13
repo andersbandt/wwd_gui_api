@@ -304,7 +304,7 @@ class tabXDS110(ThemedFrame):
             flash_option, serial_option
         )
 
-        self.prompt.print(packet.get_string())
+        self.prompt.print(packet.get_string()) # TODO: figure out how to split up into STDOUT and STDERR to take advantage of my colored printout
         if firmware_status:
             self.flashStatus.set_color(self.theme_config["success"])
         else:

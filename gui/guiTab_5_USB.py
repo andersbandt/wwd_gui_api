@@ -164,10 +164,12 @@ class tabUSB(ThemedFrame):
                 time.sleep(3)
 
     def thread_print_display(self):
-        self.t1 = guic.StoppableThread(
-            target=self.gui_refresh,
-            args=None)
-        self.t1.start()
+        # TODO: get "RunTimeError: main thread is not in main loop error"
+        #       also not needed if my detection of closed serial connection isn't auto working
+        # self.t1 = guic.StoppableThread(
+        #     target=lambda: self.gui_refresh,
+        #     args={"auto"})
+        # self.t1.start()
 
         self.t2 = guic.StoppableThread(
             target=self.ser_obj.get_data,

@@ -99,6 +99,7 @@ class tabPS(ThemedFrame):
         self.init_fr_status()
 
     # TODO: I should match the DMM for this function. Need to add a button to refresh / collect stats from the power supply
+    # TODO: add a slot for getting back the set voltage value (probably the calibrated one though? How does that work? Or can leave it at raw?)
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)

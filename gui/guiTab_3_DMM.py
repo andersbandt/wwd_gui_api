@@ -79,9 +79,9 @@ class tabDMM(ThemedFrame):
         )
         self.fr_port.initialize_fr()
         if autoconnect:
+            # TODO: add some timeout here
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
-
 
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")
@@ -138,8 +138,8 @@ class tabDMM(ThemedFrame):
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
 
         # ADD A REFRESH
-        self.btn_record = ttk.Button(self.fr_info, text='RECORD THIS', command=self.update_DMM)
-        self.btn_record.grid(row=7, column=2, pady=5, padx=3, sticky='W')
+        self.btn_update = ttk.Button(self.fr_info, text='UPDATE DMM', command=lambda: self.update_DMM(kind="full"))
+        self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_rec(self):
         fr_m = self.fr_rec
@@ -153,7 +153,7 @@ class tabDMM(ThemedFrame):
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
         self.optRecSpd.grid(row=2, column=0, padx=3, sticky='W')
-        self.btn_record = ttk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
+        self.btn_record = tk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
         self.btn_record.grid(row=2, column=3, pady=5, padx=3, sticky='W')
 
     def init_fr_PT100(self):
@@ -180,15 +180,17 @@ class tabDMM(ThemedFrame):
     ##############################################################################
 
     def update_DMM(self, kind="partial"):
-        self.dmm_Meas1 = self.dmm.read_val1_str()
-        self.dmm_Meas2 = self.dmm.read_val2_str()
+        print(f"Updating ({kind}) dmm ...")
+        self.dmm_Meas1 = self.dmm.read_val1_str().strip("\n")
+        self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
 
         if kind == "full":
             self.dmm_Auto = self.dmm.get_range_auto()
-            self.dmm_Range = self.dmm.get_range()
+            self.dmm_Range = self.dmm.get_range().strip("\n")
             self.dmm_Fu1 = self.dmm.get_func1()
             self.dmm_Fu2 = self.dmm.get_func2()
 
+        self.gui_refresh("call")
 
     ##############################################################################
     ####      PT100 FUNCTIONS        ############################################
@@ -257,11 +259,7 @@ class tabDMM(ThemedFrame):
         if not self.record_status:
             if self.ser_status:
                 # SETUP DMM
-                self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
-
-                # PERFORM CHECK ON DMM
-                res = self.dmm.test_conn()
-                guih.alert_user("DMM info", f"Found dmm with info: {res}", "error")
+                # self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
 
                 # START RECORDING
                 self.change_record_speed()
@@ -269,32 +267,51 @@ class tabDMM(ThemedFrame):
                 self.prompt.print(f"Starting DMM record every {self.record_speed} seconds ...")
                 self.csvh = CSVHelper(self.data_dir + self.recName)
                 self.csvh.initialize_file(["Time", "Range", "Func1", "Meas1"])
-                # self.btn_record.config(relief='sunken') # TODO: figure out how to make the relief be sunken when recording
+
+                self.btn_record.config(relief='sunken')
                 self.labelRecFn.config(text='{:24s}'.format(self.recName))
                 self.recCnt = 0
                 self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
-                self.record_status = True
 
                 # start the thread
+                self.record_status = True
                 threading.Thread(target=lambda: self.thread_record_dmm()).start()
             else:
                 guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
         else:
             # STOP RECORDING
             self.prompt.print("Stopped DMM record !")
-            self.labelRNums.config(text='')
-            # self.btn_record.config(relief='raised')
             self.record_status = False
+            self.btn_record.config(relief='raised')
 
         # successful exit of record function
         return True
 
     def change_record_speed(self):
-        # changes the recording speed
-        try:
-            self.record_speed = self.parse_time_to_seconds(self.RecSpdVal.get())
-        except Exception as e:
-            raise e
+        # changes the recording speed based on recording speed GUI element
+        def parse_time_to_seconds(time_str):
+            """Convert a time string to seconds.
+
+            Args:
+                time_str (str): Time string to convert. Should end with 's', 'm', or 'h'.
+
+            Returns:
+                int: Time in seconds.
+            """
+            if not isinstance(time_str, str):
+                raise ValueError("Input should be a string.")
+
+            time_str = time_str.strip().lower()
+            if time_str.endswith('s'):
+                return int(time_str[:-1])
+            elif time_str.endswith('m'):
+                return int(time_str[:-1]) * 60
+            elif time_str.endswith('h'):
+                return int(time_str[:-1]) * 3600
+            else:
+                raise ValueError("Time string should end with 's', 'm', or 'h'.")
+
+        self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
     #################################
     #### THREADS SHIT    ############
@@ -306,14 +323,17 @@ class tabDMM(ThemedFrame):
         while self.record_status and self.ser_status:
             print("Taking DMM measurement ...")
             val_str = self.cc.dmm.read_val1_str()
+            print(f"Anders you're looking at this value string: {val_str}")
 
             # add row to data file
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            self.csvh.add_row([timestamp, "xxx_range", "xxx_func", xdm1041helper.parse_voltage_str(val_str)])
+            if val_str is not None:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                self.csvh.add_row([timestamp, "xxx_range", "xxx_func", xdm1041helper.parse_voltage_str(val_str)])
 
-            # update value counter
-            self.recCnt += 1
-            self.labelRNums.config(text='#{:7n}'.format(self.recCnt)) # TODO: this is not properly icncrement during recording
+                # update value counter
+                self.recCnt += 1
+                self.labelRNums.config(text='#{:7n}'.format(self.recCnt)) # TODO: this is not properly icncrement during recording
+
             time.sleep(self.record_speed)
 
         # if serial disconnect caused termination, call the start/stop record function
@@ -322,6 +342,7 @@ class tabDMM(ThemedFrame):
 
         print("DMM record thread exiting.")
 
+    # TODO: don't think "tab into page and auto call this" is working for the DMM
     def gui_refresh(self, event):
         # refresh DMM information
         if self.ser_status:
@@ -346,6 +367,7 @@ class tabDMM(ThemedFrame):
         port = self.fr_port.get_port()
 
         self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC)
+        time.sleep(1)
         self.dmm_id = self.dmm.test_conn()
 
         # BAD ID received
@@ -363,6 +385,7 @@ class tabDMM(ThemedFrame):
             self.cc.set_dmm(self.dmm)
             self.cc.dmm.set_mode_dcv()
             self.cc.dmm.set_sample_speed_fast()
+
             self.gui_refresh("call")
             self.labelTimeConnectedValue.config(
                 text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
@@ -383,29 +406,3 @@ class tabDMM(ThemedFrame):
         self.ser_status = False
         self.fr_port.set_status(self.ser_status)
 
-
-    #################################
-    #### HELPER        ##############
-    #################################
-
-    def parse_time_to_seconds(self, time_str):
-        """Convert a time string to seconds.
-
-        Args:
-            time_str (str): Time string to convert. Should end with 's', 'm', or 'h'.
-
-        Returns:
-            int: Time in seconds.
-        """
-        if not isinstance(time_str, str):
-            raise ValueError("Input should be a string.")
-
-        time_str = time_str.strip().lower()
-        if time_str.endswith('s'):
-            return int(time_str[:-1])
-        elif time_str.endswith('m'):
-            return int(time_str[:-1]) * 60
-        elif time_str.endswith('h'):
-            return int(time_str[:-1]) * 3600
-        else:
-            raise ValueError("Time string should end with 's', 'm', or 'h'.")

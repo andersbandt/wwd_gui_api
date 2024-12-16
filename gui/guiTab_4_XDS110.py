@@ -338,14 +338,15 @@ class tabXDS110(ThemedFrame):
                     return False
 
         if flash_option == "target_power":
-            try:
-                dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1")
-                self.cc.relay.set_state(dut_vdd1_channel, 1)
-            except AttributeError:
-                res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
-                if not res:
-                    self.flashStatus.set_color(self.theme_config["error"])
-                    return False
+            pass
+            # try:
+            #     dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1") # TODO: fix this hardcode
+            #     self.cc.relay.set_state(dut_vdd1_channel, 1)
+            # except AttributeError:
+            #     res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
+            #     if not res:
+            #         self.flashStatus.set_color(self.theme_config["error"])
+            #         return False
         elif flash_option == "probe_power":
             pass
         elif flash_option == "supply_power":

@@ -21,7 +21,7 @@ from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: I don't think this connects right AFTER program startup
+# TODO: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
 
 
 class tabMainDashboard(ThemedFrame):
@@ -197,7 +197,7 @@ class tabMainDashboard(ThemedFrame):
     def open_config_ini(self):
         file_path = os.getcwd() + "/EEequipment/usbrelay/config.ini"  #tag:HARDCODE
         if os.path.exists(file_path):
-            os.startfile(file_path)  # Opens the file with the default associated application # TODO: might not work on Linux
+            os.startfile(file_path)  # Opens the file with the default associated application # TODO: might not work on Linux. Module "os" has no attribute `startfile`
         else:
             guih.alert_user("Can't edit config file", f"{file_path} doesn't exist", "error")
 

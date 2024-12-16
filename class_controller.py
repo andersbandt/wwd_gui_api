@@ -31,7 +31,7 @@ class ClassController:
 
         # Create a mapping from port numbers to their elements
         port_elements = {child.text: child for child in root}
-        # print(f"Dealing with port elements: {port_elements}")
+        print(f"class_controller.py (set_used_port) is dealing with port elements: {port_elements}")
 
         # Remove any existing element with the same usage to prevent duplicates
         # for child in root.findall(usage):

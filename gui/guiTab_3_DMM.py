@@ -332,7 +332,7 @@ class tabDMM(ThemedFrame):
 
                 # update value counter
                 self.recCnt += 1
-                self.labelRNums.config(text='#{:7n}'.format(self.recCnt)) # TODO: this is not properly icncrement during recording
+                self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
 
             time.sleep(self.record_speed)
 
@@ -353,7 +353,7 @@ class tabDMM(ThemedFrame):
         if self.ser_status:
             self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
             self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-            self.valueMeas1.config(text=self.dmm_Meas1) # TODO: figure out how to use PrettyFloat on this (in data helper)
+            self.valueMeas1.config(text=self.dmm_Meas1) # TODO: figure out how to use PrettyFloat on this (in data helper). Sample input right now is `-0.0147VDC`
             self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
             self.valueMeas2.config(text=self.dmm_Meas2)
 

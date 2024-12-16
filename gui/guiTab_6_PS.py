@@ -305,7 +305,7 @@ class tabPS(ThemedFrame):
         def animate(i):
             for j in range(0, 10):
                 # Retrieve the current reading and the timestamp
-                reading = self.ps.get_current(1)
+                reading = self.ps.get_current(2) # TODO: figure out how to get dynamic channel based on some configuration
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                 currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp

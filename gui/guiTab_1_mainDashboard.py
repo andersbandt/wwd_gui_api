@@ -22,6 +22,8 @@ from gui.guiTab_parent import ThemedFrame
 
 
 # TODO: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
+#   actually seems like I can connect but there is no status update
+
 
 
 class tabMainDashboard(ThemedFrame):
@@ -162,6 +164,7 @@ class tabMainDashboard(ThemedFrame):
             usbrelay_controller.USBRelayController(usb_dev)
         )
         if usb_dev is not None:
+            self.prompt1.print("Autoconnect success")
             self.fr_main_status.set_status(True)
             self.init_fr_main_status()
         else:

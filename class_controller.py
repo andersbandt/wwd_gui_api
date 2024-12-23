@@ -1,5 +1,6 @@
 
 import xml.etree.ElementTree as ET
+import xml.dom.minidom
 
 class ClassController:
     def __init__(self):
@@ -47,9 +48,15 @@ class ClassController:
             port_element = ET.SubElement(root, usage)
             port_element.text = str(port)
 
+        # Prettify the XML before writing it back to the file
+        rough_string = ET.tostring(root, 'utf-8')
+        reparsed = xml.dom.minidom.parseString(rough_string)
+        pretty_xml = reparsed.toprettyxml(indent="  ")
+
         # Write back to the XML file
         with open("config/ports_used.xml", "wb") as xml_file:
             tree.write(xml_file)
+            # xml_file.write(pretty_xml)
 
         print(f"Ports saved to XML: {usage},{port}")
 

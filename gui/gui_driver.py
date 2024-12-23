@@ -34,6 +34,7 @@ class MainApplication(ThemedApp):
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
         self.basefilepath = os.getcwd()
         self.controller = ClassController()
+        self.controller.set_used_port("dummy", "USB_serial")
 
         usb_dev = usbrelay_controller.find()
         self.controller.set_relay(

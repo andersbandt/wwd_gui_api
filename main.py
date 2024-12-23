@@ -7,8 +7,17 @@
 
 # needed modules
 import argparse
+import logging
+
+# import user created modules
 from gui import gui_driver
 
+
+# NOTE: mainly added this because XDM1041 EEequipment code includes it?
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
 # TODO: review my `tag:HARDCODE` items
 

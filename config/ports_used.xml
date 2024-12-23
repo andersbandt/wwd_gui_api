@@ -1,1 +1,16 @@
-<PortsUsed><PS_PyVISA>USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA><USB_serial>/dev/ttyUSB1</USB_serial><DMM_Serial>/dev/ttyUSB0</DMM_Serial><USB_serial>/dev/ttyUSBCustom</USB_serial><USB_serial>/dev/ttyUSB2</USB_serial><USB_serial>/dev/ttyUSB3</USB_serial><USB_serial>/dev/ttyUSB4</USB_serial><ATE_serial>/dev/ttyACM4</ATE_serial><ATE_serial>/dev/ttyACM5</ATE_serial><PS_PyVISA>USB1::0xf4ec::0x1430::SPD1A134600512</PS_PyVISA><ATE_serial>/dev/ttyACM3</ATE_serial><ATE_serial>/dev/ttyACM0</ATE_serial><DMM_Serial>NA</DMM_Serial></PortsUsed>
+<PortsUsed>
+    <PS_PyVISA>USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA>
+    <USB_serial>/dev/ttyUSB1</USB_serial>
+    <DMM_Serial>/dev/ttyUSB0</DMM_Serial>
+    <USB_serial>/dev/ttyUSBCustom</USB_serial>
+    <USB_serial>/dev/ttyUSB2</USB_serial>
+    <USB_serial>/dev/ttyUSB3</USB_serial>
+    <USB_serial>/dev/ttyUSB4</USB_serial>
+    <ATE_serial>/dev/ttyACM4</ATE_serial>
+    <ATE_serial>/dev/ttyACM5</ATE_serial>
+    <PS_PyVISA>USB1::0xf4ec::0x1430::SPD1A134600512</PS_PyVISA>
+    <ATE_serial>/dev/ttyACM3</ATE_serial>
+    <ATE_serial>/dev/ttyACM0</ATE_serial>
+    <DMM_Serial>NA</DMM_Serial>
+    <USB_serial>dummy</USB_serial>
+</PortsUsed>

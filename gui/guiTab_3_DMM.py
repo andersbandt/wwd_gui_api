@@ -255,7 +255,7 @@ class tabDMM(ThemedFrame):
     def record_DMM(self):
         # conditionally STOP / START the recording
         if not self.record_status:
-            if self.fr_port.status
+            if self.fr_port.status:
                 # SETUP DMM
                 # self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
 

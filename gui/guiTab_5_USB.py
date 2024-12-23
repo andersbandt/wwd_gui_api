@@ -154,7 +154,7 @@ class tabUSB(ThemedFrame):
         else:
             self.fr_port.set_status(True)
 
-    # TODO (low-priority with new FTDI module implementation): try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
+    # TODO ATE (low-priority with new FTDI module implementation): try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
     def manage_connection(self):
         status = True
         while status:
@@ -164,7 +164,7 @@ class tabUSB(ThemedFrame):
                 time.sleep(3)
 
     def thread_print_display(self):
-        # TODO: get "RunTimeError: main thread is not in main loop error"
+        # TODO ATE: get "RunTimeError: main thread is not in main loop error"
         #       also not needed if my detection of closed serial connection isn't auto working
         # self.t1 = guic.StoppableThread(
         #     target=lambda: self.gui_refresh,

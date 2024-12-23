@@ -226,8 +226,6 @@ class tabPS(ThemedFrame):
         else:
             return
 
-        # TODO: add refresh for voltage / current information here
-
         if status_decode["ch1_state"] == "ON":
             self.ch1_toggle_btn.config(bg=self.theme_config["success"])
         else:
@@ -405,5 +403,4 @@ class tabPS(ThemedFrame):
         self.prompt.print(f"Close PYVISA resource!")
         self.ps.close()
         self.fr_port.set_status(False)
-
-        # TODO: somehow set class control ps back to None here
+        self.cc.set_ps(None)

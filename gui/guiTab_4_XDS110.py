@@ -369,6 +369,7 @@ class tabXDS110(ThemedFrame):
         self.ps_channel = int(config["Target"]["ps_channel"])
         debug_config = int(config["Target"]["debug_config"])
         self.device_vdds = float(config["Target"]["vdds"])
+        self.device_usb_relay = int(config["Target"]["usb_relay"])
 
         self.targetConfig_drop[1].set(self.tg_opt[power_type])
         self.serialNumber_drop[1].set(self.db_opt[debug_config])
@@ -388,18 +389,18 @@ class tabXDS110(ThemedFrame):
 
         if flash_option == "target_power":
             pass
-            # try:
-            #     dut_vdd1_channel = self.cc.relay.return_channel("DUT_VDD_1") # TODO: fix this hardcode
-            #     self.cc.relay.set_state(dut_vdd1_channel, 1)
-            # except AttributeError:
-            #     res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
-            #     if not res:
-            #         self.flashStatus.set_color(self.theme_config["error"])
-            #         return False
+            try:
+                if self.device_usb_relay is not 0:
+                    self.cc.relay.set_state(self.device_usb_relay, 1)
+            except AttributeError:
+                res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")
+                if not res:
+                    self.flashStatus.set_color(self.theme_config["error"])
+                    return False
         elif flash_option == "probe_power":
             pass
         elif flash_option == "supply_power":
-            self.cc.relay.set_state(3, 0) # tag:HARDCODE
+            self.cc.relay.set_state(self.device_usb_relay, 0)
             try:
                 self.cc.ps.set_voltage(self.ps_channel, self.device_vdds)
                 self.cc.ps.output_on(self.ps_channel)

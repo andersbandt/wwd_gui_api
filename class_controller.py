@@ -19,7 +19,8 @@ class ClassController:
     def set_relay(self, relay):
         self.relay = relay
 
-# TODO: this still won't properly keep only one unique XML entry per SerialPort
+    # TODO: figure out how I can automatically remove duplicates here
+    # TODO: should I add a check for if the ports are matching with anything else too?
     def set_used_port(self, port, usage):
         self.ports_used[port] = usage
 
@@ -30,34 +31,25 @@ class ClassController:
             root = ET.Element("PortsUsed")
             tree = ET.ElementTree(root)
 
-        # Create a mapping from port numbers to their elements
-        port_elements = {child.text: child for child in root}
-        print(f"class_controller.py (set_used_port) is dealing with port elements: {port_elements}")
+        # Create a mapping of usage (tags) to elements
+        usage_elements = {child.tag: child for child in root}
+        print(f"class_controller.py (set_used_port) is dealing with usage elements: {usage_elements}")
 
-        # Remove any existing element with the same usage to prevent duplicates
-        # for child in root.findall(usage):
-        #     root.remove(child)
-
-        # update instance
-        if str(port) in port_elements:
-            # Update existing element
-            port_element = port_elements[str(port)]
-            port_element.tag = usage
+        # Update or create the appropriate element
+        if usage in usage_elements:
+            # If an element with the same usage already exists, update its value
+            port_element = usage_elements[usage]
+            port_element.text = str(port)
         else:
-            # Create a new element if not found
+            # Create a new element if the usage does not exist
             port_element = ET.SubElement(root, usage)
             port_element.text = str(port)
-
-        # Prettify the XML before writing it back to the file
-        rough_string = ET.tostring(root, 'utf-8')
-        reparsed = xml.dom.minidom.parseString(rough_string)
-        pretty_xml = reparsed.toprettyxml(indent="  ")
 
         # Write back to the XML file
         with open("config/ports_used.xml", "wb") as xml_file:
             tree.write(xml_file)
-            # xml_file.write(pretty_xml)
 
-        print(f"Ports saved to XML: {usage},{port}")
+        print(f"Ports saved to XML: {usage}, {port}")
+
 
 

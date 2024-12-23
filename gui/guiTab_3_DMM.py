@@ -46,7 +46,7 @@ class tabDMM(ThemedFrame):
         # set up serial / DMM variables
         self.dmm = None
         self.dmm_id = None
-        self.ser_status = False
+        self.ser_status = False # TODO (sim): phase out this variable in favor of using the connection port GUI class
         self.dmm_Auto = ''
         self.dmm_Range = ''
         self.dmm_Fu1 = ''
@@ -79,7 +79,6 @@ class tabDMM(ThemedFrame):
         )
         self.fr_port.initialize_fr()
         if autoconnect:
-            # TODO: add some timeout here
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
@@ -342,18 +341,17 @@ class tabDMM(ThemedFrame):
 
         print("DMM record thread exiting.")
 
-    # TODO: don't think "tab into page and auto call this" is working for the DMM
     def gui_refresh(self, event):
         # refresh DMM information
-        if self.ser_status:
+        if self.fr_port.status:
             if event == "auto":
                 self.update_DMM("full")
 
         # update Label
-        if self.ser_status:
+        if self.fr_port.status:
             self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
             self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-            self.valueMeas1.config(text=self.dmm_Meas1) # TODO: figure out how to use PrettyFloat on this (in data helper). Sample input right now is `-0.0147VDC`
+            self.valueMeas1.config(text=self.dmm_Meas1)
             self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
             self.valueMeas2.config(text=self.dmm_Meas2)
 

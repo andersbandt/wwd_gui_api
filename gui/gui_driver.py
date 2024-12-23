@@ -61,6 +61,7 @@ class MainApplication(ThemedApp):
         self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         # self.tab7 = guiTab_7_ATE.tabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
 
+        # TODO: should probably refactor these to be variables because they're used below on `on_tab_changed`
         self.nb.add(self.tab1, text="MAIN")
         self.nb.add(self.tab2, text="IMU Analysis")
         self.nb.add(self.tab3, text="DMM Control")
@@ -76,6 +77,8 @@ class MainApplication(ThemedApp):
         selected_tab = event.widget.tab(event.widget.select(), "text")
         if selected_tab == "MAIN":
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
+        if selected_tab == "DMM Control":
+            guiTab_3_DMM.tabDMM.gui_refresh(self.tab3, "auto")
         elif selected_tab == "PS Control":
             guiTab_6_PS.tabPS.gui_refresh(self.tab6, "auto")
 

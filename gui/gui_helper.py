@@ -15,13 +15,20 @@ import math
 ####      GUI OBJECT GENERATION FUNCTIONS           ##########################
 ##############################################################################
 
-def generate_drop_down(frame, options):
+def generate_drop_down(frame, options, callback_func=None):
     clicked_opt = StringVar()  # datatype of menu text_data
     try:
         clicked_opt.set(options[0])  # initial menu text_data (CAUSES ISSUES IF NO COM PORTS AVAILABLE)
     except Exception as e:
         clicked_opt.set("NA")
         options = ["NA"]
+
+    def callback(*args):
+        callback_func()
+
+    if callback_func is not None:
+        clicked_opt.trace("w", callback)
+
     drop = OptionMenu(frame, clicked_opt, *options)  # create drop down menu of years
     drop.config(width=15, font=('Arial', 10), bg="#2B2B2B", fg='#F8F8F2') # tag:hardcode
     return drop, clicked_opt

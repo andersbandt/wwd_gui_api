@@ -64,22 +64,22 @@ def df_float(df, column):
     return df
 
 
-def PrettyFloat(num):
-    # Handle sign
-    sign = '+' if num >= 0 else '-'
-    num = abs(num)
-
-    if num >= 100:
-        # Format numbers >= 100 with E notation and one decimal point before the E
-        formatted = f"{num:.5E}"
-    elif num >= 1:
-        # Format numbers between 1 and 100 with fixed decimal places
-        formatted = f"{num:.6f}".rstrip('0').rstrip('.')
-    else:
-        # Format numbers < 1 with E notation for precision
-        formatted = f"{num:.5E}"
-
-    return sign + formatted
+# def PrettyFloat(num):
+#     # Handle sign
+#     sign = '+' if num >= 0 else '-'
+#     num = abs(num)
+#
+#     if num >= 100:
+#         # Format numbers >= 100 with E notation and one decimal point before the E
+#         formatted = f"{num:.5E}"
+#     elif num >= 1:
+#         # Format numbers between 1 and 100 with fixed decimal places
+#         formatted = f"{num:.6f}".rstrip('0').rstrip('.')
+#     else:
+#         # Format numbers < 1 with E notation for precision
+#         formatted = f"{num:.5E}"
+#
+#     return sign + formatted
 
 
 ##############################################################

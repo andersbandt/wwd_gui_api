@@ -21,9 +21,8 @@ from gui import gui_helper as guih
 from gui.guiTab_parent import ThemedFrame
 
 
-# TODO: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
+# TODO ATE: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
 #   actually seems like I can connect but there is no status update
-
 
 
 class tabMainDashboard(ThemedFrame):
@@ -200,7 +199,7 @@ class tabMainDashboard(ThemedFrame):
     def open_config_ini(self):
         file_path = os.getcwd() + "/EEequipment/usbrelay/config.ini"  #tag:HARDCODE
         if os.path.exists(file_path):
-            os.startfile(file_path)  # Opens the file with the default associated application # TODO: might not work on Linux. Module "os" has no attribute `startfile`
+            os.startfile(file_path)  # Opens the file with the default associated application # TODO ATE: might not work on Linux. Module "os" has no attribute `startfile`
         else:
             guih.alert_user("Can't edit config file", f"{file_path} doesn't exist", "error")
 
@@ -244,7 +243,6 @@ class tabMainDashboard(ThemedFrame):
 
         self.prompt1.print("Init successful!\n")
         return True
-
 
     def port_close(self):
         self.prompt1.print("Serial close!")

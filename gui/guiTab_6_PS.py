@@ -29,8 +29,8 @@ from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
 # read in config file.
-# NOTE: there are some TODO on this code in tab 4
-config_file_path = "config/target.ini"
+# TODO: use the function I created in tab 4 here
+config_file_path = "config/default.ini"
 if os.path.exists(config_file_path):
     config = configparser.ConfigParser()
     config.read(config_file_path)
@@ -61,6 +61,10 @@ class tabPS(ThemedFrame):
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
+        self.ps_v1s = 0
+        self.ps_v2s = 0
+        self.ps_i1 = 0
+        self.ps_i2 = 0
 
         # set up recording / data information
         self.recName = False
@@ -79,7 +83,6 @@ class tabPS(ThemedFrame):
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # set up serial port (has to be done after tab content is initialized)
-        self.ser_status = False # TODO: audit naming of this is the same across tabs
         self.fr_port = guic.SerialConnFrame(self,
                                             self.cc,
                                             "PS_PyVISA",
@@ -98,7 +101,7 @@ class tabPS(ThemedFrame):
         self.init_fr_control()
         self.init_fr_status()
 
-    # TODO: I should match the DMM for this function. Need to add a button to refresh / collect stats from the power supply
+
     # TODO: add a slot for getting back the set voltage value (probably the calibrated one though? How does that work? Or can leave it at raw?)
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
@@ -143,6 +146,10 @@ class tabPS(ThemedFrame):
         self.valueI1.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueV2.grid(row=5, column=1, sticky='E', padx=5, pady=2)
         self.valueI2.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+
+        # ADD A REFRESH
+        self.btn_update = ttk.Button(self.fr_info, text='UPDATE PS', command=lambda: self.update_PS(kind="full"))
+        self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -199,6 +206,19 @@ class tabPS(ThemedFrame):
         self.labelCh2Mode.grid(row=0, column=1, pady=15, padx=15)
         self.ch2_mode.grid(row=1, column=1, pady=15, padx=15)
 
+    def gui_refresh_info(self, event):
+        # refresh DMM information
+        if self.fr_port.status:
+            if event == "auto":
+                self.update_PS("full")
+
+        # update Label
+        if self.fr_port.status:
+            self.valueV1.config(text='{:8s}'.format(self.ps_v1s))
+            self.valueI1.config(text='{:8s}'.format(self.ps_i1))
+            self.valueV1.config(text='{:8s}'.format(self.ps_v1s))
+            self.valueI2.config(text='{:8s}'.format(self.ps_i2))
+
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
         if self.ps is not None:
@@ -239,12 +259,23 @@ class tabPS(ThemedFrame):
             self.ch2_mode.set_color("red")
 
     def gui_refresh(self, event):
+        self.gui_refresh_info(event)
         self.gui_refresh_channel_mode()
         self.gui_refresh_channel_state()
 
-    #################################
-    #### ACTION FUNCTIONS  ##########
-    #################################
+    ##############################################################################
+    ####      ACTION FUNCTIONS        ############################################
+    ##############################################################################
+
+    def update_PS(self, kind="partial"):
+        print(f"Updating ({kind}) ps ...")
+        if self.fr_port.status:
+            self.ps_v1s = self.ps.get_set_voltage(1)
+            self.ps_v2s = self.ps.get_set_voltage(2)
+            self.ps_i1 = self.ps.get_current(1)
+            self.ps_i2 = self.ps.get_current(2)
+
+        self.gui_refresh("call")
 
     def toggle_channel(self, channel):
         if self.ps is None:
@@ -351,8 +382,7 @@ class tabPS(ThemedFrame):
             self.labelTimeConnectedValue.config(
                 text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             )
-            self.ser_status = True
-            self.fr_port.set_status(self.ser_status)
+            self.fr_port.set_status(True)
 
             # turn channels off and set voltages
             self.ps.output_off(1)
@@ -367,15 +397,13 @@ class tabPS(ThemedFrame):
             return True
         else:  # BAD ID received
             self.ps = None
-            self.ser_status = False
-            self.fr_port.set_status(self.ser_status)
+            self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
             return False
 
     def port_close(self):
         self.prompt.print(f"Close PYVISA resource!")
         self.ps.close()
-        self.ser_status = False
-        self.fr_port.set_status(self.ser_status)
+        self.fr_port.set_status(False)
 
         # TODO: somehow set class control ps back to None here

@@ -10,6 +10,7 @@ import time
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
+from tkinter import filedialog
 import threading
 import configparser
 import os
@@ -22,21 +23,6 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
 from gui.guiTab_parent import ThemedFrame
-
-# initialize the config parser
-# TODO: possibly have all tabs read in this info so they all have it?. I am having to repeat same code in tab 6
-# TODO: also think about having support for multiple targets in the config file .... currently only 1
-config_file_path = "config/target.ini"
-if os.path.exists(config_file_path):
-    config = configparser.ConfigParser()
-    config.read(config_file_path)
-else:
-    print(f"Configuration file {config_file_path} does not exist.")
-    raise BaseException
-
-# read in parameters from the config file
-ps_channel = int(config["Target"]["ps_channel"])
-device_vdds = float(config["Target"]["vdds"])
 
 
 class tabXDS110(ThemedFrame):
@@ -75,6 +61,9 @@ class tabXDS110(ThemedFrame):
 
         # initialize tab content
         self.initTabContent()
+
+        # load target settings
+        self.parse_target_config("default.ini")
 
     def initTabContent(self):
         print("Initializing tab XDS110 content")
@@ -125,27 +114,44 @@ class tabXDS110(ThemedFrame):
         fr_m = self.fr_firmware
 
         # set up all the usable objects
+        self.entry_timesleep = Entry(fr_m, textvariable="seconds")
+        self.entry_timeautoff = Entry(fr_m)
+        self.buildStatus = ColorCircle(fr_m, width=50, height=50)
+        self.flashStatus = ColorCircle(fr_m, width=60, height=60)
+
+        # place buttons
         btn_build_firmware = Button(fr_m, text="Build firmware",
                                     command=lambda: threading.Thread(target=self.build_firmware).start(),
-                                    bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"], height=2,
+                                    bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=2,
                                     width=20)
 
         btn_flash_firmware = Button(fr_m, text="Load firmware",
                                     command=lambda: threading.Thread(target=self.flash_firmware).start(),
-                                    bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"], height=2,
+                                    bg=self.theme_config["light_1"], fg=self.theme_config["fg_light"], height=2,
                                     width=20)
-        self.entry_timesleep = Entry(fr_m, textvariable="seconds")
-        self.entry_timeautoff = Entry(fr_m)
-        self.buildStatus = ColorCircle(fr_m, width=50, height=50)
+        load_config = Button(fr_m, text="Load configuration",
+                                    command=lambda: self.load_config(),
+                                    bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1,
+                                    width=20)
+
+        # place drop downs
+        self.tg_opt = ["target_power", "probe_power", "supply_power"]
         self.targetConfig_drop = guih.generate_drop_down(
             fr_m,
-            ["target_power", "probe_power", "supply_power"]
+            self.tg_opt
         )
+        self.db_opt = ["", "ORANGE12", "PURPLE47"]
         self.serialNumber_drop = guih.generate_drop_down(
             fr_m,
-            ["Any", "ORANGE12", "PURPLE47"]
+            self.db_opt
+        )
+        self.defaultTarget_drop = guih.generate_drop_down(
+            fr_m,
+            ["default", 2],
+            callback_func=lambda: self.autoload_config()
         )
 
+        # place checkbuttons
         self.var_autooff = tk.IntVar()
         self.checkAutoOff = ttk.Checkbutton(fr_m,
                                             text="Auto off?",
@@ -158,12 +164,10 @@ class tabXDS110(ThemedFrame):
                                             variable=self.var_toggle,
                                             onvalue=1,
                                             offvalue=0)
-        self.flashStatus = ColorCircle(fr_m, width=60, height=60)
 
-        # place the usable objects
+        # place the usable objects with .grid()
         btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
         self.buildStatus.grid(row=1, column=1)
-
         ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2, column=0, padx=10, pady=15)
         self.entry_timesleep.grid(row=2, column=1)
         ttk.Label(fr_m, text="Auto off (seconds)", style="TLabel").grid(row=4, column=0)
@@ -172,9 +176,11 @@ class tabXDS110(ThemedFrame):
         self.checkToggle.grid(row=5, column=2)
         self.targetConfig_drop[0].grid(row=2, column=2, padx=6, pady=10)
         self.serialNumber_drop[0].grid(row=3, column=2, pady=2)
-
         btn_flash_firmware.grid(row=6, column=0, padx=15, pady=22)
         self.flashStatus.grid(row=6, column=1, padx=15, pady=22)
+        self.defaultTarget_drop[0].grid(row=7, column=0, pady=2)
+        load_config.grid(row=7, column=1, padx=15, pady=22)
+
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -321,15 +327,58 @@ class tabXDS110(ThemedFrame):
 
         return True
 
+    def load_config(self):
+        """
+        Open a configuration file and display its contents in the text widget.
+        """
+        print("Loading target configuration")
+        file_path = filedialog.askopenfilename(
+            title="Open Configuration File",
+            filetypes=(("Config Files", "*.ini *.cfg *.json *.yaml *.yml"), ("All Files", "*.*"))
+        )
+        if file_path:
+            try:
+                self.prompt.print(f"Trying to open and parse target configuration file @ {file_path}")
+                self.parse_target_config(file_path)
+            except Exception:
+                guih.alert_user("Can't open file", "Couldn't open target configuration file", "error")
+
+    def autoload_config(self):
+        cfg = self.defaultTarget_drop[1].get()
+        print(f"Autoloading with config num: {cfg}")
+        self.parse_target_config(f"{cfg}.ini")
+
+
     ##############################################################################
     ####      HELPER FUNCTIONS        ############################################
     ##############################################################################
+
+    def parse_target_config(self, filename):
+        # initialize the config parser
+        # TODO: possibly have all tabs read in this info so they all have it?. I am having to repeat same code in tab 6
+        config_file_path = "config/" + filename
+        if os.path.exists(config_file_path):
+            config = configparser.ConfigParser()
+            config.read(config_file_path)
+        else:
+            print(f"Configuration file {config_file_path} does not exist.")
+            raise BaseException
+
+        # read in parameters from the config file
+        power_type = int(config["Target"]["power_type"])
+        self.ps_channel = int(config["Target"]["ps_channel"])
+        debug_config = int(config["Target"]["debug_config"])
+        self.device_vdds = float(config["Target"]["vdds"])
+
+        self.targetConfig_drop[1].set(self.tg_opt[power_type])
+        self.serialNumber_drop[1].set(self.db_opt[debug_config])
+
 
     def turn_power_on(self, flash_option):
         # CONFIG POWER
         if flash_option == "target_power" or flash_option == "probe_power":
             try:
-                self.cc.ps.output_off(ps_channel)
+                self.cc.ps.output_off(self.ps_channel)
             except (AttributeError, ValueError):
                 res = guih.promptYesNo("Can't access power supply!",
                                        "Can't access supply to turn off. Continue with flash?")
@@ -352,8 +401,8 @@ class tabXDS110(ThemedFrame):
         elif flash_option == "supply_power":
             self.cc.relay.set_state(3, 0) # tag:HARDCODE
             try:
-                self.cc.ps.set_voltage(ps_channel, device_vdds)
-                self.cc.ps.output_on(ps_channel)
+                self.cc.ps.set_voltage(self.ps_channel, self.device_vdds)
+                self.cc.ps.output_on(self.ps_channel)
             except (AttributeError, ValueError): # AttributeError covers PS not init case. ValueError covers disconnect case.
                 guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
                 self.flashStatus.set_color(self.theme_config["error"])  # RED
@@ -365,4 +414,4 @@ class tabXDS110(ThemedFrame):
         elif flash_option == "probe_power":
             return
         elif flash_option == "supply_power":
-            self.cc.ps.output_off(ps_channel)
+            self.cc.ps.output_off(self.ps_channel)

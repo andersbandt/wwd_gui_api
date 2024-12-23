@@ -73,9 +73,6 @@ class Prompt(ThemedFrame):
         self.prompt.delete("1.0", "end")  # basically line index from
 
 
-# TODO: add a class for an Equipment information frame (ID, connect time, etc)
-
-
 ##########################################
 ### CONNECTION FRAMES    #################
 ##########################################
@@ -139,9 +136,6 @@ class SerialConnFrame(ConnFrame):
 
         self.initialize_fr()
 
-        # self.connect_previous_port()
-        # TODO: figure out how to implement this in here. Main challenge is my `connect_cmd` typically requires frame to be fully initialized
-
     def initialize_fr(self):
         # Button to refresh the list of COM ports
         refresh_button = tk.Button(self, text="Refresh Ports",
@@ -158,15 +152,6 @@ class SerialConnFrame(ConnFrame):
 
         # Initial port list
         self.refresh_ports()
-
-        # place baud rate list
-        # TODO: this baud rate does nothing. Because my `connect_serial` functions are ambigious, this may be hard to splice in?
-        # TODO: if I do get it working, let's save it with our autoconnect preferences?
-        self.baud_drop = guih.generate_drop_down(
-            self,
-            ["115200", "9600"]
-        )
-        self.baud_drop[0].grid(row=2, column=1, padx=3, pady=10)
 
         # Button to refresh the list of COM ports
         # TARGET - BUTTON/STATUS

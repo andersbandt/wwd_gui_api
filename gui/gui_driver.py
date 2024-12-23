@@ -48,6 +48,7 @@ class MainApplication(ThemedApp):
         self.tab5 = None
         self.tab6 = None
         self.tab7 = None
+        self.tab_names = []
         self.setTabs()
 
     def setTabs(self):
@@ -61,25 +62,24 @@ class MainApplication(ThemedApp):
         self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         # self.tab7 = guiTab_7_ATE.tabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
 
-        # TODO: should probably refactor these to be variables because they're used below on `on_tab_changed`
-        self.nb.add(self.tab1, text="MAIN")
-        self.nb.add(self.tab2, text="IMU Analysis")
-        self.nb.add(self.tab3, text="DMM Control")
-        self.nb.add(self.tab4, text="XDS110 JTAG")
-        self.nb.add(self.tab5, text="USB COMM")
-        self.nb.add(self.tab6, text="PS Control")
-        # self.nb.add(self.tab7, text="ATE")
+        # Define an array of tab names
+        self.tab_names = ["MAIN", "IMU Analysis", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6]
+
+        # Add tabs dynamically using a loop
+        for tab, name in zip(tabs, self.tab_names):
+            self.nb.add(tab, text=name)
 
         self.nb.grid(column=0, row=0)
         return True
 
     def on_tab_changed(self, event):
         selected_tab = event.widget.tab(event.widget.select(), "text")
-        if selected_tab == "MAIN":
+        if selected_tab == self.tab_names[0]:
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
-        if selected_tab == "DMM Control":
+        if selected_tab == self.tab_names[2]:
             guiTab_3_DMM.tabDMM.gui_refresh(self.tab3, "auto")
-        elif selected_tab == "PS Control":
+        elif selected_tab == self.tab_names[5]:
             guiTab_6_PS.tabPS.gui_refresh(self.tab6, "auto")
 
 
@@ -128,7 +128,7 @@ def main(autoconnect):
         app.controller.relay.open_all()
 
     # close any open serial ports
-    # TODO: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated
+    # TODO ATE: none of these can properly close because there is all sorts of runtime exceptions since mainloop() has terminated
     print("\nClosing serial ports")
     # app.tab3.port_close()
     # app.tab5.port_close()

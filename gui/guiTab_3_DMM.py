@@ -46,7 +46,6 @@ class tabDMM(ThemedFrame):
         # set up serial / DMM variables
         self.dmm = None
         self.dmm_id = None
-        self.ser_status = False # TODO (sim): phase out this variable in favor of using the connection port GUI class
         self.dmm_Auto = ''
         self.dmm_Range = ''
         self.dmm_Fu1 = ''
@@ -256,7 +255,7 @@ class tabDMM(ThemedFrame):
     def record_DMM(self):
         # conditionally STOP / START the recording
         if not self.record_status:
-            if self.ser_status:
+            if self.fr_port.status
                 # SETUP DMM
                 # self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
 
@@ -319,7 +318,7 @@ class tabDMM(ThemedFrame):
     def thread_record_dmm(self):
         print("Starting DMM record!")
 
-        while self.record_status and self.ser_status:
+        while self.record_status and self.fr_port.status:
             print("Taking DMM measurement ...")
             val_str = self.cc.dmm.read_val1_str()
             print(f"Anders you're looking at this value string: {val_str}")
@@ -372,8 +371,7 @@ class tabDMM(ThemedFrame):
         if self.dmm_id == '' or self.dmm_id is None:
             self.prompt.print("Connection failed")
             self.dmm = None
-            self.ser_status = False
-            self.fr_port.set_status(self.ser_status)
+            self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
             return False
         # GOOD ID received
@@ -389,8 +387,7 @@ class tabDMM(ThemedFrame):
                 text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             )
             self.labelIDValue.config(text=self.dmm_id)
-            self.ser_status = True
-            self.fr_port.set_status(self.ser_status)
+            self.fr_port.set_status(True)
             return True
 
     def port_close(self):
@@ -401,6 +398,5 @@ class tabDMM(ThemedFrame):
             pass
 
         self.dmm.disconnect()
-        self.ser_status = False
-        self.fr_port.set_status(self.ser_status)
+        self.fr_port.set_status(False)
 

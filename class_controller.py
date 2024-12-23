@@ -20,7 +20,6 @@ class ClassController:
         self.relay = relay
 
     # TODO: figure out how I can automatically remove duplicates here
-    # TODO: should I add a check for if the ports are matching with anything else too?
     def set_used_port(self, port, usage):
         self.ports_used[port] = usage
 
@@ -31,11 +30,14 @@ class ClassController:
             root = ET.Element("PortsUsed")
             tree = ET.ElementTree(root)
 
-        # Create a mapping of usage (tags) to elements
-        usage_elements = {child.tag: child for child in root}
-        print(f"class_controller.py (set_used_port) is dealing with usage elements: {usage_elements}")
+        # check for already existing port
+        port_elements = {child.text: child for child in root}
+        if port in port_elements:
+            print("Can't save XML element, port already in config file")
+            return False
 
         # Update or create the appropriate element
+        usage_elements = {child.tag: child for child in root}
         if usage in usage_elements:
             # If an element with the same usage already exists, update its value
             port_element = usage_elements[usage]

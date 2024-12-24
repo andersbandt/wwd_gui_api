@@ -19,7 +19,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# TODO: review my `tag:HARDCODE` items
 
 
 def main():

@@ -1,6 +1,5 @@
 
 import xml.etree.ElementTree as ET
-import xml.dom.minidom
 
 class ClassController:
     def __init__(self):
@@ -19,7 +18,7 @@ class ClassController:
     def set_relay(self, relay):
         self.relay = relay
 
-    # TODO: figure out how I can automatically remove duplicates here
+
     def set_used_port(self, port, usage):
         self.ports_used[port] = usage
 
@@ -33,10 +32,12 @@ class ClassController:
         # check for already existing port
         port_elements = {child.text: child for child in root}
         if port in port_elements:
-            print("Can't save XML element, port already in config file")
+            print(f"Can't save XML element {usage}@{port}, port already in config file")
+            # TODO: do I want to alert the user with an error here? Sent it back to guic?
             return False
 
         # Update or create the appropriate element
+        # TODO: figure out how I can automatically remove duplicates here
         usage_elements = {child.tag: child for child in root}
         if usage in usage_elements:
             # If an element with the same usage already exists, update its value
@@ -50,8 +51,6 @@ class ClassController:
         # Write back to the XML file
         with open("config/ports_used.xml", "wb") as xml_file:
             tree.write(xml_file)
-
-        print(f"Ports saved to XML: {usage}, {port}")
 
 
 

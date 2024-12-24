@@ -362,7 +362,6 @@ class tabXDS110(ThemedFrame):
 
     def parse_target_config(self, filename):
         # initialize the config parser
-        # TODO: possibly have all tabs read in this info so they all have it?. I am having to repeat same code in tab 6
         config_file_path = "config/" + filename
         if os.path.exists(config_file_path):
             config = configparser.ConfigParser()
@@ -381,7 +380,6 @@ class tabXDS110(ThemedFrame):
         self.targetConfig_drop[1].set(self.tg_opt[power_type])
         self.serialNumber_drop[1].set(self.db_opt[debug_config])
 
-
     def turn_power_on(self, flash_option):
         # CONFIG POWER
         if flash_option == "target_power" or flash_option == "probe_power":
@@ -397,7 +395,7 @@ class tabXDS110(ThemedFrame):
         if flash_option == "target_power":
             pass
             try:
-                if self.device_usb_relay is not 0:
+                if self.device_usb_relay != 0:
                     self.cc.relay.set_state(self.device_usb_relay, 1)
             except AttributeError:
                 res = guih.promptYesNo("Can't access relay!", "Can't access for relay power. Continue with flash?")

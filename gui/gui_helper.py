@@ -30,7 +30,7 @@ def generate_drop_down(frame, options, callback_func=None):
         clicked_opt.trace("w", callback)
 
     drop = OptionMenu(frame, clicked_opt, *options)  # create drop down menu of years
-    drop.config(width=15, font=('Arial', 10), bg="#2B2B2B", fg='#F8F8F2') # tag:hardcode
+    drop.config(width=15, font=('Arial', 10), bg="#2B2B2B", fg='#F8F8F2')
     return drop, clicked_opt
 
 

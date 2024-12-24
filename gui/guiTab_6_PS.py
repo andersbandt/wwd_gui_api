@@ -28,19 +28,6 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
-# read in config file.
-# TODO: use the function I created in tab 4 here
-config_file_path = "config/default.ini"
-if os.path.exists(config_file_path):
-    config = configparser.ConfigParser()
-    config.read(config_file_path)
-else:
-    print(f"Configuration file {config_file_path} does not exist.")
-    raise BaseException
-
-# read in parameters from the config file
-ps_channel = int(config["Target"]["ps_channel"])
-device_vdds = float(config["Target"]["vdds"])
 
 
 class tabPS(ThemedFrame):
@@ -63,6 +50,8 @@ class tabPS(ThemedFrame):
         self.ch2_on = False
         self.ps_v1s = 0
         self.ps_v2s = 0
+        self.ps_v1r = 0
+        self.ps_v2r = 0
         self.ps_i1 = 0
         self.ps_i2 = 0
 
@@ -101,8 +90,6 @@ class tabPS(ThemedFrame):
         self.init_fr_control()
         self.init_fr_status()
 
-
-    # TODO: add a slot for getting back the set voltage value (probably the calibrated one though? How does that work? Or can leave it at raw?)
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
@@ -125,31 +112,40 @@ class tabPS(ThemedFrame):
 
         # Add labels for range and measurements
         self.labelV1 = ttk.Label(self.fr_info, width=10, text='Voltage 1', style="TLabel", anchor='w')
-        self.labelI1 = ttk.Label(self.fr_info, width=9, text='Current 1', style="TLabel", anchor='w')
-        self.labelV2 = ttk.Label(self.fr_info, width=9, text='Voltage 2', style="TLabel", anchor='w')
+        self.labelV1_r = ttk.Label(self.fr_info, width=15, text='Voltage 1 (read)', style="TLabel", anchor='w')
+        self.labelI1 = ttk.Label(self.fr_info, width=10, text='Current 1', style="TLabel", anchor='w')
+        self.labelV2 = ttk.Label(self.fr_info, width=10, text='Voltage 2', style="TLabel", anchor='w')
+        self.labelV2_r = ttk.Label(self.fr_info, width=15, text='Voltage 2 (read)', style="TLabel", anchor='w')
         self.labelI2 = ttk.Label(self.fr_info, width=10, text='Current 2', style="TLabel", anchor='w')
 
         # Position the range and measurement labels
         self.labelV1.grid(row=3, column=0, sticky='W', padx=5, pady=2)
-        self.labelI1.grid(row=4, column=0, sticky='W', padx=5, pady=2)
-        self.labelV2.grid(row=5, column=0, sticky='W', padx=5, pady=2)
-        self.labelI2.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+        self.labelV1_r.grid(row=4, column=0, sticky='W', padx=5, pady=2)
+        self.labelI1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
+        self.labelV2.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+        self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
+        self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for range and measurements
         self.valueV1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueV1_r = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueV2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueV2_r = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
         # Position the value labels
         self.valueV1.grid(row=3, column=1, sticky='E', padx=5, pady=2)
-        self.valueI1.grid(row=4, column=1, sticky='E', padx=5, pady=2)
-        self.valueV2.grid(row=5, column=1, sticky='E', padx=5, pady=2)
-        self.valueI2.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+        self.valueV1_r.grid(row=4, column=1, sticky='E', padx=5, pady=2)
+        self.valueI1.grid(row=5, column=1, sticky='E', padx=5, pady=2)
+        self.valueV2.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+        self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
+        self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
 
         # ADD A REFRESH
         self.btn_update = ttk.Button(self.fr_info, text='UPDATE PS', command=lambda: self.update_PS(kind="full"))
-        self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
+        self.btn_update.grid(row=9, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -180,16 +176,21 @@ class tabPS(ThemedFrame):
         self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
         # MISC CONTROL
+        self.channelRecord_drop = guih.generate_drop_down(
+            fr_m,
+            [1, 2],
+        )
+        self.plot_current_btn = ttk.Button(fr_m, text="Live Plot current", style="TButton",
+                                           command=lambda: self.plot_current(),
+                                           )
         self.var_record = tk.IntVar()
         ttk.Checkbutton(fr_m,
                         text="Record current",
                         variable=self.var_record,
                         onvalue=1,
-                        offvalue=0).grid(row=2, column=0)
-        self.plot_current_btn = ttk.Button(fr_m, text="Live Plot current", style="TButton",
-                                           command=lambda: self.plot_current(),
-                                           )
-        self.plot_current_btn.grid(row=2, column=1, padx=10, pady=10)
+                        offvalue=0).grid(row=2, column=1)
+        self.plot_current_btn.grid(row=2, column=3, padx=10, pady=10)
+        self.channelRecord_drop[0].grid(row=2, column=0)
 
     def init_fr_status(self):
         # channel 1 CV/CC mode
@@ -270,6 +271,8 @@ class tabPS(ThemedFrame):
         if self.fr_port.status:
             self.ps_v1s = self.ps.get_set_voltage(1)
             self.ps_v2s = self.ps.get_set_voltage(2)
+            self.ps_v1r = self.ps.get_voltage(1)
+            self.ps_v2r = self.ps.get_voltage(2)
             self.ps_i1 = self.ps.get_current(1)
             self.ps_i2 = self.ps.get_current(2)
 
@@ -334,7 +337,7 @@ class tabPS(ThemedFrame):
         def animate(i):
             for j in range(0, 10):
                 # Retrieve the current reading and the timestamp
-                reading = self.ps.get_current(2) # TODO: figure out how to get dynamic channel based on some configuration
+                reading = self.ps.get_current(self.channelRecord_drop[1].get())
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                 currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
@@ -387,8 +390,8 @@ class tabPS(ThemedFrame):
             self.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
-            self.ps.set_voltage(1, device_vdds)
-            self.ps.set_voltage(2, device_vdds)
+            self.ps.set_voltage(1, 3.3) # tag:HARDCODE
+            self.ps.set_voltage(2, 3.3) # tag:HARDCODE
 
             # gui refresh
             self.gui_refresh_channel_state()

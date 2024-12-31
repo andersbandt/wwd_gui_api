@@ -65,21 +65,12 @@ def execute_Popen(exec_path, base_command, flags):
     except FileNotFoundError:
         return False
 
-    #     process.wait(timeout=10)
-    # Check if the command was successful
-    #     if process.poll() is None:
-    #         process.terminate()
-    #         print("Command terminated after 10 seconds")
     packet = CommandPacket(
         stdout.decode(),
         stderr.decode(),
         False,
     )
     return packet
-
-
-
-
 
 
 

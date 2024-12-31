@@ -329,7 +329,7 @@ class tabPS(ThemedFrame):
         if recording:
             self.recName = 'AREC_' + time.strftime('%Y%m%d%H%M%S', time.localtime()) + '.csv'
             self.csvh = CSVHelper(self.data_dir + self.recName)
-            self.csvh.initialize_file(["Time", "Current"])
+            self.csvh.initialize_file(["Sample", "Time", "Current"])
 
         self.prompt.print("Starting live current plot ...")
         currentLivePlot = plotter.LivePlot()
@@ -345,7 +345,7 @@ class tabPS(ThemedFrame):
 
                 # add row to data file
                 if recording:
-                    self.csvh.add_row([timestamp, reading])
+                    self.csvh.add_row([i,timestamp, reading])
 
             # Clear and plot again, but avoid clearing the entire plot for better visual
             currentLivePlot.ax.clear()

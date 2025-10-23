@@ -276,6 +276,7 @@ class tabPS(ThemedFrame):
             self.ps_i1 = self.ps.get_current(1)
             self.ps_i2 = self.ps.get_current(2)
 
+        print("... done updating, now calling `gui_refresh`")
         self.gui_refresh("call")
 
     def toggle_channel(self, channel):

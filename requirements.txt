@@ -16,6 +16,6 @@ libusb
 
 
 #added by anders
-tkinter
+#tkinter
 
 

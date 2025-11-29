@@ -14,6 +14,7 @@ from gui import gui_driver
 
 
 # NOTE: mainly added this because XDM1041 EEequipment code includes it?
+print("Setting up basic logging config in main()")
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -45,6 +46,7 @@ def main():
     gui_driver.main(autoconnect)
 
     # quit if we reach this point
+    print("calling quit()")
     quit()
 
 

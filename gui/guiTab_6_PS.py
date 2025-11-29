@@ -111,35 +111,35 @@ class tabPS(ThemedFrame):
         self.labelTimeConnectedValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
 
         # Add labels for range and measurements
-        self.labelV1 = ttk.Label(self.fr_info, width=10, text='Voltage 1', style="TLabel", anchor='w')
+        self.labelV1_s = ttk.Label(self.fr_info, width=10, text='Voltage 1', style="TLabel", anchor='w')
         self.labelV1_r = ttk.Label(self.fr_info, width=15, text='Voltage 1 (read)', style="TLabel", anchor='w')
         self.labelI1 = ttk.Label(self.fr_info, width=10, text='Current 1', style="TLabel", anchor='w')
-        self.labelV2 = ttk.Label(self.fr_info, width=10, text='Voltage 2', style="TLabel", anchor='w')
+        self.labelV2_s = ttk.Label(self.fr_info, width=10, text='Voltage 2', style="TLabel", anchor='w')
         self.labelV2_r = ttk.Label(self.fr_info, width=15, text='Voltage 2 (read)', style="TLabel", anchor='w')
         self.labelI2 = ttk.Label(self.fr_info, width=10, text='Current 2', style="TLabel", anchor='w')
 
         # Position the range and measurement labels
-        self.labelV1.grid(row=3, column=0, sticky='W', padx=5, pady=2)
+        self.labelV1_s.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelV1_r.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelI1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
-        self.labelV2.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+        self.labelV2_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
         self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
         self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for range and measurements
-        self.valueV1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueV1_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueV1_r = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
-        self.valueV2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueV2_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueV2_r = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
         # Position the value labels
-        self.valueV1.grid(row=3, column=1, sticky='E', padx=5, pady=2)
+        self.valueV1_s.grid(row=3, column=1, sticky='E', padx=5, pady=2)
         self.valueV1_r.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueI1.grid(row=5, column=1, sticky='E', padx=5, pady=2)
-        self.valueV2.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+        self.valueV2_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
         self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
         self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
 
@@ -215,10 +215,12 @@ class tabPS(ThemedFrame):
 
         # update Label
         if self.fr_port.status:
-            self.valueV1.config(text='{:8s}'.format(self.ps_v1s))
-            self.valueI1.config(text='{:8s}'.format(self.ps_i1))
-            self.valueV1.config(text='{:8s}'.format(self.ps_v1s))
-            self.valueI2.config(text='{:8s}'.format(self.ps_i2))
+            self.valueV1_s.config(text='{:8s}'.format(str(self.ps_v1s)))
+            self.valueV1_r.config(text='{:8s}'.format(str(self.ps_v1r)))
+            self.valueI1.config(text='{:8s}'.format(str(self.ps_i1)))
+            self.valueV2_s.config(text='{:8s}'.format(str(self.ps_v2s)))
+            self.valueV2_r.config(text='{:8s}'.format(str(self.ps_v2r)))
+            self.valueI2.config(text='{:8s}'.format(str(self.ps_i2)))
 
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
@@ -269,8 +271,8 @@ class tabPS(ThemedFrame):
     def update_PS(self, kind="partial"):
         print(f"Updating ({kind}) ps ...")
         if self.fr_port.status:
-            self.ps_v1s = self.ps.get_set_voltage(1)
-            self.ps_v2s = self.ps.get_set_voltage(2)
+            # self.ps_v1s = self.ps.get_set_voltage(1)
+            # self.ps_v2s = self.ps.get_set_voltage(2)
             self.ps_v1r = self.ps.get_voltage(1)
             self.ps_v2r = self.ps.get_voltage(2)
             self.ps_i1 = self.ps.get_current(1)
@@ -320,6 +322,10 @@ class tabPS(ThemedFrame):
             voltage = float(voltage_str)
             self.ps.set_voltage(channel, voltage)
             self.prompt.print(f"Set voltage on channel {channel} to {voltage} V")
+            if channel == 1:
+                self.ps_v1r = voltage
+            elif channel == 2:
+                self.ps_v2r = voltage
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
 
@@ -338,7 +344,7 @@ class tabPS(ThemedFrame):
         def animate(i):
             for j in range(0, 10):
                 # Retrieve the current reading and the timestamp
-                reading = self.ps.get_current(self.channelRecord_drop[1].get())
+                reading = self.ps.get_current(int(self.channelRecord_drop[1].get()))
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                 currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
@@ -391,8 +397,6 @@ class tabPS(ThemedFrame):
             self.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
-            self.ps.set_voltage(1, 3.3) # tag:HARDCODE
-            self.ps.set_voltage(2, 3.3) # tag:HARDCODE
 
             # gui refresh
             self.gui_refresh_channel_state()

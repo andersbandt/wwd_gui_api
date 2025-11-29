@@ -122,7 +122,7 @@ def main(autoconnect):
     if app.controller.ps is not None:
         app.controller.ps.output_off(1)
         app.controller.ps.output_off(2)
-            # print("UNABLE TO TURN OFF POWER SUPPLY CHANNELS!")
+        app.controller.ps.close()
 
     if app.controller.relay is not None:
         app.controller.relay.open_all()

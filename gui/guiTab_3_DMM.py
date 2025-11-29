@@ -19,7 +19,6 @@ from time import localtime, strftime
 import math
 from datetime import datetime
 
-
 # import user defined modules
 from analysis.csv_helper import CSVHelper
 from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode

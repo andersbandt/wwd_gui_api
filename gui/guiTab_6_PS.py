@@ -4,7 +4,7 @@
 @date     May 2024
 @brief    control power supply test equipment
 """
-
+import logging
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
@@ -14,6 +14,8 @@ import tkinter.messagebox as tkmb
 import time
 from datetime import datetime
 import pyvisa.errors
+
+import EEequipment.E3640A.E3640A
 from analysis.csv_helper import CSVHelper
 import configparser
 import os
@@ -248,15 +250,22 @@ class tabPS(ThemedFrame):
         else:
             return
 
-        if status_decode["ch1_mode"] == "CV":
-            self.ch1_mode.set_color("green")
-        else:
-            self.ch1_mode.set_color("red")
 
-        if status_decode["ch2_mode"] == "CV":
-            self.ch2_mode.set_color("green")
-        else:
-            self.ch2_mode.set_color("red")
+        try:
+            if status_decode["ch1_mode"] == "CV":
+                self.ch1_mode.set_color("green")
+            else:
+                self.ch1_mode.set_color("red")
+
+            if status_decode["ch2_mode"] == "CV":
+                self.ch2_mode.set_color("green")
+            else:
+                self.ch2_mode.set_color("red")
+        # TODO: need more elegant way to handle the status_decode key errors here
+        except KeyError:
+            logging.error("Can't set channel CC and CV states because of KeyError")
+            self.ch1_mode.set_color("black")
+            self.ch2_mode.set_color("black")
 
     def gui_refresh(self, event):
         self.gui_refresh_info(event)
@@ -368,7 +377,8 @@ class tabPS(ThemedFrame):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
-        self.ps = SPD3303X.SPD3303X(port, 2)
+        # self.ps = SPD3303X.SPD3303X(port)
+        self.ps = EEequipment.E3640A.E3640A.E3640A(port)
 
         try:
             self.id = self.ps.test_conn()

@@ -1,54 +1,93 @@
 
 # import needed modules
-import pyvisa
 import time
+from time import localtime, strftime
 
-import platform
-print(platform.architecture())
-
-
-try:
-    # Open Connection Keysight Visa
-    rm = pyvisa.ResourceManager()
-    print("PyVISA Version:", pyvisa.__version__)
-    print("Backend:", rm.visalib)
-    print("Available Resources:", rm.list_resources())
+# import user created modules
+from analysis.csv_helper import CSVHelper
+from EEequipment.E3640A.E3640A import E3640A
+from EEequipment.fluke8842A.fluke8842A import fluke8842A
 
 
-    # Connect to VISA Address
-    # GPIB Connection: 'GPIP0::xx::INSTR'
-    myinst = rm.open_resource("GPIB0::2::INSTR")
-    myinst.write_termination = '\r\n'
-    myinst.read_termination = '\r\n'
-    myinst.timeout = 3 * 1000
+# connect to power supply and DMM
+ps = E3640A("GPIB0::5::INSTR")
+dmm = fluke8842A("GPIB0::2::INSTR")
+
+
+### *IDN? TEST
+print(f"PS ID query: {ps.test_conn()}")
+# print(f"PS DMM query: {dmm.test_conn()}")
+
+voltage = dmm.read_value()  # Assuming ps has a get_voltage() method
+
+
+# SET UP CSV RECORDING STUFF
+board = 10
+pwm_freq = 32
+recName = f"AREC_b{board}_{pwm_freq}kHz_{strftime('%m%d%H%M', localtime())}.csv"
+print(f"Starting DMM/PS record ...")
+data_dir = "data/data/"
+csvh = CSVHelper(data_dir + recName)
+csvh.initialize_file(["V_set", "I_in", "V_out", "Load"])
+
+
+def thermopile_ramp():
+    start_voltage = 0.0  # volts
+    end_voltage = 0.65  # volts
+    duration = 20.0  # seconds
+    steps = 100  # number of increments
+
+    # Calculate step size and delay
+    voltage_step = (end_voltage - start_voltage) / steps
+    delay = duration / steps
+
+    # Ramp the voltage
+    current_voltage = start_voltage
+    for _ in range(steps + 1):
+        ps.set_voltage(1, current_voltage)
+        time.sleep(delay)
+        current_voltage += voltage_step
+
+
+# PERFORM TEST
+# generate voltage level output in sequence
+ps.output_on(1)
+listMode = [0.25, 0.35, 0.45, 0.55, 0.65]
+samples = 10
+delay_between_samples = 0.01
+
+print(f"Ramping thermopile")
+thermopile_ramp()
+time.sleep(2)
+for v in listMode:
+    # print(f"Ramping thermopile")
+    # thermopile_ramp()
+    print(f"Writing test voltage ... {v}")
+    ps.set_voltage(1, v)
     time.sleep(0.5)
 
-    ### *IDN? TEST
-    # print(f"IDN query: {myinst.query("*IDN?")}")
-    # myinst.write("F1")
-    print(f"ID query: {myinst.query("?")}")
+    res = input("Please enter load value: ")
+    if res == "q":
+        break
+
+    voltage_sum = 0.0
+    current_sum = 0.0
+    for _ in range(samples):
+        current = ps.get_current(1)  # Assuming ps has a get_current() method
+        voltage = dmm.read_value()  # Assuming ps has a get_voltage() method
+
+        voltage_sum += voltage
+        current_sum += current
+        time.sleep(delay_between_samples)
+
+    avg_voltage = voltage_sum / samples
+    avg_current = current_sum / samples
+
+    csvh.add_row([v, avg_current, avg_voltage, res])
 
 
-    ### DMM TEST
-    # print(myinst.query("MEAS?"))
-
-
-    # POWER SUPPLY TEST
-    # generate voltage level output in sequence
-    # myinst.write('OUTPut ON')
-    # listMode = [0, 1, 2, 3, 5, 10]
-    # for v in listMode:
-    #     print(f"Writing voltage ... {v}")
-    #     myinst.write(':SOURce:VOLTage:LEVel:IMMediate:AMPLitude %G' % v)
-    #     time.sleep(0.25)
-
-
-    # Close Connection
-    myinst.close()
-    print
-    'close instrument connection'
-except Exception as err:
-    print(err)
-finally:
-    # perform clean up operations
-    print("\nprogram complete!")
+# Close Connection
+print("Closing connections ...")
+ps.output_off(1)
+ps.disconnect()
+dmm.disconnect()

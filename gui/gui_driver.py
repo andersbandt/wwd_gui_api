@@ -122,7 +122,7 @@ def main(autoconnect):
     if app.controller.ps is not None:
         app.controller.ps.output_off(1)
         app.controller.ps.output_off(2)
-        app.controller.ps.close()
+        app.controller.ps.disconnect()
 
     if app.controller.relay is not None:
         app.controller.relay.open_all()
@@ -133,5 +133,4 @@ def main(autoconnect):
     # app.tab3.port_close()
     # app.tab5.port_close()
     # app.tab6.port_close()
-
     return

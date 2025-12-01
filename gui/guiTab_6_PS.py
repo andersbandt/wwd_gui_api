@@ -47,8 +47,8 @@ class tabPS(ThemedFrame):
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
-        self.ps_v1s = 0
-        self.ps_v2s = 0
+        self.ps_v1s = "?"
+        self.ps_v2s = "?"
         self.ps_v1r = 0
         self.ps_v2r = 0
         self.ps_i1 = 0

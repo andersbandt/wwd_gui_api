@@ -21,8 +21,8 @@ from datetime import datetime
 
 # import user defined modules
 from analysis.csv_helper import CSVHelper
-from EEequipment.xdm1041.xdm1041main import XDM1041, XDM1041Mode
-from EEequipment.xdm1041 import xdm1041helper
+from EEequipment.XDM1041.xdm1041main import XDM1041, XDM1041Mode
+from EEequipment.XDM1041 import xdm1041helper
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
@@ -320,7 +320,7 @@ class tabDMM(ThemedFrame):
         while self.record_status and self.fr_port.status:
             print("Taking DMM measurement ...")
             val_str = self.cc.dmm.read_val1_str()
-            print(f"Anders you're looking at this value string: {val_str}")
+            print(f"\tDMM: {val_str}")
 
             # add row to data file
             if val_str is not None:
@@ -362,7 +362,7 @@ class tabDMM(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.dmm = XDM1041(port, XDM1041Mode.MODE_VOLTAGE_DC)
+        self.dmm = XDM1041(port, "XDM1041")
         time.sleep(1)
         self.dmm_id = self.dmm.test_conn()
 

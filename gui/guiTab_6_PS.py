@@ -20,14 +20,13 @@ import os
 
 # import user defined modules
 from common import plotter
-from EEequipment.spd3303x import SPD3303X
+from EEequipment.SPD3303X import SPD3303X
 
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
-
 
 
 class tabPS(ThemedFrame):
@@ -48,8 +47,8 @@ class tabPS(ThemedFrame):
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
-        self.ps_v1s = 0
-        self.ps_v2s = 0
+        self.ps_v1s = "?"
+        self.ps_v2s = "?"
         self.ps_v1r = 0
         self.ps_v2r = 0
         self.ps_i1 = 0
@@ -369,21 +368,19 @@ class tabPS(ThemedFrame):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
-        try:
-            self.ps = SPD3303X.SPD3303X(port)
-        except ValueError:
-            self.ps = None
+        self.ps = SPD3303X.SPD3303X(port, 2)
 
         try:
             self.id = self.ps.test_conn()
-        except AttributeError:
-            guih.alert_user("Can't connect to VISA", "Best guess is the port is not active", "warning")
+        except AttributeError as e:
+            guih.alert_user("Can't connect to VISA", e, "warning")
             self.fr_port.set_status(False)
             return False
-        except pyvisa.errors.VisaIOError:
-            guih.alert_user("Can't connect to VISA", "Visa connect error (likely timeout)", "error")
+        except pyvisa.errors.VisaIOError as e:
+            guih.alert_user("Can't connect to VISA", e, "error")
             self.fr_port.set_status(False)
-        if self.id is not False:  # CONNECTION SUCCESS
+
+        if self.id:  # CONNECTION SUCCESS
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)
             self.labelIDValue.config(text=self.id)

@@ -18,23 +18,23 @@ dmm = fluke8842A("GPIB0::2::INSTR")
 print(f"PS ID query: {ps.test_conn()}")
 # print(f"PS DMM query: {dmm.test_conn()}")
 
-voltage = dmm.read_value()  # Assuming ps has a get_voltage() method
-
 
 # SET UP CSV RECORDING STUFF
-board = 10
+board = 12
 pwm_freq = 32
-recName = f"AREC_b{board}_{pwm_freq}kHz_{strftime('%m%d%H%M', localtime())}.csv"
+ind = 22
+temp = 70
+recName = f"AREC_b{board}_{temp}_{pwm_freq}kHz_{ind}uH_{strftime('%m%d%H%M', localtime())}.csv"
 print(f"Starting DMM/PS record ...")
 data_dir = "data/data/"
 csvh = CSVHelper(data_dir + recName)
-csvh.initialize_file(["V_set", "I_in", "V_out", "Load"])
+csvh.initialize_file(["V_set", "I_in", "P_in", "V_out", "Load", "P_out"])
 
 
 def thermopile_ramp():
     start_voltage = 0.0  # volts
-    end_voltage = 0.65  # volts
-    duration = 20.0  # seconds
+    end_voltage = 0.55  # volts
+    duration = 10  # seconds
     steps = 100  # number of increments
 
     # Calculate step size and delay
@@ -66,8 +66,8 @@ for v in listMode:
     ps.set_voltage(1, v)
     time.sleep(0.5)
 
-    res = input("Please enter load value: ")
-    if res == "q":
+    load = input("Please enter load value: ")
+    if load == "q":
         break
 
     voltage_sum = 0.0
@@ -82,8 +82,10 @@ for v in listMode:
 
     avg_voltage = voltage_sum / samples
     avg_current = current_sum / samples
+    p_in = v * avg_current
+    p_out = (avg_voltage ** 2) / float(load)
 
-    csvh.add_row([v, avg_current, avg_voltage, res])
+    csvh.add_row([v, avg_current, p_in, avg_voltage, load, p_out])
 
 
 # Close Connection

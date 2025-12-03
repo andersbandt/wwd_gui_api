@@ -32,8 +32,7 @@ class ClassController:
         # check for already existing port
         port_elements = {child.text: child for child in root}
         if port in port_elements:
-            print(f"Can't save XML element {usage}@{port}, port already in config file")
-            # TODO: do I want to alert the user with an error here? Sent it back to guic?
+            print(f"Can't save XML element {usage}@{port}, port already in config file (not an issue).")
             return False
 
         # Update or create the appropriate element

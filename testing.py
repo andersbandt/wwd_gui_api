@@ -2,94 +2,109 @@
 # import needed modules
 import time
 from time import localtime, strftime
+import pyvisa
 
 # import user created modules
 from analysis.csv_helper import CSVHelper
 from EEequipment.E3640A.E3640A import E3640A
-from EEequipment.fluke8842A.fluke8842A import fluke8842A
+from EEequipment.fluke8842A.fluke8842A import Fluke8842A
+from EEequipment.hp3478A.hp3478A import HP3478A
+
+from EEequipment.TestEquipment import SerialHandler
+
+
+# pyvisa stuff
+rm = pyvisa.ResourceManager()
+print(rm.list_resources())
 
 
 # connect to power supply and DMM
 ps = E3640A("GPIB0::5::INSTR")
-dmm = fluke8842A("GPIB0::2::INSTR")
+dmm1 = Fluke8842A("GPIB0::2::INSTR")
+dmm2 = HP3478A("GPIB0::23::INSTR")
+ser = SerialHandler()
+ser.connect("COM8", None)
+ser.set_timeout(None)
+
+
+time.sleep(5)
 
 
 ### *IDN? TEST
 print(f"PS ID query: {ps.test_conn()}")
 # print(f"PS DMM query: {dmm.test_conn()}")
+print(f"PS DMM2 read: {dmm2.read_value()}")
 
 
 # SET UP CSV RECORDING STUFF
-board = 12
-pwm_freq = 32
+board = 10
 ind = 22
-temp = 70
-recName = f"AREC_b{board}_{temp}_{pwm_freq}kHz_{ind}uH_{strftime('%m%d%H%M', localtime())}.csv"
+temp = 25
+load = 500
+recName = f"AREC_b{board}_{temp}_{ind}uH_{strftime('%m%d%H%M', localtime())}.csv"
 print(f"Starting DMM/PS record ...")
 data_dir = "data/data/"
 csvh = CSVHelper(data_dir + recName)
-csvh.initialize_file(["V_set", "I_in", "P_in", "V_out", "Load", "P_out"])
+csvh.initialize_file(["V_set", "V_tp", "I_in", "P_in", "V_out", "P_out", "PWM", "Duty", "Deadtime"])
 
 
-def thermopile_ramp():
-    start_voltage = 0.0  # volts
-    end_voltage = 0.55  # volts
-    duration = 10  # seconds
-    steps = 100  # number of increments
 
-    # Calculate step size and delay
-    voltage_step = (end_voltage - start_voltage) / steps
-    delay = duration / steps
-
-    # Ramp the voltage
-    current_voltage = start_voltage
-    for _ in range(steps + 1):
-        ps.set_voltage(1, current_voltage)
-        time.sleep(delay)
-        current_voltage += voltage_step
+# SET UP PARAMETERS
+listMode = [0.45, 0.55, 0.65]
+samples = 3
+delay_between_samples = 0.01
 
 
 # PERFORM TEST
 # generate voltage level output in sequence
+ps.output_off(1)
+time.sleep(5)
+ps.set_voltage(0.55)
 ps.output_on(1)
-listMode = [0.25, 0.35, 0.45, 0.55, 0.65]
-samples = 10
-delay_between_samples = 0.01
+time.sleep(5)
 
-print(f"Ramping thermopile")
-thermopile_ramp()
-time.sleep(2)
+
 for v in listMode:
-    # print(f"Ramping thermopile")
-    # thermopile_ramp()
-    print(f"Writing test voltage ... {v}")
-    ps.set_voltage(1, v)
-    time.sleep(0.5)
+    print(f"Starting test at voltage: {v}")
+    ps.set_voltage(v)
+    time.sleep(1)
 
-    load = input("Please enter load value: ")
-    if load == "q":
-        break
+    line = ""
+    while line != "EXIT":
+        line = ser.read(decode=True)
+        print(line)
+        part = line.split(",")
 
-    voltage_sum = 0.0
-    current_sum = 0.0
-    for _ in range(samples):
-        current = ps.get_current(1)  # Assuming ps has a get_current() method
-        voltage = dmm.read_value()  # Assuming ps has a get_voltage() method
+        v1_sum = 0.0
+        v2_sum = 0.0
+        current_sum = 0.0
+        for _ in range(samples):
+            current = ps.get_current(1)  # Assuming ps has a get_current() method
+            v1 = dmm1.read_value()  # Assuming ps has a get_voltage() method
+            v2 = dmm2.read_value()
 
-        voltage_sum += voltage
-        current_sum += current
-        time.sleep(delay_between_samples)
+            v1_sum += v1
+            v2_sum += v2
+            current_sum += current
+            time.sleep(delay_between_samples)
 
-    avg_voltage = voltage_sum / samples
-    avg_current = current_sum / samples
-    p_in = v * avg_current
-    p_out = (avg_voltage ** 2) / float(load)
+        avg_v1 = v1_sum / samples
+        avg_v2 = v2_sum / samples
+        avg_current = current_sum / samples
+        p_in = v * avg_current
+        p_out = (avg_v1 ** 2) / float(load)
 
-    csvh.add_row([v, avg_current, p_in, avg_voltage, load, p_out])
+        try:
+            csvh.add_row([v, avg_v2, avg_current, p_in, avg_v1, p_out, part[0], part[1], part[2]])
+        except IndexError:
+            print(f"Couldn't add a sample with parts looking like: {part}")
+
 
 
 # Close Connection
 print("Closing connections ...")
-ps.output_off(1)
+#ps.output_off(1)
+ps.set_voltage(0)
 ps.disconnect()
-dmm.disconnect()
+dmm1.disconnect()
+

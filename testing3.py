@@ -3,7 +3,9 @@
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from time import localtime, strftime
+
 
 # import user created modules
 from analysis.csv_helper import CSVHelper
@@ -18,62 +20,54 @@ dmm = Fluke8842A("GPIB0::2::INSTR")
 fg = Agilent33120A("GPIB0::10::INSTR")
 
 
-
 ### *IDN? TEST
 print(f"PS ID query: {ps.test_conn()}")
 print(f"FG ID query: {fg.test_conn()}")
 
-fg.clear()
-
-
-# Parameters
-freq = 155000
-duty = 70
-tp = 0.4
-
-
-# start = 20       # starting value
-# stop = 80      # ending value
-# step = 1        # increment (x)
-start = 40000
-stop = 220000
-samples = 30
-
 
 ps.output_on(1)
-ps.set_voltage(tp)
-
-fg.set_frequency(freq)
-fg.set_duty(70)
-
-# Generate array to sweep
-arr = np.linspace(start, stop, samples)  # evenly spaced values
-print(arr)
+ps.set_voltage(0.4)
 
 
+# Sweep parameters
+freq_start, freq_stop, freq_samples = 40000, 220000, 30
+duty_start, duty_stop, duty_samples = 20, 80, 20
+
+# Generate arrays
+freq_arr = np.linspace(freq_start, freq_stop, freq_samples)
+duty_arr = np.linspace(duty_start, duty_stop, duty_samples)
+
+# Simulated output voltage (replace with actual measurements)
 vdds = []
-for v in arr:
-    #fg.set_duty(v)
-    fg.set_frequency(v)
-    time.sleep(2)
-    vdds.append(dmm.read_value())
+for f in freq_arr:
+    fg.set_frequency(f)
+    time.sleep(1)
+    row = []
+    for d in duty_arr:
+        fg.set_duty(d)
+        time.sleep(1.5)
+        voltage = dmm.read_value()
+        row.append(voltage)
+    vdds.append(row)
+
+vdds = np.array(vdds)
+
+# Meshgrid for plotting
+FREQ, DUTY = np.meshgrid(duty_arr, freq_arr)
+
+# 3D plot
+fig = plt.figure(figsize=(10, 7))
+ax = fig.add_subplot(111, projection='3d')
+surf = ax.plot_surface(FREQ, DUTY, vdds, cmap='viridis')
+
+ax.set_title('Frequency vs Duty Cycle vs Output Voltage')
+ax.set_xlabel('Duty Cycle (%)')
+ax.set_ylabel('Frequency (Hz)')
+ax.set_zlabel('Output Voltage (V)')
+fig.colorbar(surf, shrink=0.5, aspect=10, label='Voltage (V)')
 
 
-# make final plot
-plt.figure(figsize=(8, 5))
-plt.plot(arr, vdds, marker='o', linestyle='-', color='b')
-
-#plt.title(f'Duty Cycle vs Output Voltage at TP={tp} and F={freq}')
-#plt.xlabel('Duty Cycle (%)')
-
-plt.title(f"Frequency vs VCC at TP={tp} and D={duty}")
-plt.xlabel("Frequency (Hz)")
-
-plt.ylabel('Output Voltage (V)')
-plt.grid(True)
 plt.show()
-
-
 
 # Close Connection
 print("Closing connections ...")

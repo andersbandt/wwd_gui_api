@@ -95,9 +95,10 @@ def main(autoconnect):
     print("Executing main function of gui_driver.py")
 
     # tag:HARDCODE
-    desired_w = 1280
-    desired_h = 900
-    margin = 10
+    desired_w = 1300
+    desired_h = 700
+    margin_w = 50
+    margin_h = 125
 
     # setup window
     window = tk.Tk()
@@ -108,8 +109,8 @@ def main(autoconnect):
     hs = window.winfo_screenheight()
 
     # Clamp desired size within screen (leave a margin for taskbar/titlebar)
-    w = min(desired_w, max(300, ws - margin))
-    h = min(desired_h, max(300, hs - margin))
+    w = min(desired_w, max(300, ws - margin_w))
+    h = min(desired_h, max(300, hs - margin_h))
 
     # Center placement
     x = (ws / 2) - (w / 4)

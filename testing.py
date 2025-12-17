@@ -37,22 +37,21 @@ print(f"PS DMM2 read: {dmm2.read_value()}")
 
 
 # SET UP CSV RECORDING STUFF
-board = 10
-ind = 22
+board = 12
+ind = 68
 temp = 25
 load = 500
 recName = f"AREC_b{board}_{temp}_{ind}uH_{strftime('%m%d%H%M', localtime())}.csv"
 print(f"Starting DMM/PS record ...")
 data_dir = "data/data/"
 csvh = CSVHelper(data_dir + recName)
-csvh.initialize_file(["V_set", "V_tp", "I_in", "P_in", "V_out", "P_out", "PWM", "Duty", "Deadtime"])
-
+csvh.initialize_file(["V_set", "V_tp", "I_in", "P_in", "V_out", "P_out", "Load", "PWM", "Duty", "Deadtime", "ADC_V_out", "ADC_VCC"])
 
 
 # SET UP PARAMETERS
-listMode = [0.45, 0.55, 0.65]
+listMode = [0.35]
 samples = 3
-delay_between_samples = 0.01
+delay_between_samples = 0
 
 
 # PERFORM TEST
@@ -61,7 +60,6 @@ ps.output_off(1)
 time.sleep(5)
 ps.set_voltage(0.55)
 ps.output_on(1)
-time.sleep(5)
 
 
 for v in listMode:
@@ -95,16 +93,15 @@ for v in listMode:
         p_out = (avg_v1 ** 2) / float(load)
 
         try:
-            csvh.add_row([v, avg_v2, avg_current, p_in, avg_v1, p_out, part[0], part[1], part[2]])
+            csvh.add_row([v, avg_v2, avg_current, p_in, avg_v1, p_out, load, part[0], part[1], part[2], part[3], part[4]])
         except IndexError:
             print(f"Couldn't add a sample with parts looking like: {part}")
 
 
-
 # Close Connection
 print("Closing connections ...")
-#ps.output_off(1)
-ps.set_voltage(0)
+ps.output_off(1)
 ps.disconnect()
 dmm1.disconnect()
+dmm2.disconnect()
 

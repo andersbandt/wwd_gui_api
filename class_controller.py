@@ -50,6 +50,7 @@ class ClassController:
         # Write back to the XML file
         with open("config/ports_used.xml", "wb") as xml_file:
             tree.write(xml_file)
+            return True
 
 
 

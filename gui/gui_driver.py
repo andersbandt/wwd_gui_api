@@ -94,24 +94,33 @@ class MainApplication(ThemedApp):
 def main(autoconnect):
     print("Executing main function of gui_driver.py")
 
+    # tag:HARDCODE
+    desired_w = 1280
+    desired_h = 900
+    margin = 10
+
     # setup window
     window = tk.Tk()
     window.title("WWD GUI API")
 
-    w = 1280  # width for the Tk root
-    h = 900  # height for the Tk root
-    # get screen width and height
-    ws = window.winfo_screenwidth()  # width of the screen
-    hs = window.winfo_screenheight()  # height of the screen
-    # set the dimensions of the screen and where is it placed
+    # Get screen size
+    ws = window.winfo_screenwidth()
+    hs = window.winfo_screenheight()
+
+    # Clamp desired size within screen (leave a margin for taskbar/titlebar)
+    w = min(desired_w, max(300, ws - margin))
+    h = min(desired_h, max(300, hs - margin))
+
+    # Center placement
     x = (ws / 2) - (w / 4)
     y = 70
-    window.geometry('%dx%d+%d+%d' % (w, h, x, y))
+
+    window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
     # place main app
     app = MainApplication(window,
-                          1800,
-                          1800,
+                          h,
+                          w,
                           "config/darcula.json",
                           autoconnect)
 

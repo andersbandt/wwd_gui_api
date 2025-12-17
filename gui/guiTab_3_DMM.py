@@ -7,7 +7,6 @@
 
 
 # import needed GUI packages
-import tkinter
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -23,6 +22,7 @@ from datetime import datetime
 from analysis.csv_helper import CSVHelper
 from EEequipment.XDM1041.xdm1041main import XDM1041, XDM1041Mode
 from EEequipment.XDM1041 import xdm1041helper
+from EEequipment.fluke8842A.fluke8842A import Fluke8842A
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
@@ -68,12 +68,14 @@ class tabDMM(ThemedFrame):
         self.initTabContent()
 
         # set up port
+        # TODO: somehow make this port_func VISIBLE and CHANGABLE
         self.fr_port = guic.SerialConnFrame(
             self,
             self.cc,
             "DMM_Serial",
             self.port_init,
-            self.port_close
+            self.port_close,
+            port_func=3
         )
         self.fr_port.initialize_fr()
         if autoconnect:
@@ -135,7 +137,7 @@ class tabDMM(ThemedFrame):
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
 
         # ADD A REFRESH
-        self.btn_update = ttk.Button(self.fr_info, text='UPDATE DMM', command=lambda: self.update_DMM(kind="full"))
+        self.btn_update = tk.Button(self.fr_info, text='UPDATE DMM', command=lambda: self.gui_refresh_DMM(kind="full"))
         self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_rec(self):
@@ -171,21 +173,36 @@ class tabDMM(ThemedFrame):
             self.PT100_On = False
             self.PT100_Unit = self.PT100UnitList[0]
 
+    def gui_refresh(self, event):
+        # refresh DMM information
+        if self.fr_port.status:
+            if event == "auto":
+                self.gui_refresh_DMM("full")
+
+        # update Label
+        if self.fr_port.status:
+            self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
+            self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
+            self.valueMeas1.config(text=self.dmm_Meas1)
+            self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
+            self.valueMeas2.config(text=self.dmm_Meas2)
 
     ##############################################################################
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
 
-    def update_DMM(self, kind="partial"):
+    def gui_refresh_DMM(self, kind="partial"):
         print(f"Updating ({kind}) dmm ...")
-        self.dmm_Meas1 = self.dmm.read_val1_str().strip("\n")
-        self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
+        # self.dmm_Meas1 = self.dmm.read_val1_str().strip("\n")
+        self.dmm_Meas1 = self.dmm.read_value()
+        # self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
 
         if kind == "full":
-            self.dmm_Auto = self.dmm.get_range_auto()
-            self.dmm_Range = self.dmm.get_range().strip("\n")
-            self.dmm_Fu1 = self.dmm.get_func1()
-            self.dmm_Fu2 = self.dmm.get_func2()
+            pass
+            # self.dmm_Auto = self.dmm.get_range_auto()
+            # self.dmm_Range = self.dmm.get_range().strip("\n")
+            # self.dmm_Fu1 = self.dmm.get_func1()
+            # self.dmm_Fu2 = self.dmm.get_func2()
 
         self.gui_refresh("call")
 
@@ -339,21 +356,6 @@ class tabDMM(ThemedFrame):
 
         print("DMM record thread exiting.")
 
-    def gui_refresh(self, event):
-        # refresh DMM information
-        if self.fr_port.status:
-            if event == "auto":
-                self.update_DMM("full")
-
-        # update Label
-        if self.fr_port.status:
-            self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
-            self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-            self.valueMeas1.config(text=self.dmm_Meas1)
-            self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
-            self.valueMeas2.config(text=self.dmm_Meas2)
-
-
     #################################
     #### SERIAL (COM)  ##############
     #################################
@@ -362,7 +364,10 @@ class tabDMM(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.dmm = XDM1041(port, "XDM1041")
+        # TODO: conditional connect based on model!!!
+        # self.dmm = XDM1041(port, "XDM1041")
+        self.dmm = Fluke8842A(port)
+
         time.sleep(1)
         self.dmm_id = self.dmm.test_conn()
 
@@ -378,8 +383,10 @@ class tabDMM(ThemedFrame):
             self.prompt.print("Connected to DMM")
             self.prompt.print(f"Got id: {self.dmm_id}")
             self.cc.set_dmm(self.dmm)
-            self.cc.dmm.set_mode_dcv()
-            self.cc.dmm.set_sample_speed_fast()
+
+            # TODO: add these back once I get my DMM abstraction better
+            # self.cc.dmm.set_mode_dcv()
+            # self.cc.dmm.set_sample_speed_fast()
 
             self.gui_refresh("call")
             self.labelTimeConnectedValue.config(
@@ -393,7 +400,7 @@ class tabDMM(ThemedFrame):
         # NOTE: added this Exception because we might call this after app is destroyed
         try:
             self.prompt.print(f"Serial close!")
-        except tkinter.TclError:
+        except tk.TclError:
             pass
 
         self.dmm.disconnect()

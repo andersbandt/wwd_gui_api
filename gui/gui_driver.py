@@ -18,7 +18,7 @@ from EEequipment.usbrelay import usbrelay_controller
 # import tab classes
 from gui.guiTab_parent import ThemedApp
 from gui import guiTab_1_mainDashboard
-from gui import guiTab_2_IMU
+from gui import guiTab_2_LOG
 from gui import guiTab_3_DMM
 from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
@@ -26,6 +26,7 @@ from gui import guiTab_6_PS
 from gui import guiTab_7_ATE
 
 
+# TODO: (small) change all the class names to CamelCase with TabXxx
 class MainApplication(ThemedApp):
     def __init__(self, window, height, width, theme_file, autoconnect):
         super().__init__(window, theme_file)
@@ -55,7 +56,7 @@ class MainApplication(ThemedApp):
         print("Creating tab nav bar and initializing tab content")
         self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath,
                                                             "config/darcula.json", self.autoconnect)
-        self.tab2 = guiTab_2_IMU.tabIMU(self.nb, self.basefilepath, "config/darcula.json")
+        self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, "config/darcula.json")
         self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
         self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
@@ -63,7 +64,7 @@ class MainApplication(ThemedApp):
         # self.tab7 = guiTab_7_ATE.tabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "IMU Analysis", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control"]
+        self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control"]
         tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6]
 
         # Add tabs dynamically using a loop
@@ -77,6 +78,8 @@ class MainApplication(ThemedApp):
         selected_tab = event.widget.tab(event.widget.select(), "text")
         if selected_tab == self.tab_names[0]:
             guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
+        if selected_tab == self.tab_names[1]:
+            guiTab_2_LOG.TabLog.gui_refresh(self.tab2, "auto")
         if selected_tab == self.tab_names[2]:
             guiTab_3_DMM.tabDMM.gui_refresh(self.tab3, "auto")
         elif selected_tab == self.tab_names[5]:

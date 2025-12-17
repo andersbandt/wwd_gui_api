@@ -3,11 +3,15 @@ import xml.etree.ElementTree as ET
 
 class ClassController:
     def __init__(self):
+        self.ser = None
         self.dmm = None
         self.ps = None
         self.relay = None
 
         self.ports_used = {}
+
+    def set_ser(self, ser):
+        self.ser = ser
 
     def set_dmm(self, dmm):
         self.dmm = dmm
@@ -17,6 +21,31 @@ class ClassController:
 
     def set_relay(self, relay):
         self.relay = relay
+
+
+    def get_ser_status(self):
+        if self.ser is None:
+            return False
+        else:
+            return self.ser.status
+
+    def get_dmm_status(self):
+        if self.dmm is None:
+            return False
+        else:
+            return self.dmm.status
+
+    def get_ps_status(self):
+        if self.ps is None:
+            return False
+        else:
+            return self.ps.status
+
+    def get_relay_status(self):
+        if self.relay is None:
+            return False
+        else:
+            return self.relay.status
 
 
     def set_used_port(self, port, usage):

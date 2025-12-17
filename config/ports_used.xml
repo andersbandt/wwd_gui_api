@@ -1,6 +1,6 @@
 <PortsUsed>
     <PS_PyVISA>GPIB0::5::INSTR</PS_PyVISA>
     <USB_serial>dummy3</USB_serial>
-    <DMM_Serial>/dev/ttyUSB0</DMM_Serial>
+    <DMM_Serial>GPIB0::2::INSTR</DMM_Serial>
     <ATE_serial>/dev/ttyACM4</ATE_serial>
 </PortsUsed>

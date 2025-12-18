@@ -1,13 +1,16 @@
 
 import csv
+from typing import Dict, Any, Optional
 from pathlib import Path
 
 class CSVHelper:
     def __init__(self, file_path):
         self.file_path = Path(file_path)
+        self.headers = None
 
     def initialize_file(self, headers):
         """Initialize the CSV file with headers."""
+        self.headers = headers
         with open(self.file_path, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(headers)
@@ -23,6 +26,31 @@ class CSVHelper:
         with open(self.file_path, mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(rows)
+
+    def add_row_from_dict(self, row_dict: Dict[str, Any], default: Optional[str] = "") -> None:
+        """
+        Add a row based on a dictionary keyed by your known headers.
+
+        - Values are written in the same order as self.headers.
+        - Keys in row_dict that are not in headers are ignored.
+        - Missing header keys are filled with `default` (empty string by default).
+        - None values are converted to empty strings (or `default` if provided).
+
+        :param row_dict: Dict where keys correspond to CSV headers you control.
+        :param default: Value used when a header is missing in row_dict or is None.
+        """
+        # Normalize values and ensure order
+        ordered_row = []
+        for h in self.headers:
+            val = row_dict.get(h, default)
+            if val is None:
+                val = default
+            ordered_row.append(val)
+
+        # Now append the row
+        with open(self.file_path, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(ordered_row)
 
     def read_data(self):
         """Read data from the CSV file."""

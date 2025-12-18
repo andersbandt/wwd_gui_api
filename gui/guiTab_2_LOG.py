@@ -49,19 +49,18 @@ class TabLog(ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_status.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_setup.grid(row=0, column=1, pady=15, padx=15)
-        self.fr_analysis.grid(row=1, column=0, pady=15, padx=15)
+        self.fr_status.grid(row=1, column=0, pady=15, padx=15)
+        self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
+        self.fr_analysis.grid(row=2, column=0, pady=15, padx=15)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
     def initTabContent(self):
         print("Initializing tab 2 (Logger) content")
 
-        # TODO: add these nice titles to all tabs?
         # print welcome text_data
-        # l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
-        #                font=("Arial", 16))
-        # l1.grid(column=0, row=0)
+        l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
+                       font=(self.theme_config["font"]["family"], 16))
+        l1.grid(column=0, row=0, columnspan=4)
 
         self.init_fr_status()
         self.init_fr_setup()
@@ -212,6 +211,7 @@ class TabLog(ThemedFrame):
         # Organize parameters first
         self.organize_record_params()
         self.record_status = False
+        self.recCnt = 0
 
         # Check Serial if requested
         if self.record_config["use_ser"]:
@@ -226,7 +226,6 @@ class TabLog(ThemedFrame):
             if not self.cc.get_dmm_status():
                 guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
                 return
-            print("DMM is ready.")
             self.record_status = True
 
         # Check Power Supply if requested
@@ -234,7 +233,6 @@ class TabLog(ThemedFrame):
             if not self.cc.get_ps_status():
                 guih.alert_user("Can't start record!", "Power Supply connection is not valid!", "error")
                 return
-            print("Power Supply is ready.")
             self.record_status = True
 
         if not self.record_status:
@@ -294,15 +292,13 @@ class TabLog(ThemedFrame):
 
     def organize_record_params(self):
         # FILENAME SETUP
-        # TODO: add more thoughts on file name forming
-        file_str_ext = self.output_file_name.get("1.0", "end").strip(
-            "\n")  # TODO: I THINK THIS CATEGORY NAME IS GETTING STRIPPED WRONG
-        if file_str_ext == "":
-            self.prompt.print("Detected blank file name, going to use default")
-            self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S',
-                                              localtime()) + '.csv'
-        else:
+        self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S',localtime())
+        file_str_ext = self.output_file_name.get("1.0", "end").strip("\n")
+        if file_str_ext != "":
+            self.recName += "_" + file_str_ext
             self.prompt.print(f"Using filename extension: {file_str_ext}")
+        self.recName += ".csv"
+        self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
 
         # CALL HELPER FUNCTIONS
         self.set_record_speed()
@@ -331,12 +327,14 @@ class TabLog(ThemedFrame):
 
         # DMM selected?
         if self.record_config["use_dmm"]:
-            dmm_params = ["DMM_Range", "DMM_Func1", "DMM_Meas1"]
+            # dmm_params = ["DMM_Range", "DMM_Func1", "DMM_Meas1"]
+            dmm_params = ["DMM_Meas1"]
             headers += dmm_params
 
         # Power Supply selected?
         if self.record_config["use_ps"]:
-            ps_params = ["PS_Vset", "PS_Iset", "PS_Vmeas", "PS_Imeas"]
+            # TODO: add multiple channel support for power supplies
+            ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
             headers += ps_params
 
         # SETUP CSV
@@ -354,19 +352,20 @@ class TabLog(ThemedFrame):
 
             # DMM data if requested
             if self.record_config.get("use_dmm", False):
-                row["DMM_Val1"] = self.cc.dmm.read_value()
+                row["DMM_Meas1"] = self.cc.dmm.read_value()
 
             # Power Supply data if requested
             if self.record_config.get("use_ps", False):
-                row["PS_V"] = self.cc.ps.get_voltage(1)
-                row["PS_I"] = self.cc.ps.get_current(1)
+                # row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
+                row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
+                row["PS_Imeas1"] = self.cc.ps.get_current(1)
 
             # Update record counter and UI
             self.recCnt += 1
             self.labelRNums.config(text=f'#{self.recCnt:7d}')
 
             # Append to CSV
-            self.csvh.add_row(row)
+            self.csvh.add_row_from_dict(row)
 
             # Wait for next sample
             time.sleep(self.record_speed)

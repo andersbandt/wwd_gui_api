@@ -33,11 +33,6 @@ class tabMainDashboard(ThemedFrame):
         self.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
-        # print welcome text_data
-        l1 = ttk.Label(self, text="Welcome to the WWD program!!!!", style="BW.TLabel",
-                       font=(self.theme_config["font"]["family"], 16))
-        l1.grid(column=0, row=0, columnspan=2)
-
         # add some other variables
         self.relay_btns = []
 
@@ -72,6 +67,10 @@ class tabMainDashboard(ThemedFrame):
 
     def initTabContent(self):
         print("Initializing tab 1 main dashboard")
+        # print welcome text_data
+        l1 = ttk.Label(self, text="Welcome to the WWD program!!!!", style="BW.TLabel",
+                       font=(self.theme_config["font"]["family"], 16))
+        l1.grid(column=0, row=0, columnspan=2)
         self.init_fr_main_status()
         self.init_fr_relay_control()
         self.init_fr_control()

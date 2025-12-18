@@ -124,6 +124,7 @@ class ConnFrame(ThemedFrame):
 
 
 # SerialConnFrame: just a basic serial connection frame
+# TODO: make some drop down where I can select connection method?
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
         super().__init__(master, name, connect_cmd, disconnect_cmd)
@@ -181,14 +182,15 @@ class SerialConnFrame(ConnFrame):
         # update port list
         ports = serial_api.get_ports(method=self.port_func)
 
-        prev_port = self.get_previous_port()
-        if prev_port in ports:
-            pass
-
         # add each port name to the drop down menu
         for string in ports:
             menu.add_command(label=string,
                              command=lambda value=string: self.com_drop[1].set(value))
+
+        # set value to previously used port (if available)
+        prev_port = self.get_previous_port()
+        if prev_port in ports:
+            self.com_drop[1].set(prev_port)
 
     def get_port(self):
         self.port = self.com_drop[1].get()

@@ -415,7 +415,8 @@ class tabPS(ThemedFrame):
             return False
 
     def port_close(self):
-        self.prompt.print(f"Close PYVISA resource!")
-        self.ps.close()
+        self.prompt.print(f"Closing PYVISA resource!")
+        self.ps.disconnect()
         self.fr_port.set_status(False)
         self.cc.set_ps(None)
+        self.prompt.print(f"Connection is closed.")

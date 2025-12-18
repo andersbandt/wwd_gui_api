@@ -96,7 +96,7 @@ def main(autoconnect):
 
     # tag:HARDCODE
     desired_w = 1300
-    desired_h = 700
+    desired_h = 900
     margin_w = 50
     margin_h = 125
 
@@ -105,6 +105,7 @@ def main(autoconnect):
     window.title("WWD GUI API")
 
     # Get screen size
+    # TODO: this could be a big ask ... but can I dynamically size elements if the screen size is small?
     ws = window.winfo_screenwidth()
     hs = window.winfo_screenheight()
 
@@ -114,7 +115,7 @@ def main(autoconnect):
 
     # Center placement
     x = (ws / 2) - (w / 4)
-    y = 70
+    y = 20
 
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 

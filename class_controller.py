@@ -65,7 +65,6 @@ class ClassController:
             return False
 
         # Update or create the appropriate element
-        # TODO: figure out how I can automatically remove duplicates here
         usage_elements = {child.tag: child for child in root}
         if usage in usage_elements:
             # If an element with the same usage already exists, update its value

@@ -4,13 +4,14 @@
 @date     May 2024
 @brief    control power supply test equipment
 """
-import logging
+
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
 
 # import needed packages
+import logging
 import time
 from datetime import datetime
 import pyvisa.errors
@@ -31,7 +32,7 @@ from gui.gui_class import ColorCircle
 from gui.guiTab_parent import ThemedFrame
 
 
-class tabPS(ThemedFrame):
+class TabPS(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
@@ -82,7 +83,6 @@ class tabPS(ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-            # self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
     def initTabContent(self):

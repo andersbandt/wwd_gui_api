@@ -60,12 +60,12 @@ class MainApplication(ThemedApp):
         self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
         self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        self.tab6 = guiTab_6_PS.tabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        # self.tab7 = guiTab_7_ATE.tabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control"]
-        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6]
+        self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7]
 
         # Add tabs dynamically using a loop
         for tab, name in zip(tabs, self.tab_names):
@@ -83,7 +83,7 @@ class MainApplication(ThemedApp):
         if selected_tab == self.tab_names[2]:
             guiTab_3_DMM.tabDMM.gui_refresh(self.tab3, "auto")
         elif selected_tab == self.tab_names[5]:
-            guiTab_6_PS.tabPS.gui_refresh(self.tab6, "auto")
+            guiTab_6_PS.TabPS.gui_refresh(self.tab6, "auto")
 
 
 ###########################################################

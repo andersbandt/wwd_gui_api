@@ -11,7 +11,25 @@ from EEequipment.fluke8842A.fluke8842A import Fluke8842A
 
 # connect to power supply and DMM
 ps = E3640A("GPIB0::5::INSTR")
-dmm = Fluke8842A("GPIB0::2::INSTR")
+# dmm = Fluke8842A("GPIB0::2::INSTR")
+
+
+
+
+ps.output_on(1)
+time.sleep(1)
+ps.check_status()
+ps.output_off(1)
+time.sleep(1)
+ps.check_status()
+ps.output_on(1)
+time.sleep(1)
+ps.check_status()
+ps.output_off(1)
+time.sleep(1)
+ps.check_status()
+#
+# quit()
 
 
 ### *IDN? TEST

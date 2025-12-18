@@ -235,10 +235,11 @@ class tabPS(ThemedFrame):
         else:
             self.ch1_toggle_btn.config(bg=self.theme_config["error"])
 
-        if status_decode["ch2_state"] == "ON":
-            self.ch2_toggle_btn.config(bg=self.theme_config["success"])
-        else:
-            self.ch2_toggle_btn.config(bg=self.theme_config["error"])
+        # TODO: elegantly handle multi-channel power supplies here
+        # if status_decode["ch2_state"] == "ON":
+        #     self.ch2_toggle_btn.config(bg=self.theme_config["success"])
+        # else:
+        #     self.ch2_toggle_btn.config(bg=self.theme_config["error"])
 
     def gui_refresh_channel_mode(self):
         if self.ps is not None:
@@ -249,7 +250,6 @@ class tabPS(ThemedFrame):
                 return
         else:
             return
-
 
         try:
             if status_decode["ch1_mode"] == "CV":
@@ -328,12 +328,12 @@ class tabPS(ThemedFrame):
         if self.ps is not None:
             # have to format input text_data box into float
             voltage = float(voltage_str)
-            self.ps.set_voltage(channel, voltage)
+            self.ps.set_voltage(voltage)
             self.prompt.print(f"Set voltage on channel {channel} to {voltage} V")
             if channel == 1:
-                self.ps_v1r = voltage
+                self.ps_v1s = voltage
             elif channel == 2:
-                self.ps_v2r = voltage
+                self.ps_v2s = voltage
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
 

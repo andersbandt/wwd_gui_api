@@ -3,4 +3,5 @@
     <USB_serial>dummy3</USB_serial>
     <DMM_Serial>GPIB0::2::INSTR</DMM_Serial>
     <ATE_serial>/dev/ttyACM4</ATE_serial>
+    <Generic_ATE>GPIB0::5::INSTR</Generic_ATE>
 </PortsUsed>

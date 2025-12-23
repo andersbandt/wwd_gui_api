@@ -17,36 +17,35 @@ from gui.guiTab_parent import ThemedFrame
 
 # import needed packages
 from datetime import datetime
+import time
 import pyvisa.errors
 
 
 import EEequipment
-import inspect, pkgutil, importlib, EEequipment
-# TODO: can I print out everything I imported and tie that into a drop down ???
+from EEequipment.TestEquipment import TestEquipment
+import inspect, pkgutil, importlib
 
 
+
+ALLOWED_BASES = (TestEquipment,)  # add DMMBase, PowerSupplyBase, etc., if available
 
 def get_instruments():
-    """
-    Return [(display_name, class_obj), ...] by walking all subpackages/submodules
-    within EEequipment. Only includes classes defined in their modules (no imports).
-    """
-    items = []
-    pkg_name = EEequipment.__name__
-    for module_info in pkgutil.walk_packages(EEequipment.__path__, prefix=f"{pkg_name}."):
-        modname = module_info.name
+    """Return {display_name: class_obj} by walking subpackages and filtering."""
+    reg = {}
+    base_pkg = EEequipment.__name__
+    for m in pkgutil.walk_packages(EEequipment.__path__, prefix=f"{base_pkg}."):
+        modname = m.name
         try:
             module = importlib.import_module(modname)
         except Exception:
-            continue  # Skip modules that fail to import
-
+            continue
         for name, obj in inspect.getmembers(module, inspect.isclass):
-            # Only include classes defined in this module (avoid re-exported ones)
-            if obj.__module__ == modname:
-                display = f"{modname}.{name}"  # e.g., EEequipment.power_supplies.E3640A.E3640A
-                items.append((display, obj))
-    return items
-
+            if obj.__module__ != modname:
+                continue
+            if any(obj is base or issubclass(obj, base) for base in ALLOWED_BASES) and obj not in ALLOWED_BASES:
+                display = name  # or f"{modname}.{name}" for uniqueness
+                reg[display] = obj
+    return reg
 
 
 
@@ -88,7 +87,6 @@ class TabATE(ThemedFrame):
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
 
-
     def initTabContent(self):
         print("Initializing tab 7 (ATE) content")
         self.init_fr_info()
@@ -98,11 +96,12 @@ class TabATE(ThemedFrame):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
+
         # add equipment selector dropdown
-        # initialize port list
+        self.registry = get_instruments()
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
-            get_instruments()
+            sorted(self.registry.keys())
         )
 
         # Add labels for device information
@@ -122,7 +121,6 @@ class TabATE(ThemedFrame):
         self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=2)
 
-
     def init_fr_control(self):
         fr_m = self.fr_control
 
@@ -135,6 +133,9 @@ class TabATE(ThemedFrame):
         self.cmd_button = ttk.Button(fr_m, text="Send", style="TButton",
                                       command=lambda: self.ate_command(self.cmd_entry.get())
                                       )
+        self.qry_button = ttk.Button(fr_m, text="Query", style="TButton",
+                                      command=lambda: self.ate_query(self.cmd_entry.get())
+                                      )
 
 
         # MISC CONTROL
@@ -146,20 +147,31 @@ class TabATE(ThemedFrame):
         self.cmd_label.grid(row=1, column=0, padx=10, pady=10)
         self.cmd_entry.grid(row=1, column=1, padx=10, pady=10)
         self.cmd_button.grid(row=1, column=2, padx=10, pady=10)
+        self.qry_button.grid(row=1, column=3, padx=10, pady=10)
         self.benchmark.grid(row=2, column=0, padx=10, pady=10)
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
 
-
     def ate_command(self, command_str):
         if self.ate is not None:
-            self.ate.send_command(command_str)
+            self.ate.send_cmd(command_str)
 
+    def ate_query(self, command_str):
+        if self.ate is not None:
+            res = self.ate.query(command_str)
+            self.prompt.print(f"Got response: {res}")
+
+
+    # TODO: might need a drop down on the benchark method choice... some equipment test_conn doesn't work?
     def ate_benchmark(self):
         if self.ate is not None:
-            self.ate.benchmark()
+            self.prompt.print("Running benchmark with the `test_conn` function")
+            time.sleep(0.2)
+            bench_result = self.ate.benchmark(100, self.ate.test_conn)
+            self.prompt.print(bench_result["string"])
+            guih.alert_user("Benchmark complete!", bench_result["string"], "info")
 
 
     #################################
@@ -169,10 +181,8 @@ class TabATE(ThemedFrame):
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
         self.prompt.print("Connect to PYVISA resource!")
-        port = self.fr_port.get_port()
-
-        # TODO: need to somehow grab a dropdown of selectable classes here
-        self.ate = EEequipment.E3640A.E3640A.E3640A(port)
+        ate_temp = self.registry[self.ate_drop[1].get()]
+        self.ate = ate_temp(self.fr_port.get_port())
 
         try:
             self.id = self.ate.test_conn()
@@ -185,32 +195,25 @@ class TabATE(ThemedFrame):
             self.fr_port.set_status(False)
 
         if self.id:  # CONNECTION SUCCESS
-            self.prompt.print(f"Connected to PS with id: {self.id}")
-            self.cc.set_ps(self.ps)
+            self.prompt.print(f"Connected to ATE with id: {self.id}")
             self.labelIDValue.config(text=self.id)
             self.labelTimeConnectedValue.config(
                 text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             )
             self.fr_port.set_status(True)
 
-            # turn channels off and set voltages
-            self.ps.output_off(1)
-            self.ps.output_off(2)
-            self.ch1_on = 0
-            self.ch2_on = 0
-
             # gui refresh
-            self.gui_refresh_channel_state()
+            # self.gui_refresh()
             return True
         else:  # BAD ID received
             self.ps = None
             self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
+            tkmb.showerror("Device error", "Device at does not respond or is not correct config")
             return False
 
     def port_close(self):
         self.prompt.print(f"Closing PYVISA resource!")
-        self.ps.disconnect()
+        self.ate.disconnect()
         self.fr_port.set_status(False)
         self.cc.set_ps(None)
         self.prompt.print(f"Connection is closed.")

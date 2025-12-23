@@ -298,7 +298,7 @@ class tabXDS110(ThemedFrame):
         ### FLASH FIRMWARE
         # apply time delay (if added)
         sleep_second = self.entry_timesleep.get()
-        if guih.is_float(sleep_second):
+        if type(sleep_second) == float:
             time.sleep(float(sleep_second))
         elif sleep_second != '':
             guih.alert_user("Invalid sleep duration.", "Input is not an integer", "error")
@@ -326,13 +326,10 @@ class tabXDS110(ThemedFrame):
         # auto shut off of target
         if self.var_autooff.get():
             wait_seconds = int(self.entry_timeautoff.get())
-            if guih.is_float(wait_seconds):
-                self.after_call_id = self.after(wait_seconds * 1000, lambda: self.turn_power_off(flash_option))
-                return True
-            else:
-                return False
-
-        return True
+            self.after_call_id = self.after(wait_seconds * 1000, lambda: self.turn_power_off(flash_option))
+            return True
+        else:
+            return False
 
     def load_config(self):
         """

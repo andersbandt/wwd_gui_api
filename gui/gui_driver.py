@@ -5,6 +5,8 @@
 @brief    critical GUI code to launch Tkinter notebook
 """
 
+# TODO: add some scrollbars to each of the frames
+
 # import needed packages
 import tkinter as tk
 from tkinter import ttk

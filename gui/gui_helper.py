@@ -8,7 +8,6 @@
 # import needed modules
 from tkinter import *
 from tkinter import messagebox
-import math
 
 
 ##############################################################################
@@ -35,26 +34,6 @@ def generate_drop_down(frame, options, callback_func=None):
 
 
 ##############################################################################
-####      DATA VERIFICATION FUNCTIONS           ##############################
-##############################################################################
-
-def is_int(integer_maybe):
-    try:
-        int(integer_maybe)
-    except Exception:
-        return False
-    return True
-
-
-def is_float(float_maybe):
-    try:
-        float(float_maybe)
-    except Exception:
-        return False
-    return True
-
-
-##############################################################################
 ####      PROMPT/ALERT FUNCTIONS           ###################################
 ##############################################################################
 
@@ -78,34 +57,4 @@ def alert_user(title, message, kind):
     show_method(title, message)
 
 
-# initialize an empty string
-def convertTuple(tup):
-    string = ''
-    for item in tup:
-        string = string + item
-    return string
 
-
-##############################################################################
-####      TREE FUNCTIONS           ###########################################
-##############################################################################
-
-# drawLine: draws a line between coordinates (x1, y1) and (x2, y2) on 'canvas'
-def drawLine(canvas, x1, y1, x2, y2):
-    canvas.create_line(x1, y1, x2, y2, tags="line")
-
-def paintBranch(canvas, depth, x1, y1, length, angle):
-    if depth >= 0:
-        x2 = x1 + int(math.cos(angle) * length)
-        y2 = y1 + int(math.sin(angle) * length)
-
-        # Draw the line
-        drawLine(canvas, x1, y1, x2, y2)
-
-        angleFactor = math.pi / 5
-        sizeFactor = 0.58
-
-        # Draw the left branch
-        paintBranch(canvas, depth - 1, x2, y2, length * sizeFactor, angle + angleFactor)
-        # Draw the right branch
-        paintBranch(canvas, depth - 1, x2, y2, length * sizeFactor, angle - angleFactor)

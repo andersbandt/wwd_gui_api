@@ -50,7 +50,7 @@ class TabLog(ThemedFrame):
 
         # place everything in grid
         self.fr_status.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
+        self.fr_setup.grid(row=1, column=1, rowspan=2, pady=15, padx=15)
         self.fr_analysis.grid(row=2, column=0, pady=15, padx=15)
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
@@ -111,7 +111,7 @@ class TabLog(ThemedFrame):
                         text="Use Serial",
                         variable=self.var_use_ser,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=0, pady=10)
+                        offvalue=0).grid(row=4, column=0, pady=2)
 
         self.var_use_dmm = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
@@ -136,22 +136,22 @@ class TabLog(ThemedFrame):
         btn_start_entry = tk.Button(self.fr_setup, text="Start Record",
                                  command=lambda: self.start_record(),
                                  bg=self.theme_config["success"], fg="white", height=2, width=15)
-        btn_start_entry.grid(row=5, column=1, padx=15, pady=22)
+        btn_start_entry.grid(row=5, column=1, padx=15, pady=5)
 
         # set up button STOP recording
         btn_stop_entry = tk.Button(self.fr_setup, text="Stop Record",
                                 command=lambda: self.stop_record(),
                                 bg=self.theme_config["error"], fg="white", height=2, width=15)
-        btn_stop_entry.grid(row=5, column=2, padx=15, pady=22)
+        btn_stop_entry.grid(row=5, column=2, padx=15, pady=5)
 
         self.labelRNums = ttk.Label(self.fr_setup, text='', width=8, relief='sunken')
         self.labelRNums.grid(row=5, column=3, padx=10, pady=10, sticky='W')
 
         # set up button START live GRAPH
-        btn_stop_entry = tk.Button(self.fr_setup, text="Live Graph",
+        btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
                                 command=lambda: None,
                                 bg=self.theme_config["dark_3"], fg="white", height=2, width=15)
-        btn_stop_entry.grid(row=6, column=1, pady=12)
+        btn_live_graph.grid(row=6, column=1, pady=5)
 
     def init_fr_analysis(self):
         # Create a StringVar to hold the selected file path

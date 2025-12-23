@@ -48,6 +48,8 @@ class ClassController:
             return self.relay.status
 
 
+    # TODO: I don't think this thing can add or even detect if the XML tag isn't in there (say if I add a new tab)
+    # TODO: I don't think this thing can handle multiple tabs having the same port either ... ?
     def set_used_port(self, port, usage):
         self.ports_used[port] = usage
 

@@ -68,14 +68,13 @@ class tabDMM(ThemedFrame):
         self.initTabContent()
 
         # set up port
-        # TODO: somehow make this port_func VISIBLE and CHANGABLE
         self.fr_port = guic.SerialConnFrame(
             self,
             self.cc,
             "DMM_Serial",
             self.port_init,
             self.port_close,
-            port_func=3
+            port_func=2
         )
         self.fr_port.initialize_fr()
         if autoconnect:
@@ -365,8 +364,8 @@ class tabDMM(ThemedFrame):
         port = self.fr_port.get_port()
 
         # TODO: conditional connect based on model!!!
-        # self.dmm = XDM1041(port, "XDM1041")
-        self.dmm = Fluke8842A(port)
+        self.dmm = XDM1041(port)
+        # self.dmm = Fluke8842A(port)
 
         time.sleep(1)
         self.dmm_id = self.dmm.test_conn()

@@ -7,6 +7,8 @@
 
 # TODO: add some scrollbars to each of the frames
 
+# TODO: autoconnect somehow needs an option to toggle which tabs get autconnected
+
 # import needed packages
 import tkinter as tk
 from tkinter import ttk

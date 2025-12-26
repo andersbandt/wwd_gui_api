@@ -242,12 +242,9 @@ class TabPS(ThemedFrame):
         #     self.ch2_toggle_btn.config(bg=self.theme_config["error"])
 
     def gui_refresh_channel_mode(self):
+        # TODO: I'm not properly stt
         if self.ps is not None:
-            try:
-                status_decode = self.ps.check_status()
-            except ValueError:
-                self.ps = None
-                return
+            status_decode = self.ps.check_status()
         else:
             return
 
@@ -377,8 +374,9 @@ class TabPS(ThemedFrame):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
-        # self.ps = SPD3303X.SPD3303X(port)
-        self.ps = EEequipment.E3640A.E3640A.E3640A(port)
+        # TODO: this thing needs to be dynamic ... copy my tab7 shit
+        self.ps = SPD3303X.SPD3303X(port)
+        # self.ps = EEequipment.E3640A.E3640A.E3640A(port)
 
         try:
             self.id = self.ps.test_conn()
@@ -418,5 +416,8 @@ class TabPS(ThemedFrame):
         self.prompt.print(f"Closing PYVISA resource!")
         self.ps.disconnect()
         self.fr_port.set_status(False)
+
+        # TODO: big change. Can I just completely rely on one or the other variable here? just self.cc probably?
         self.cc.set_ps(None)
+        self.ps = None
         self.prompt.print(f"Connection is closed.")

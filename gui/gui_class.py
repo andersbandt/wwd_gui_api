@@ -131,32 +131,51 @@ class SerialConnFrame(ConnFrame):
         super().__init__(master, name, connect_cmd, disconnect_cmd)
         self.cc = class_controller
 
-        # NOTE: port_func is for tracking what method is used for populating array of ports
+        # set up connection options
         self.port_func = port_func  # NONE defaults to OS detection method. 1=Windows, 2=Linux, 3=PyVISA
+        self.port_func_options = {
+            "Auto (OS detection)": 0,
+            "Windows (COM ports)": 1,
+            "Linux (/dev/tty*)": 2,
+            "PyVISA": 3,
+        }
+
+        # GUI elements
+        self.port_func_drop = None
         self.com_drop = None
         self.baud_drop = None
 
         self.initialize_fr()
 
     def initialize_fr(self):
-        # Button to refresh the list of COM ports
+        # initialize port connection method dropdown
+        self.port_func_drop = guih.generate_drop_down(
+            self,
+            list(self.port_func_options.keys())
+        )
+        self.port_func_drop[0].grid(row=0, column=1, padx=3, pady=10)
+
+        # add Button for refreshing port list
+        update_conn_button = tk.Button(self, text="Update method",
+                                   command=self.set_port_func,
+                                   bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
+        update_conn_button.grid(row=0, column=2, pady=1)
+
+        # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",
                                    command=self.refresh_ports,
                                    bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
-        refresh_button.grid(row=1, column=2, columnspan=1, pady=1)
+        refresh_button.grid(row=1, column=2, pady=1)
 
-        # initialize port list
+        # initialize port list dropdown
         self.com_drop = guih.generate_drop_down(
             self,
             serial_api.get_ports(method=self.port_func)
         )
         self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
+        self.refresh_ports(first_run=True)
 
-        # Initial port list
-        self.refresh_ports()
-
-        # Button to refresh the list of COM ports
-        # TARGET - BUTTON/STATUS
+        # add Buttons for Connect / Disconnect
         btn_connect_serial = tk.Button(self, text="Connect to COM",
                                        command=self.connect,
                                        bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=1,
@@ -176,22 +195,31 @@ class SerialConnFrame(ConnFrame):
         if self.status and set_used_port:
             self.cc.set_used_port(self.port, self.name)
 
-    def refresh_ports(self):
+    def set_port_func(self):
+        selected_label = self.port_func_drop[1].get()
+        self.port_func = self.port_func_options[selected_label]
+        self.refresh_ports()
+
+    def refresh_ports(self, first_run=False):
         menu = self.com_drop[0]["menu"]
         menu.delete(0, "end")
 
         # update port list
         ports = serial_api.get_ports(method=self.port_func)
 
-        # add each port name to the drop down menu
+        # add each port name to the drop-down menu
         for string in ports:
             menu.add_command(label=string,
                              command=lambda value=string: self.com_drop[1].set(value))
 
+        if not self.status:
+            self.com_drop[1].set(ports[0])
+
         # set value to previously used port (if available)
-        prev_port = self.get_previous_port()
-        if prev_port in ports:
-            self.com_drop[1].set(prev_port)
+        if first_run:
+            prev_port = self.get_previous_port()
+            if prev_port in ports:
+                self.com_drop[1].set(prev_port)
 
     def get_port(self):
         self.port = self.com_drop[1].get()

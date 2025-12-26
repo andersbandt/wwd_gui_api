@@ -169,7 +169,8 @@ class TabATE(ThemedFrame):
         if self.ate is not None:
             self.prompt.print("Running benchmark with the `test_conn` function")
             time.sleep(0.2)
-            bench_result = self.ate.benchmark(100, self.ate.test_conn)
+            # bench_result = self.ate.benchmark(100, self.ate.test_conn)
+            bench_result = self.ate.benchmark(100, self.ate.read_value)
             self.prompt.print(bench_result["string"])
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")
 

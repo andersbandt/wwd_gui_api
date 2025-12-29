@@ -356,7 +356,7 @@ class TabLog(ThemedFrame):
 
             # Power Supply data if requested
             if self.record_config.get("use_ps", False):
-                # row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
+                row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
                 row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
                 row["PS_Imeas1"] = self.cc.ps.get_current(1)
 

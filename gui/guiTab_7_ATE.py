@@ -186,14 +186,13 @@ class TabATE(ThemedFrame):
         self.ate = ate_temp(self.fr_port.get_port())
 
         try:
+            import usb
             self.id = self.ate.test_conn()
-        except AttributeError as e:
+            # TODO: standardize the error exceptions below?
+        except (AttributeError, pyvisa.errors.VisaIOError, usb.core.USBError) as e:
             guih.alert_user("Can't connect to VISA", e, "warning")
             self.fr_port.set_status(False)
             return False
-        except pyvisa.errors.VisaIOError as e:
-            guih.alert_user("Can't connect to VISA", e, "error")
-            self.fr_port.set_status(False)
 
         if self.id:  # CONNECTION SUCCESS
             self.prompt.print(f"Connected to ATE with id: {self.id}")
@@ -204,10 +203,10 @@ class TabATE(ThemedFrame):
             self.fr_port.set_status(True)
 
             # gui refresh
-            # self.gui_refresh()
+            self.gui_refresh()
             return True
         else:  # BAD ID received
-            self.ps = None
+            self.ate = None
             self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at does not respond or is not correct config")
             return False

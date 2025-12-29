@@ -15,6 +15,7 @@ import logging
 import time
 from datetime import datetime
 import pyvisa.errors
+import usb.core
 
 import EEequipment.E3640A.E3640A
 from analysis.csv_helper import CSVHelper
@@ -274,16 +275,12 @@ class TabPS(ThemedFrame):
     ##############################################################################
 
     def update_PS(self, kind="partial"):
-        print(f"Updating ({kind}) ps ...")
         if self.fr_port.status:
-            # self.ps_v1s = self.ps.get_set_voltage(1)
-            # self.ps_v2s = self.ps.get_set_voltage(2)
             self.ps_v1r = self.ps.get_voltage(1)
             self.ps_v2r = self.ps.get_voltage(2)
             self.ps_i1 = self.ps.get_current(1)
             self.ps_i2 = self.ps.get_current(2)
 
-        print("... done updating, now calling `gui_refresh`")
         self.gui_refresh("call")
 
     def toggle_channel(self, channel):
@@ -380,13 +377,10 @@ class TabPS(ThemedFrame):
 
         try:
             self.id = self.ps.test_conn()
-        except AttributeError as e:
+        except (pyvisa.errors.VisaIOError, usb.core.USBError) as e:
             guih.alert_user("Can't connect to VISA", e, "warning")
             self.fr_port.set_status(False)
             return False
-        except pyvisa.errors.VisaIOError as e:
-            guih.alert_user("Can't connect to VISA", e, "error")
-            self.fr_port.set_status(False)
 
         if self.id:  # CONNECTION SUCCESS
             self.prompt.print(f"Connected to PS with id: {self.id}")

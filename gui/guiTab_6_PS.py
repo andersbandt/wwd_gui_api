@@ -63,7 +63,7 @@ class TabPS(ThemedFrame):
         self.data_dir = "data/ps_data/"
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=140)
+        self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=110)
 
         # initialize tab content
         self.initTabContent()
@@ -269,6 +269,7 @@ class TabPS(ThemedFrame):
         self.gui_refresh_info(event)
         self.gui_refresh_channel_mode()
         self.gui_refresh_channel_state()
+        self.fr_port.refresh_ports()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################

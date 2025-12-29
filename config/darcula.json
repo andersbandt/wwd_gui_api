@@ -42,6 +42,12 @@
         "background": "#2B2B2B",
         "foreground": "#A9B7C6"
     },
+    "size": {
+      "hpad": 10,
+      "vpad": 5,
+      "w_prompt": 110,
+      "h_prompt": 14
+    },
     "light_1": "#FF79C6",
     "light_2": "#282A36",
     "light_3": "#F1FA8C",

@@ -81,13 +81,18 @@ class MainApplication(ThemedApp):
     def on_tab_changed(self, event):
         selected_tab = event.widget.tab(event.widget.select(), "text")
         if selected_tab == self.tab_names[0]:
-            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
-        if selected_tab == self.tab_names[1]:
+            guiTab_1_mainDashboard.TabMainDashboard.gui_refresh(self.tab1, "auto")
+        elif selected_tab == self.tab_names[1]:
             guiTab_2_LOG.TabLog.gui_refresh(self.tab2, "auto")
-        if selected_tab == self.tab_names[2]:
-            guiTab_3_DMM.tabDMM.gui_refresh(self.tab3, "auto")
+        elif selected_tab == self.tab_names[2]:
+            guiTab_3_DMM.TabDMM.gui_refresh(self.tab3, "auto")
+        elif selected_tab == self.tab_names[3]:
+            guiTab_5_USB.TabUSB.gui_refresh(self.tab5, "auto")
         elif selected_tab == self.tab_names[5]:
             guiTab_6_PS.TabPS.gui_refresh(self.tab6, "auto")
+        elif selected_tab == self.tab_names[6]:
+            guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
+
 
 
 ###########################################################

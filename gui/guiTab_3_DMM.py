@@ -28,7 +28,7 @@ from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
 
-class tabDMM(ThemedFrame):
+class TabDMM(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
@@ -173,6 +173,8 @@ class tabDMM(ThemedFrame):
             self.PT100_Unit = self.PT100UnitList[0]
 
     def gui_refresh(self, event):
+        self.fr_port.refresh_ports()
+
         # refresh DMM information
         if self.fr_port.status:
             if event == "auto":

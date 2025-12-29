@@ -22,7 +22,7 @@ from gui import gui_class as guic
 from gui.guiTab_parent import ThemedFrame
 
 
-class tabUSB(ThemedFrame):
+class TabUSB(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
@@ -38,7 +38,10 @@ class tabUSB(ThemedFrame):
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
 
-        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=140)
+        self.prompt1 = guic.Prompt(self,
+                                   "Debug serial",
+                                   height=self.theme_config["size"]["h_prompt"],
+                                   width=self.theme_config["size"]["w_prompt"])
         self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
@@ -98,6 +101,18 @@ class tabUSB(ThemedFrame):
         self.output_file_name = Text(self.fr_state, height=2, width=20)
         self.output_file_name.grid(row=3, column=3)
 
+    def gui_refresh(self, event):
+        self.fr_port.refresh_ports()
+
+        if self.ser_obj is not None:
+            if self.ser_obj.serStatus is False:
+                # TODO: here is where I can add back that printout to the log that like "USB DISCONNECTED"
+                self.ser_obj.stop_process()
+                self.fr_port.set_status(False)
+                self.t1.stop()
+        else:
+            self.fr_port.set_status(True)
+
     ##############################################################################
     ####      BUTTON ACTION FUNCTIONS        #####################################
     ##############################################################################
@@ -145,14 +160,6 @@ class tabUSB(ThemedFrame):
     #################################
     #### THREADS SHIT    ############
     #################################
-
-    def gui_refresh(self, event):
-        if self.ser_obj.serStatus is False:
-            self.ser_obj.stop_process()
-            self.fr_port.set_status(False)
-            self.t1.stop()
-        else:
-            self.fr_port.set_status(True)
 
     # TODO ATE (low-priority with new FTDI module implementation): try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
     def manage_connection(self):

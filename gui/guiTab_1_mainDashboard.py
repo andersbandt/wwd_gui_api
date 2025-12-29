@@ -25,7 +25,7 @@ from gui.guiTab_parent import ThemedFrame
 #   actually seems like I can connect but there is no status update
 
 
-class tabMainDashboard(ThemedFrame):
+class TabMainDashboard(ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
@@ -49,7 +49,7 @@ class tabMainDashboard(ThemedFrame):
         self.canvas1 = tk.Canvas(self.fr_main_status, width=50, height=50)
 
         # setup prompt
-        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=140)
+        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=110)
         self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
@@ -149,6 +149,7 @@ class tabMainDashboard(ThemedFrame):
                 guih.alert_user("Can't refresh relay!", "Relay is not connected", "error")
 
         # update serial status
+        self.fr_port.refresh_ports()
         if self.ser_obj is not None:
             if self.ser_obj.serStatus is False:
                 self.ser_obj.stop_process()

@@ -65,7 +65,7 @@ class TabATE(ThemedFrame):
         self.ate = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "ATE Output", height=18, width=140)
+        self.prompt = guic.Prompt(self, "ATE Output", height=18, width=110)
 
         # initialize tab content
         self.initTabContent()
@@ -149,6 +149,9 @@ class TabATE(ThemedFrame):
         self.cmd_button.grid(row=1, column=2, padx=10, pady=10)
         self.qry_button.grid(row=1, column=3, padx=10, pady=10)
         self.benchmark.grid(row=2, column=0, padx=10, pady=10)
+
+    def gui_refresh(self, event):
+        self.fr_port.refresh_ports()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################

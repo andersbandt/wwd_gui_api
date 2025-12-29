@@ -124,8 +124,6 @@ class ConnFrame(ThemedFrame):
 
 
 # SerialConnFrame: just a basic serial connection frame
-# TODO: make some drop down where I can select connection method?
-# TODO: automatically refresh port list when I tab into a tab
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
         super().__init__(master, name, connect_cmd, disconnect_cmd)
@@ -212,8 +210,12 @@ class SerialConnFrame(ConnFrame):
             menu.add_command(label=string,
                              command=lambda value=string: self.com_drop[1].set(value))
 
-        if not self.status:
-            self.com_drop[1].set(ports[0])
+        # TODO: is this helpful / needed to have below? Setting the port list values?
+        # if not self.status:
+        #     try:
+        #         self.com_drop[1].set(ports[0])
+        #     except IndexError:
+        #         self.com_drop[1].set(None)
 
         # set value to previously used port (if available)
         if first_run:

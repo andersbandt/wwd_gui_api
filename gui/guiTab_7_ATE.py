@@ -65,7 +65,11 @@ class TabATE(ThemedFrame):
         self.ate = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "ATE Output", height=18, width=110)
+        self.prompt = guic.Prompt(self,
+                                   "ATE Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
         self.initTabContent()

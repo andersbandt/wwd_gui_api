@@ -38,7 +38,10 @@ class tabXDS110(ThemedFrame):
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "XDS110 Comms", height=22, width=140)
+        self.prompt = guic.Prompt(self,
+                                   "XDS110 Comms",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab

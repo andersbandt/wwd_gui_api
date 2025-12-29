@@ -43,7 +43,10 @@ class TabLog(ThemedFrame):
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "Data Logger Output", height=18, width=115)
+        self.prompt = guic.Prompt(self,
+                                   "Data Logger Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
 
         # initialize tab content
         self.initTabContent()
@@ -242,7 +245,7 @@ class TabLog(ThemedFrame):
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument
         self.prompt.print(f"Starting Logging record every {self.record_speed} seconds ...")
         self.record_status = True
-        threading.Thread(target=self.thread_record, daemon=True).start() # TODO: added this daemon thing, do we need it?
+        threading.Thread(target=self.thread_record).start()
 
     def stop_record(self):
         self.record_status = False

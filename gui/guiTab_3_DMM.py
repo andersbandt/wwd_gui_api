@@ -61,7 +61,10 @@ class TabDMM(ThemedFrame):
         self.csvh = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "DMM Console Output", height=21, width=140)
+        self.prompt = guic.Prompt(self,
+                                   "DMM Console Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content

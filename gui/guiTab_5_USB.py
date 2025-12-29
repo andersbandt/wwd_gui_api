@@ -38,12 +38,11 @@ class TabUSB(ThemedFrame):
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
 
-        # TODO: make sure all prompts use this theme_config sizing
-        self.prompt1 = guic.Prompt(self,
+        self.prompt = guic.Prompt(self,
                                    "Debug serial",
-                                   height=self.theme_config["size"]["h_prompt"],
-                                   width=self.theme_config["size"]["w_prompt"])
-        self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
@@ -121,19 +120,19 @@ class TabUSB(ThemedFrame):
     def activate_test_mode(self):
         command = "DAGA"  # tag:HARDCODE
         my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.prompt1.print(f"INFO: issuing command {command} ...")
+        self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj.serStatus:
             # send the TEST MODE command for ACTIVATION
             self.ser_obj.send_data(command)
-            self.prompt1.print(f"INFO: issued command!\n")
+            self.prompt.print(f"INFO: issued command!\n")
             self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
         else:
-            self.prompt1.print("ERROR: can't issue command, no serial connection\n")
+            self.prompt.print("ERROR: can't issue command, no serial connection\n")
             self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
 
     def set_test_type(self):
         test_type_command = self.test_drop[1].get()
-        self.prompt1.print(f"INFO: test type {test_type_command} ...")
+        self.prompt.print(f"INFO: test type {test_type_command} ...")
         if test_type_command == "flash-read":
             command = "FR91"
         elif test_type_command == "flash-read-all":
@@ -149,13 +148,13 @@ class TabUSB(ThemedFrame):
             print("Fuck man no known test command")
             return False
 
-        self.prompt1.print(f"INFO: issuing command {command} ...")
+        self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj.serStatus:
             self.ser_obj.send_data(command)
-            self.prompt1.print(f"INFO: issued command!\n")
+            self.prompt.print(f"INFO: issued command!\n")
             return True
         else:
-            self.prompt1.print("ERROR: can't issue command, no serial connection\n")
+            self.prompt.print("ERROR: can't issue command, no serial connection\n")
             return False
 
     #################################
@@ -200,23 +199,23 @@ class TabUSB(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.prompt1.print(f"Init with port: {port}")
+        self.prompt.print(f"Init with port: {port}")
         try:
             self.ser_obj = SerialReader(port, 115200)
         except serial.serialutil.SerialException as e:
-            self.prompt1.print(f"ERROR: {e}")
-            self.prompt1.print(f"Can't init with port\n")
+            self.prompt.print(f"ERROR: {e}")
+            self.prompt.print(f"Can't init with port\n")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
         threading.Thread(target=self.thread_print_display).start()
         # threading.Timer(1.0, self.thread_print_display).start() # NOTE: I possiblyy had this 1 second delayyy in there for a reason?
-        self.prompt1.print("Init successful!\n")
+        self.prompt.print("Init successful!\n")
         return True
 
     def port_close(self):
         print("xxxx seial cclose")
-        self.prompt1.print("Serial close!")
+        self.prompt.print("Serial close!")
         self.ser_obj.stop_process()
         self.fr_port.set_status(False)
         self.t2.stop()

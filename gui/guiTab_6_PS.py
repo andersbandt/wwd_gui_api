@@ -63,7 +63,10 @@ class TabPS(ThemedFrame):
         self.data_dir = "data/ps_data/"
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=110)
+        self.prompt = guic.Prompt(self,
+                                   "PS Console Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
 
         # initialize tab content
         self.initTabContent()

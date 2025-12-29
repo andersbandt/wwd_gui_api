@@ -49,8 +49,11 @@ class TabMainDashboard(ThemedFrame):
         self.canvas1 = tk.Canvas(self.fr_main_status, width=50, height=50)
 
         # setup prompt
-        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=110)
-        self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt = guic.Prompt(self,
+                                   "Main",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
         self.initTabContent()
@@ -145,7 +148,7 @@ class TabMainDashboard(ThemedFrame):
                     btn.config(style="TButtonOff.TButton")
         else:
             if event == "call":
-                self.prompt1.print("Can't refresh relay state with disconnected relay", "error")
+                self.prompt.print("Can't refresh relay state with disconnected relay", "error")
                 guih.alert_user("Can't refresh relay!", "Relay is not connected", "error")
 
         # update serial status
@@ -163,7 +166,7 @@ class TabMainDashboard(ThemedFrame):
             usbrelay_controller.USBRelayController(usb_dev)
         )
         if usb_dev is not None:
-            self.prompt1.print("Autoconnect success")
+            self.prompt.print("Autoconnect success")
             self.fr_main_status.set_status(True)
             self.init_fr_main_status()
         else:
@@ -187,14 +190,14 @@ class TabMainDashboard(ThemedFrame):
                 try:
                     self.ser_obj.send_data(command)
                 except serial.serialutil.SerialException:
-                    self.prompt1.print("ERROR: self.ser_obj is defined but status is FALSE", "error")
+                    self.prompt.print("ERROR: self.ser_obj is defined but status is FALSE", "error")
                     guih.alert_user("Can't send serial data", "Really can't send any shit. Probably I/O error?", "error")
-                self.prompt1.print(f"INFO: issued command {command} ...")
+                self.prompt.print(f"INFO: issued command {command} ...")
             else:
-                self.prompt1.print(f"ERROR: self.ser_obj exists but serStatus is false", "error")
+                self.prompt.print(f"ERROR: self.ser_obj exists but serStatus is false", "error")
 
         except AttributeError:
-            self.prompt1.print("ERROR: probably self.ser_obj is None", "error")
+            self.prompt.print("ERROR: probably self.ser_obj is None", "error")
 
     def open_config_ini(self):
         file_path = os.getcwd() + "/EEequipment/usbrelay/config.ini"  #tag:HARDCODE
@@ -232,20 +235,20 @@ class TabMainDashboard(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.prompt1.print(f"Init with port: {port}")
+        self.prompt.print(f"Init with port: {port}")
         try:
             self.ser_obj = SerialReader(port,
                                         9600)
         except serial.serialutil.SerialException as e:
-            self.prompt1.print(f"Can't init with port: {e}", "error")
+            self.prompt.print(f"Can't init with port: {e}", "error")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
-        self.prompt1.print("Init successful!\n")
+        self.prompt.print("Init successful!\n")
         return True
 
     def port_close(self):
-        self.prompt1.print("Serial close!")
+        self.prompt.print("Serial close!")
         try:
             self.ser_obj.stop_process()
         except AttributeError:

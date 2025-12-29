@@ -7,11 +7,8 @@
 
 # import needed packages
 import time
-import tkinter as tk
 from tkinter import *
-from tkinter import ttk
 from tkinter import filedialog
-import threading
 import configparser
 import os
 

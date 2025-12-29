@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk
 import os
 import time
+import configparser
 
 # import ClassController
 from class_controller import ClassController
@@ -30,7 +31,33 @@ from gui import guiTab_6_PS
 from gui import guiTab_7_ATE
 
 
-# TODO: (small) change all the class names to CamelCase with TabXxx
+
+def parse_autoconnect_config():
+    # initialize the config parser
+    config_file_path = "config/master.ini"
+    if os.path.exists(config_file_path):
+        config = configparser.ConfigParser()
+        config.read(config_file_path)
+    else:
+        print(f"Configuration file {config_file_path} does not exist.")
+        raise BaseException
+
+    # Ensure the section and option exist
+    if "AUTOCONNECT" not in config:
+        raise KeyError("Missing [AUTOCONNECT] section in config.")
+
+    # read in parameters from the config file
+    autoconn_vars = []
+    for i in range(1, 8):
+        tmp = config["AUTOCONNECT"][f"tab_{i}"]
+        if tmp.strip().upper() == "YES":
+            autoconn_vars.append(True)
+        else:
+            autoconn_vars.append(False)
+    return autoconn_vars
+
+
+
 class MainApplication(ThemedApp):
     def __init__(self, window, height, width, theme_file, autoconnect):
         super().__init__(window, theme_file)
@@ -58,14 +85,21 @@ class MainApplication(ThemedApp):
 
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
-        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath,
-                                                            "config/darcula.json", self.autoconnect)
+
+        # setup autoconnect array
+        if self.autoconnect:
+            autoconnect = parse_autoconnect_config()
+        else:
+            autoconnect = [False for i in range(8)]
+
+        # create Tab objects
+        self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,"config/darcula.json", autoconnect[0])
         self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+        self.tab3 = guiTab_3_DMM.TabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[2])
         self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+        self.tab5 = guiTab_5_USB.TabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[4])
+        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[5])
+        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[6])
 
         # Define an array of tab names
         self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE"]
@@ -94,7 +128,6 @@ class MainApplication(ThemedApp):
             guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
 
 
-
 ###########################################################
 ######################### MAIN ############################
 ###########################################################
@@ -115,6 +148,7 @@ def main(autoconnect):
 
     # Get screen size
     # TODO: this could be a big ask ... but can I dynamically size elements if the screen size is small?
+    #   bonus points if I can update the theme_config based on sizing
     ws = window.winfo_screenwidth()
     hs = window.winfo_screenheight()
 

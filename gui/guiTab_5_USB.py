@@ -38,6 +38,7 @@ class TabUSB(ThemedFrame):
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
 
+        # TODO: make sure all prompts use this theme_config sizing
         self.prompt1 = guic.Prompt(self,
                                    "Debug serial",
                                    height=self.theme_config["size"]["h_prompt"],

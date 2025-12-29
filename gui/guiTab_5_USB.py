@@ -214,7 +214,6 @@ class TabUSB(ThemedFrame):
         return True
 
     def port_close(self):
-        print("xxxx seial cclose")
         self.prompt.print("Serial close!")
         self.ser_obj.stop_process()
         self.fr_port.set_status(False)

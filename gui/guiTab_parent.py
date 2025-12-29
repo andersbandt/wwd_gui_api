@@ -116,7 +116,6 @@ class ThemedFrame(tk.Frame):
                                    self.theme_config["h1"]["size"],
                                    self.theme_config["h1"]["style"]))
 
-
     def update_theme(self, new_theme_file):
         """Update the theme from a different theme file."""
         self.load_theme(new_theme_file)

@@ -149,15 +149,16 @@ class SerialConnFrame(ConnFrame):
         # initialize port connection method dropdown
         self.port_func_drop = guih.generate_drop_down(
             self,
-            list(self.port_func_options.keys())
+            list(self.port_func_options.keys()),
+            callback_func=self.set_port_func
         )
         self.port_func_drop[0].grid(row=0, column=1, padx=3, pady=10)
 
         # add Button for refreshing port list
-        update_conn_button = tk.Button(self, text="Update method",
-                                   command=self.set_port_func,
-                                   bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
-        update_conn_button.grid(row=0, column=2, pady=1)
+        # update_conn_button = tk.Button(self, text="Update method",
+        #                            command=self.set_port_func,
+        #                            bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
+        # update_conn_button.grid(row=0, column=2, pady=1)
 
         # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",

@@ -84,7 +84,6 @@ class SerialReader(SerialGeneral.SerialGeneral):
                 else:
                     raise BaseException("ERROR: undefined data mode for SerialReader")
 
-    # TODO: this really shouldn't have things specific to text processing in it ...
     def stop_process(self):
         if self.procStatus:
             self.procStatus = False

@@ -38,9 +38,7 @@ class TabDMM(ThemedFrame):
 
         # set up frames
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_rec = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
-        self.fr_rec.grid(row=1, column=0, pady=10, padx=10)
+        self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up serial / DMM variables
         self.dmm = None
@@ -65,7 +63,6 @@ class TabDMM(ThemedFrame):
                                    "DMM Console Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
         self.initTabContent()
@@ -84,13 +81,16 @@ class TabDMM(ThemedFrame):
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=30, pady=12)
 
+        # place Frames into grid
+        self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
+        self.fr_control.grid(row=1, column=0, pady=10, padx=10)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")
         self.init_fr_info()
-        self.init_fr_rec()
+        self.init_fr_control()
         self.init_fr_PT100()
-        # remaining initialisation and start of main loop
-        # self.entryPort.focus_set()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
@@ -142,20 +142,19 @@ class TabDMM(ThemedFrame):
         self.btn_update = tk.Button(self.fr_info, text='UPDATE DMM', command=lambda: self.gui_refresh_DMM(kind="full"))
         self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
 
-    def init_fr_rec(self):
-        fr_m = self.fr_rec
-        ttk.Label(fr_m, text="Record DMM", style="TPinkLabel.TLabel").grid(row=0, column=0, pady=10, padx=15)
+    def init_fr_control(self):
+        fr_m = self.fr_control
 
-        self.labelRNums = ttk.Label(fr_m, text='', width=8, relief='sunken')
-        self.labelRecFn = ttk.Label(fr_m, text='{:24s}'.format(self.recName), width=40, relief='sunken')
-        self.labelRNums.grid(row=1, column=0, padx=10, pady=10, sticky='W')
-        self.labelRecFn.grid(row=1, column=1, sticky='E')
+        labelInfo = ttk.Label(fr_m, text='DMM_Control', style="TPinkLabel.TLabel", width=15)
+        labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
-        options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
-        self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(fr_m, options)
-        self.optRecSpd.grid(row=2, column=0, padx=3, sticky='W')
-        self.btn_record = tk.Button(fr_m, text='RECORD THIS', command=self.record_DMM)
-        self.btn_record.grid(row=2, column=3, pady=5, padx=3, sticky='W')
+        # sample rate control
+        self.sample_drop = guih.generate_drop_down(fr_m,
+                                                   ["slow", "medium", "fast"],
+                                                   callback_func=self.dmm_set_sample)
+
+
+        self.sample_drop[0].grid(row=2, column=0)
 
     def init_fr_PT100(self):
             self.optframe = tk.Frame(self)
@@ -174,6 +173,21 @@ class TabDMM(ThemedFrame):
 
             self.PT100_On = False
             self.PT100_Unit = self.PT100UnitList[0]
+
+    def gui_refresh_DMM(self, kind="partial"):
+        print(f"Updating ({kind}) dmm ...")
+        # self.dmm_Meas1 = self.dmm.read_val1_str().strip("\n")
+        self.dmm_Meas1 = self.dmm.read_value()
+        # self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
+
+        if kind == "full":
+            pass
+            # self.dmm_Auto = self.dmm.get_range_auto()
+            # self.dmm_Range = self.dmm.get_range().strip("\n")
+            # self.dmm_Fu1 = self.dmm.get_func1()
+            # self.dmm_Fu2 = self.dmm.get_func2()
+
+        self.gui_refresh("call")
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
@@ -195,20 +209,11 @@ class TabDMM(ThemedFrame):
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
 
-    def gui_refresh_DMM(self, kind="partial"):
-        print(f"Updating ({kind}) dmm ...")
-        # self.dmm_Meas1 = self.dmm.read_val1_str().strip("\n")
-        self.dmm_Meas1 = self.dmm.read_value()
-        # self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
+    def dmm_set_sample(self, ):
+        if self.dmm is not None:
+            sample_speed = self.sample_drop[1].get()
+            self.dmm.set_sample_speed(sample_speed)
 
-        if kind == "full":
-            pass
-            # self.dmm_Auto = self.dmm.get_range_auto()
-            # self.dmm_Range = self.dmm.get_range().strip("\n")
-            # self.dmm_Fu1 = self.dmm.get_func1()
-            # self.dmm_Fu2 = self.dmm.get_func2()
-
-        self.gui_refresh("call")
 
     ##############################################################################
     ####      PT100 FUNCTIONS        ############################################
@@ -388,9 +393,7 @@ class TabDMM(ThemedFrame):
             self.prompt.print(f"Got id: {self.dmm_id}")
             self.cc.set_dmm(self.dmm)
 
-            # TODO: add these back once I get my DMM abstraction better
-            # self.cc.dmm.set_mode_dcv()
-            # self.cc.dmm.set_sample_speed_fast()
+            self.cc.dmm.set_sample_speed("fast")
 
             self.gui_refresh("call")
             self.labelTimeConnectedValue.config(

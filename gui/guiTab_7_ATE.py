@@ -18,33 +18,7 @@ from gui import gui_class as guic
 from datetime import datetime
 import time
 import pyvisa.errors
-
-
-import EEequipment
-from EEequipment.TestEquipment import TestEquipment
-import inspect, pkgutil, importlib
-
-
-
-ALLOWED_BASES = (TestEquipment,)  # add DMMBase, PowerSupplyBase, etc., if available
-
-def get_instruments():
-    """Return {display_name: class_obj} by walking subpackages and filtering."""
-    reg = {}
-    base_pkg = EEequipment.__name__
-    for m in pkgutil.walk_packages(EEequipment.__path__, prefix=f"{base_pkg}."):
-        modname = m.name
-        try:
-            module = importlib.import_module(modname)
-        except Exception:
-            continue
-        for name, obj in inspect.getmembers(module, inspect.isclass):
-            if obj.__module__ != modname:
-                continue
-            if any(obj is base or issubclass(obj, base) for base in ALLOWED_BASES) and obj not in ALLOWED_BASES:
-                display = name  # or f"{modname}.{name}" for uniqueness
-                reg[display] = obj
-    return reg
+from EEequipment import equipment_manager
 
 
 
@@ -99,9 +73,8 @@ class TabATE(guic.ThemedFrame):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
-
         # add equipment selector dropdown
-        self.registry = get_instruments()
+        self.registry = equipment_manager.get_instruments("all")
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -168,7 +141,6 @@ class TabATE(guic.ThemedFrame):
         if self.ate is not None:
             res = self.ate.query(command_str)
             self.prompt.print(f"Got response: {res}")
-
 
     # TODO: might need a drop down on the benchark method choice... some equipment test_conn doesn't work?
     def ate_benchmark(self):

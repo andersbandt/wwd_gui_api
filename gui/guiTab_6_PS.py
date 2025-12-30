@@ -17,14 +17,11 @@ from datetime import datetime
 import pyvisa.errors
 import usb.core
 
-import EEequipment.E3640A.E3640A
-from analysis.csv_helper import CSVHelper
-import configparser
-import os
 
 # import user defined modules
 from common import plotter
-from EEequipment.SPD3303X import SPD3303X
+from analysis.csv_helper import CSVHelper
+from EEequipment import equipment_manager
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -47,6 +44,7 @@ class TabPS(guic.ThemedFrame):
 
         # set up serial / PS variables
         self.ps = None
+        self.channel_count = 0
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
@@ -97,6 +95,14 @@ class TabPS(guic.ThemedFrame):
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
+
+        # add equipment selector dropdown
+        self.registry = equipment_manager.get_instruments("ps")
+        self.ate_drop = guih.generate_drop_down(
+            self.fr_info,
+            sorted(self.registry.keys())
+        )
+        self.ate_drop[0].grid(row=0, column=2, padx=15)
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -238,14 +244,13 @@ class TabPS(guic.ThemedFrame):
         else:
             self.ch1_toggle_btn.config(bg=self.theme_config["error"])
 
-        # TODO: elegantly handle multi-channel power supplies here
-        # if status_decode["ch2_state"] == "ON":
-        #     self.ch2_toggle_btn.config(bg=self.theme_config["success"])
-        # else:
-        #     self.ch2_toggle_btn.config(bg=self.theme_config["error"])
+        if self.channel_count > 1:
+            if status_decode["ch2_state"] == "ON":
+                self.ch2_toggle_btn.config(bg=self.theme_config["success"])
+            else:
+                self.ch2_toggle_btn.config(bg=self.theme_config["error"])
 
     def gui_refresh_channel_mode(self):
-        # TODO: I'm not properly stt
         if self.ps is not None:
             status_decode = self.ps.check_status()
         else:
@@ -374,9 +379,8 @@ class TabPS(guic.ThemedFrame):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
-        # TODO: this thing needs to be dynamic ... copy my tab7 shit
-        self.ps = SPD3303X.SPD3303X(port)
-        # self.ps = EEequipment.E3640A.E3640A.E3640A(port)
+        ate_temp = self.registry[self.ate_drop[1].get()]
+        self.ps = ate_temp(self.fr_port.get_port())
 
         try:
             self.id = self.ps.test_conn()
@@ -389,10 +393,9 @@ class TabPS(guic.ThemedFrame):
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.cc.set_ps(self.ps)
             self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(
-                text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-            )
+            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
             self.fr_port.set_status(True)
+            self.channel_count = self.ps.channel_count
 
             # turn channels off and set voltages
             self.ps.output_off(1)

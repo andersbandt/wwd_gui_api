@@ -20,9 +20,8 @@ from datetime import datetime
 
 # import user defined modules
 from analysis.csv_helper import CSVHelper
-from EEequipment.XDM1041.xdm1041main import XDM1041, XDM1041Mode
-from EEequipment.XDM1041 import xdm1041helper
-from EEequipment.fluke8842A.fluke8842A import Fluke8842A
+from EEequipment import equipment_manager
+from EEequipment.XDM1041 import xdm1041helper # TODO: phase out this import module
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -94,6 +93,14 @@ class TabDMM(guic.ThemedFrame):
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
+
+        # add equipment selector dropdown
+        self.registry = equipment_manager.get_instruments("dmm")
+        self.ate_drop = guih.generate_drop_down(
+            self.fr_info,
+            sorted(self.registry.keys())
+        )
+        self.ate_drop[0].grid(row=0, column=2, padx=15)
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -372,9 +379,8 @@ class TabDMM(guic.ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        # TODO: conditional connect based on model!!!
-        # self.dmm = XDM1041(port)
-        self.dmm = Fluke8842A(port)
+        ate_temp = self.registry[self.ate_drop[1].get()]
+        self.ps = ate_temp(self.fr_port.get_port())
 
         time.sleep(1)
         self.dmm_id = self.dmm.test_conn()

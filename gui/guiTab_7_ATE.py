@@ -210,7 +210,7 @@ class TabATE(ThemedFrame):
             self.fr_port.set_status(True)
 
             # gui refresh
-            self.gui_refresh()
+            self.gui_refresh("call")
             return True
         else:  # BAD ID received
             self.ate = None

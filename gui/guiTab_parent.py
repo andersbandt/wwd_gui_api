@@ -6,6 +6,9 @@ import tkinter as tk
 from tkinter import ttk
 
 
+# TODO: move this whole thing to gui_class ?
+
+
 class ThemedApp:
     def __init__(self, root, theme_file):
         self.root = root
@@ -122,6 +125,3 @@ class ThemedFrame(tk.Frame):
 
     def set_bg(self, bg):
         self.configure(bg=bg)
-
-
-# TODO: make a subclass of ThemedFrame if there is a serial port for the tab? Can handle the `autoconnect` variable more elegantly?

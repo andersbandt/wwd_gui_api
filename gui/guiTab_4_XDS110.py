@@ -66,7 +66,7 @@ class tabXDS110(ThemedFrame):
         self.parse_target_config("default.ini")
 
     def initTabContent(self):
-        print("Initializing tab XDS110 content")
+        print("Initializing tab 4 (XDS110) content")
         self.init_fr_xds110()
         self.init_fr_target()
         self.init_fr_firmware()

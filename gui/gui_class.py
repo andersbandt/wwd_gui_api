@@ -30,10 +30,6 @@ class ColorCircle(tk.Canvas):
         self.itemconfig(self.status_oval, fill=color)
 
 
-##########################################
-### FRAMES (VARIOUS)     #################
-##########################################
-
 class Prompt(ThemedFrame):
     def __init__(self, master, title, height, width):
         self.theme_file = "config/darcula.json"  #tag:hardcode
@@ -155,12 +151,6 @@ class SerialConnFrame(ConnFrame):
         self.port_func_drop[0].grid(row=0, column=1, padx=3, pady=10)
 
         # add Button for refreshing port list
-        # update_conn_button = tk.Button(self, text="Update method",
-        #                            command=self.set_port_func,
-        #                            bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
-        # update_conn_button.grid(row=0, column=2, pady=1)
-
-        # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",
                                    command=self.refresh_ports,
                                    bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
@@ -197,7 +187,7 @@ class SerialConnFrame(ConnFrame):
     def set_port_func(self):
         selected_label = self.port_func_drop[1].get()
         self.port_func = self.port_func_options[selected_label]
-        self.refresh_ports()
+        self.refresh_ports(first_run=True)
 
     def refresh_ports(self, first_run=False):
         menu = self.com_drop[0]["menu"]
@@ -211,12 +201,11 @@ class SerialConnFrame(ConnFrame):
             menu.add_command(label=string,
                              command=lambda value=string: self.com_drop[1].set(value))
 
-        # TODO: is this helpful / needed to have below? Setting the port list values?
-        # if not self.status:
-        #     try:
-        #         self.com_drop[1].set(ports[0])
-        #     except IndexError:
-        #         self.com_drop[1].set(None)
+        if not self.status:
+            try:
+                self.com_drop[1].set(ports[0])
+            except IndexError:
+                self.com_drop[1].set(None)
 
         # set value to previously used port (if available)
         if first_run:

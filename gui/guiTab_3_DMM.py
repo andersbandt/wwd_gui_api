@@ -374,8 +374,8 @@ class TabDMM(ThemedFrame):
         port = self.fr_port.get_port()
 
         # TODO: conditional connect based on model!!!
-        self.dmm = XDM1041(port)
-        # self.dmm = Fluke8842A(port)
+        # self.dmm = XDM1041(port)
+        self.dmm = Fluke8842A(port)
 
         time.sleep(1)
         self.dmm_id = self.dmm.test_conn()

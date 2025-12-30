@@ -17,8 +17,8 @@ from gui import gui_class as guic
 # import needed packages
 from datetime import datetime
 import time
-import pyvisa.errors
 from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
 
@@ -166,8 +166,7 @@ class TabATE(guic.ThemedFrame):
         try:
             import usb
             self.id = self.ate.test_conn()
-            # TODO: standardize the error exceptions below?
-        except (AttributeError, pyvisa.errors.VisaIOError, usb.core.USBError) as e:
+        except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't connect to VISA", e, "warning")
             self.fr_port.set_status(False)
             return False

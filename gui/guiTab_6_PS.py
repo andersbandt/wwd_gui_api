@@ -11,17 +11,15 @@ from tkinter import ttk
 import tkinter.messagebox as tkmb
 
 # import needed packages
-import logging
 import time
 from datetime import datetime
-import pyvisa.errors
-import usb.core
 
 
 # import user defined modules
 from common import plotter
 from analysis.csv_helper import CSVHelper
 from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -266,9 +264,8 @@ class TabPS(guic.ThemedFrame):
                 self.ch2_mode.set_color("green")
             else:
                 self.ch2_mode.set_color("red")
-        # TODO: need more elegant way to handle the status_decode key errors here
-        except KeyError:
-            logging.error("Can't set channel CC and CV states because of KeyError")
+        except KeyError as e:
+            guih.alert_user("Can't set channel CC/CV states", f"KeyError:{e}", "error")
             self.ch1_mode.set_color("black")
             self.ch2_mode.set_color("black")
 
@@ -384,8 +381,8 @@ class TabPS(guic.ThemedFrame):
 
         try:
             self.id = self.ps.test_conn()
-        except (pyvisa.errors.VisaIOError, usb.core.USBError) as e:
-            guih.alert_user("Can't connect to VISA", e, "warning")
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't connect to PS", e, "warning")
             self.fr_port.set_status(False)
             return False
 

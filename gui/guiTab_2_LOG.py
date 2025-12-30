@@ -339,12 +339,13 @@ class TabLog(guic.ThemedFrame):
         if self.record_config["use_ps"]:
             ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
 
-            if self.cc.ps.channel_count > 1:
-                    res = guih.promptYesNo("Use all power supply channels?",
-                                           f"Power supply has {self.cc.ps.channel_count} channels, use 2 of them?")
-                    if res:
-                        ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
-                        self.record_config["ps_channels"] = 2
+            if self.cc.get_ps_status():
+                if self.cc.ps.channel_count > 1:
+                        res = guih.promptYesNo("Use all power supply channels?",
+                                               f"Power supply has {self.cc.ps.channel_count} channels, use 2 of them?")
+                        if res:
+                            ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
+                            self.record_config["ps_channels"] = 2
 
             headers += ps_params
 

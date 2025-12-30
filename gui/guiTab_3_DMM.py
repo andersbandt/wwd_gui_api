@@ -21,6 +21,7 @@ from datetime import datetime
 # import user defined modules
 from analysis.csv_helper import CSVHelper
 from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from EEequipment.XDM1041 import xdm1041helper # TODO: phase out this import module
 from gui import gui_helper as guih
 from gui import gui_class as guic
@@ -88,7 +89,6 @@ class TabDMM(guic.ThemedFrame):
         print("Initializing tab 3 (DMM) content")
         self.init_fr_info()
         self.init_fr_control()
-        self.init_fr_PT100()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
@@ -154,35 +154,32 @@ class TabDMM(guic.ThemedFrame):
         labelInfo = ttk.Label(fr_m, text='DMM_Control', style="TPinkLabel.TLabel", width=15)
         labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
+        # mode control
+        self.mode_drop = guih.generate_drop_down(fr_m,
+                                                   ["VDC", "VAC", "IDC", "IAC", "RES_2WIRE", "RES_4WIRE"],
+                                                   callback_func=self.dmm_set_mode)
+
+        self.range_drop = guih.generate_drop_down(fr_m,
+                                                   ["AUTO", "LOWEST", "HIGHEST"],
+                                                   callback_func=self.dmm_set_range)
+
         # sample rate control
         self.sample_drop = guih.generate_drop_down(fr_m,
                                                    ["slow", "medium", "fast"],
                                                    callback_func=self.dmm_set_sample)
 
 
-        self.sample_drop[0].grid(row=2, column=0)
-
-    def init_fr_PT100(self):
-            self.optframe = tk.Frame(self)
-
-            self.PT100UnitList = ('C', 'F', 'K')
-            self.PT100UnitVal = tk.StringVar()
-            self.PT100UnitVal.set(self.PT100UnitList[0])
-            self.optPT100Unit = tk.OptionMenu(self.optframe, self.PT100UnitVal, *self.PT100UnitList,
-                                              command=self.DoPT100Unit)
-            self.buttonPT100 = tk.Button(self.optframe, text='PT100', bd=5, command=self.DoPT100, width=5)
-
-            self.optPT100Unit.grid(row=0, column=0, sticky='W')
-            self.buttonPT100.grid(row=0, column=1, sticky='W')
-
-            self.optframe.grid(row=6, column=0, columnspan=2)
-
-            self.PT100_On = False
-            self.PT100_Unit = self.PT100UnitList[0]
+        self.mode_drop[0].grid(row=1 ,column=1, pady=self.theme_config["size"]["ypad_s"])
+        self.range_drop[0].grid(row=2, column=1, pady=self.theme_config["size"]["ypad_s"])
+        self.sample_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
 
     def gui_refresh_DMM(self, kind="partial"):
+        if not self.fr_port.status:
+            return
+
         print(f"Updating ({kind}) dmm ...")
-        # self.dmm_Meas1 = self.dmm.read_val1_str().strip("\n")
+
+        # TODO: let's figure out how to add all of these things back with my new abstraction
         self.dmm_Meas1 = self.dmm.read_value()
         # self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
 
@@ -193,7 +190,14 @@ class TabDMM(guic.ThemedFrame):
             # self.dmm_Fu1 = self.dmm.get_func1()
             # self.dmm_Fu2 = self.dmm.get_func2()
 
-        self.gui_refresh("call")
+        # update Label
+        if self.fr_port.status:
+            self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
+            self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
+            self.valueMeas1.config(text=self.dmm_Meas1)
+            self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
+            self.valueMeas2.config(text=self.dmm_Meas2)
+
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
@@ -203,19 +207,22 @@ class TabDMM(guic.ThemedFrame):
             if event == "auto":
                 self.gui_refresh_DMM("full")
 
-        # update Label
-        if self.fr_port.status:
-            self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
-            self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-            self.valueMeas1.config(text=self.dmm_Meas1)
-            self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
-            self.valueMeas2.config(text=self.dmm_Meas2)
 
     ##############################################################################
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
 
-    def dmm_set_sample(self, ):
+    def dmm_set_mode(self):
+        if self.dmm is not None:
+            mode = self.mode_drop[1].get()
+            self.dmm.set_mode(mode)
+
+    def dmm_set_range(self):
+        if self.dmm is not None:
+            dmm_range = self.range_drop[1].get()
+            self.dmm.set_range(dmm_range)
+
+    def dmm_set_sample(self):
         if self.dmm is not None:
             sample_speed = self.sample_drop[1].get()
             self.dmm.set_sample_speed(sample_speed)
@@ -225,58 +232,58 @@ class TabDMM(guic.ThemedFrame):
     ####      PT100 FUNCTIONS        ############################################
     ##############################################################################
 
-    def DoPT100Unit(self, event=None):
-        """
-            changes the unit for PT100
-        """
-        self.PT100_Unit = self.PT100UnitVal.get()
-
-    def DoPT100(self, event=None):
-        """
-            enables PT100 mode. i.e. we convert a 100+ ohm value into
-            a temperature
-        """
-        if self.Fu1.upper() == 'RES' and self.Range.upper() == '500 OHM':
-            self.PT100_On = not self.PT100_On
-            if self.PT100_On:
-                self.buttonPT100.config(relief='sunken')
-            else:
-                self.buttonPT100.config(relief='raised')
-        else:
-            tkmb.showinfo('info', 'switch to 500 Ohm RES mode with REL to compensate for wire res.')
-
-    def update_PT100(self):
-        def PT100_temp_convert(self, ohm, vnull=0.0):
-            """
-                convert a resistance reading of a standard PT100 probe to
-                a temperature in celsius. The resistance must be >=100 Ohm
-            """
-            TC = 0.00385
-            A = 3.9083E-03
-            B = 5.775E-07
-            C = -4.183E-12
-            R0 = 100.0
-            return (-A + math.sqrt(A * A - 4 * B * (1 - (ohm - vnull) / R0))) / (2 * B)
-
-        if self.PT100_On:
-            if self.Range.upper() == '500 OHM':
-                if (self.Meas1 >= 100) and (self.Meas1 < 550):
-                    self.Fu2 = 'PT100'
-                    self.Meas2 = PT100_temp_convert(self.Meas1)
-                    if self.PT100_Unit == 'F':
-                        self.Meas2 = 32 + self.Meas2 * (9 / 5)
-                    elif self.PT100_Unit == 'K':
-                        self.Meas2 = 273.15 + self.Meas2
-
-                else:
-                    tkmb.showinfo('info', 'resistance out of range for PT100')
-                    self.PT100_On = False
-                    self.buttonPT100.config(relief='raised')
-
-            else:
-                tkmb.showinfo('info', 'must be in 500 Ohm range to use PT100')
-                self.PT100_On = False
-                self.buttonPT100.config(relief='raised')
+    # def DoPT100Unit(self, event=None):
+    #     """
+    #         changes the unit for PT100
+    #     """
+    #     self.PT100_Unit = self.PT100UnitVal.get()
+    #
+    # def DoPT100(self, event=None):
+    #     """
+    #         enables PT100 mode. i.e. we convert a 100+ ohm value into
+    #         a temperature
+    #     """
+    #     if self.Fu1.upper() == 'RES' and self.Range.upper() == '500 OHM':
+    #         self.PT100_On = not self.PT100_On
+    #         if self.PT100_On:
+    #             self.buttonPT100.config(relief='sunken')
+    #         else:
+    #             self.buttonPT100.config(relief='raised')
+    #     else:
+    #         tkmb.showinfo('info', 'switch to 500 Ohm RES mode with REL to compensate for wire res.')
+    #
+    # def update_PT100(self):
+    #     def PT100_temp_convert(self, ohm, vnull=0.0):
+    #         """
+    #             convert a resistance reading of a standard PT100 probe to
+    #             a temperature in celsius. The resistance must be >=100 Ohm
+    #         """
+    #         TC = 0.00385
+    #         A = 3.9083E-03
+    #         B = 5.775E-07
+    #         C = -4.183E-12
+    #         R0 = 100.0
+    #         return (-A + math.sqrt(A * A - 4 * B * (1 - (ohm - vnull) / R0))) / (2 * B)
+    #
+    #     if self.PT100_On:
+    #         if self.Range.upper() == '500 OHM':
+    #             if (self.Meas1 >= 100) and (self.Meas1 < 550):
+    #                 self.Fu2 = 'PT100'
+    #                 self.Meas2 = PT100_temp_convert(self.Meas1)
+    #                 if self.PT100_Unit == 'F':
+    #                     self.Meas2 = 32 + self.Meas2 * (9 / 5)
+    #                 elif self.PT100_Unit == 'K':
+    #                     self.Meas2 = 273.15 + self.Meas2
+    #
+    #             else:
+    #                 tkmb.showinfo('info', 'resistance out of range for PT100')
+    #                 self.PT100_On = False
+    #                 self.buttonPT100.config(relief='raised')
+    #
+    #         else:
+    #             tkmb.showinfo('info', 'must be in 500 Ohm range to use PT100')
+    #             self.PT100_On = False
+    #             self.buttonPT100.config(relief='raised')
 
     ##############################################################################
     ####      RECORDING FUNCTIONS        #########################################
@@ -380,10 +387,16 @@ class TabDMM(guic.ThemedFrame):
         port = self.fr_port.get_port()
 
         ate_temp = self.registry[self.ate_drop[1].get()]
-        self.ps = ate_temp(self.fr_port.get_port())
+        self.dmm = ate_temp(self.fr_port.get_port())
 
         time.sleep(1)
-        self.dmm_id = self.dmm.test_conn()
+
+        try:
+            self.dmm_id = self.dmm.test_conn()
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't connect to DMM", e, "warning")
+            self.fr_port.set_status(False)
+            return False
 
         # BAD ID received
         if self.dmm_id == '' or self.dmm_id is None:

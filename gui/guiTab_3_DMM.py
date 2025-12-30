@@ -25,10 +25,9 @@ from EEequipment.XDM1041 import xdm1041helper
 from EEequipment.fluke8842A.fluke8842A import Fluke8842A
 from gui import gui_helper as guih
 from gui import gui_class as guic
-from gui.guiTab_parent import ThemedFrame
 
 
-class TabDMM(ThemedFrame):
+class TabDMM(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master

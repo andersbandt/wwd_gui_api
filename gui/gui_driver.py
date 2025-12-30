@@ -18,7 +18,7 @@ from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
-from gui.guiTab_parent import ThemedApp
+from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_LOG
 from gui import guiTab_3_DMM

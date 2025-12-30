@@ -17,10 +17,9 @@ from analysis.csv_helper import CSVHelper
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
-from gui.guiTab_parent import ThemedFrame
 
 
-class TabLog(ThemedFrame):
+class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file):
         super().__init__(master, theme_file)
         self.master = master
@@ -36,6 +35,7 @@ class TabLog(ThemedFrame):
         #self.recName = ''
         self.data_dir = basefilepath + "/data/"
         self.csvh = None
+        self.record_config = None
 
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_setup = tk.Frame(self, bg=self.theme_config["light_4"])
@@ -286,11 +286,12 @@ class TabLog(ThemedFrame):
 
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
-    def get_record_status(self):
+    def get_record_config(self):
         self.record_config = {
             "use_ser": self.var_use_ser.get(),
             "use_dmm": self.var_use_dmm.get(),
-            "use_ps": self.var_use_ps.get()
+            "use_ps": self.var_use_ps.get(),
+            "ps_channel": 1,
         }
 
     def organize_record_params(self):
@@ -305,7 +306,7 @@ class TabLog(ThemedFrame):
 
         # CALL HELPER FUNCTIONS
         self.set_record_speed()
-        self.get_record_status()
+        self.get_record_config()
 
         # SETUP CSV HEADER PARAMETERS
         headers = ["Time"]
@@ -336,8 +337,15 @@ class TabLog(ThemedFrame):
 
         # Power Supply selected?
         if self.record_config["use_ps"]:
-            # TODO: add multiple channel support for power supplies
             ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
+
+            if self.cc.ps.channel_count > 1:
+                    res = guih.promptYesNo("Use all power supply channels?",
+                                           f"Power supply has {self.cc.ps.channel_count} channels, use 2 of them?")
+                    if res:
+                        ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
+                        self.record_config["ps_channels"] = 2
+
             headers += ps_params
 
         # SETUP CSV
@@ -362,6 +370,10 @@ class TabLog(ThemedFrame):
                 row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
                 row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
                 row["PS_Imeas1"] = self.cc.ps.get_current(1)
+                if self.record_config["ps_channels"] == 2:
+                    row["PS_Vset2"] = self.cc.ps.get_set_voltage(2)
+                    row["PS_Vmeas2"] = self.cc.ps.get_set_voltage(2)
+                    row["PS_Imeas1"] = self.cc.ps.get_current(1)
 
             # Update record counter and UI
             self.recCnt += 1
@@ -373,36 +385,40 @@ class TabLog(ThemedFrame):
             # Wait for next sample
             time.sleep(self.record_speed)
 
-    def analyze_file(self, filename):
-        print("Analyzing file")
-        file_path = self.basefilepath + self.data_folder + filename
 
-        # imu_data = processor.load_csv(file_path)
-        # if imu_data is None:
-        #     gui_helper.alert_user("Something wrong with data!",
-        #                           "Couldn't load data, something wrong",
-        #                           kind="error")
-        #     return False
 
-        imu_stats = imu_analysis.analyze_imu(file_path)
-        # output_frame = tk.Frame(self.master)
-        # output_frame.grid(row=4, column=0)
-        text_box = tk.Text(self.fr_analysis, height=17)
-        text_box.grid(row=5, column=0, padx=15, pady=15)
+    # def analyze_file(self, filename):
+    #     print("Analyzing file")
+    #     file_path = self.basefilepath + self.data_folder + filename
+    #
+    #     # imu_data = processor.load_csv(file_path)
+    #     # if imu_data is None:
+    #     #     gui_helper.alert_user("Something wrong with data!",
+    #     #                           "Couldn't load data, something wrong",
+    #     #                           kind="error")
+    #     #     return False
+    #
+    #     imu_stats = imu_analysis.analyze_imu(file_path)
+    #     # output_frame = tk.Frame(self.master)
+    #     # output_frame.grid(row=4, column=0)
+    #     text_box = tk.Text(self.fr_analysis, height=17)
+    #     text_box.grid(row=5, column=0, padx=15, pady=15)
+    #
+    #     # Add the dictionary contents to the Text widget
+    #     for key, value in imu_stats.items():
+    #         text_box.insert(tk.END, f"{key}: {value}\n")
+    #     return True
 
-        # Add the dictionary contents to the Text widget
-        for key, value in imu_stats.items():
-            text_box.insert(tk.END, f"{key}: {value}\n")
-        return True
 
-    def graph_file(self, filename):
-        print("Graphing file")
 
-        file_path = self.basefilepath + self.data_folder + filename
-        imu_data = processor.load_csv(file_path)
-        if imu_data is None:
-            gui_helper.alert_user("Something wrong with IMU data!",
-                                  "Couldn't load data, something wrong",
-                                  kind="error")
-            return False
+    # def graph_file(self, filename):
+    #     print("Graphing file")
+    #
+    #     file_path = self.basefilepath + self.data_folder + filename
+    #     imu_data = processor.load_csv(file_path)
+    #     if imu_data is None:
+    #         gui_helper.alert_user("Something wrong with IMU data!",
+    #                               "Couldn't load data, something wrong",
+    #                               kind="error")
+    #         return False
 

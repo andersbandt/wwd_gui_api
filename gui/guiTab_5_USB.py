@@ -19,10 +19,9 @@ from datetime import datetime
 from common.SerialReader import SerialReader
 from gui import gui_helper as guih
 from gui import gui_class as guic
-from gui.guiTab_parent import ThemedFrame
 
 
-class TabUSB(ThemedFrame):
+class TabUSB(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master
@@ -161,14 +160,14 @@ class TabUSB(ThemedFrame):
     #### THREADS SHIT    ############
     #################################
 
-    # TODO ATE (low-priority with new FTDI module implementation): try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
-    def manage_connection(self):
-        status = True
-        while status:
-            if self.ser_obj.serStatus is False:
-                print("Attempt to reopen serial ...")
-                self.ser_obj.reopen()
-                time.sleep(3)
+    # NOTE: autoconnect attempt. Problem right now is probably the performance hit with threading
+    # def manage_connection(self):
+    #     status = True
+    #     while status:
+    #         if self.ser_obj.serStatus is False:
+    #             print("Attempt to reopen serial ...")
+    #             self.ser_obj.reopen()
+    #             time.sleep(3)
 
     def thread_print_display(self):
         # TODO ATE: get "RunTimeError: main thread is not in main loop error"

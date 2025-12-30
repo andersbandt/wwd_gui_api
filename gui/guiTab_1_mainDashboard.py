@@ -18,14 +18,13 @@ from common.SerialReader import SerialReader
 # import GUI modules
 from gui import gui_class as guic
 from gui import gui_helper as guih
-from gui.guiTab_parent import ThemedFrame
 
 
 # TODO ATE: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
 #   actually seems like I can connect but there is no status update
 
 
-class TabMainDashboard(ThemedFrame):
+class TabMainDashboard(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master

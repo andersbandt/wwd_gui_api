@@ -19,10 +19,9 @@ from common import subprocessor as subp
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
-from gui.guiTab_parent import ThemedFrame
 
 
-class tabXDS110(ThemedFrame):
+class tabXDS110(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file):
         super().__init__(master, theme_file)
         self.master = master

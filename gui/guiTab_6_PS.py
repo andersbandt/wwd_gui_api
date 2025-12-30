@@ -30,10 +30,9 @@ from EEequipment.SPD3303X import SPD3303X
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
-from gui.guiTab_parent import ThemedFrame
 
 
-class TabPS(ThemedFrame):
+class TabPS(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master

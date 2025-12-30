@@ -13,7 +13,6 @@ import tkinter.messagebox as tkmb
 # import uGUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
-from gui.guiTab_parent import ThemedFrame
 
 # import needed packages
 from datetime import datetime
@@ -49,7 +48,7 @@ def get_instruments():
 
 
 
-class TabATE(ThemedFrame):
+class TabATE(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
         super().__init__(master, theme_file)
         self.master = master

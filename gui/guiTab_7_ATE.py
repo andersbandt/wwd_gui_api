@@ -23,8 +23,8 @@ from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
 class TabATE(guic.ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath

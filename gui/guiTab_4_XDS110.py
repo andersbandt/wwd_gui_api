@@ -22,8 +22,8 @@ from gui.gui_class import *
 
 
 class tabXDS110(guic.ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file):
-        super().__init__(master, theme_file)
+    def __init__(self, master, class_controller, basefilepath, theme_config):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.grid(row=0, column=0)

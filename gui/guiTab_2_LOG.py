@@ -10,7 +10,6 @@ from time import localtime, strftime
 from datetime import datetime
 
 # import user defined modules
-from imu import imu_analysis
 from analysis.csv_helper import CSVHelper
 
 # import user defined GUI modules
@@ -20,9 +19,8 @@ from gui.gui_class import ColorCircle
 
 
 class TabLog(guic.ThemedFrame):
-    # TODO: eventually need to go through all my classes and move `theme_file` to `theme_config`
-    def __init__(self, master, class_controller, basefilepath, theme_file):
-        super().__init__(master, theme_file)
+    def __init__(self, master, class_controller, basefilepath, theme_config):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
@@ -33,7 +31,6 @@ class TabLog(guic.ThemedFrame):
         self.record_speed = 1
         self.record_status = False
         self.recCnt = 0
-        #self.recName = ''
         self.data_dir = basefilepath + "/data/"
         self.csvh = None
         self.record_config = None
@@ -55,9 +52,9 @@ class TabLog(guic.ThemedFrame):
 
         # place everything in grid
         self.fr_status.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_setup.grid(row=1, column=1, rowspan=2, pady=15, padx=15)
+        self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
         self.fr_analysis.grid(row=2, column=0, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=12)
 
     def initTabContent(self):
         print("Initializing tab 2 (Logger) content")
@@ -76,20 +73,20 @@ class TabLog(guic.ThemedFrame):
         self.labelSerStat = ttk.Label(self.fr_status, width=10, text='Serial', style="TLabel", anchor='w')
         self.ser_status = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelSerStat.grid(row=0, column=0, pady=15, padx=15)
-        self.ser_status.grid(row=0, column=1, pady=15, padx=15)
+        self.labelSerStat.grid(row=0, column=0)
+        self.ser_status.grid(row=0, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # DMM connection status
         self.labelDmmStat = ttk.Label(self.fr_status, width=10, text='DMM', style="TLabel", anchor='w')
         self.dmm_status = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelDmmStat.grid(row=1, column=0, pady=15, padx=15)
-        self.dmm_status.grid(row=1, column=1, pady=15, padx=15)
+        self.labelDmmStat.grid(row=1, column=0)
+        self.dmm_status.grid(row=1, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # PS connection status
         self.labelPsStat = ttk.Label(self.fr_status, width=10, text='PS', style="TLabel", anchor='w')
         self.ps_status = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelPsStat.grid(row=2, column=0, pady=15, padx=15)
-        self.ps_status.grid(row=2, column=1, pady=15, padx=15)
+        self.labelPsStat.grid(row=2, column=0)
+        self.ps_status.grid(row=2, column=1, pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_setup(self):
         # add directory search
@@ -106,9 +103,9 @@ class TabLog(guic.ThemedFrame):
         self.output_file_name.grid(row=2, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add serial parameters box
-        tk.Label(self.fr_setup, text="Serial parameters").grid(row=3, column=0, padx=5, pady=5)
+        tk.Label(self.fr_setup, text="Serial parameters").grid(row=3, column=1, padx=5, pady=5)
         self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
-        self.serial_log_params.grid(row=3, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.serial_log_params.grid(row=3, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add check boxes for the various options
         self.var_use_ser = tk.IntVar()
@@ -155,7 +152,7 @@ class TabLog(guic.ThemedFrame):
         # set up button START live GRAPH
         btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
                                 command=lambda: None,
-                                bg=self.theme_config["dark_3"], fg="white", height=2, width=self.theme_config["size"]["w_button"])
+                                bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_analysis(self):

@@ -77,16 +77,26 @@ class ThemedApp:
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
 
+        # do more "normal" scaling
         factor = 1
         if compact:
             factor *= 0.75
 
         KEY_PATHS = [
-            # ["font", "size"],
             ["pad", "xpad_s"],
             ["pad", "ypad_s"],
+            ["size", "w_prompt"],
+            ["size", "h_prompt"]
         ]
 
+        self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
+
+        # do some other scaling on weird things with smaller values
+        if compact:
+            factor = 0.45
+        KEY_PATHS = [
+            ["size", "h_button"],
+        ]
         self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
 
 

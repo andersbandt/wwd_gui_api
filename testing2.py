@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 
-# TODO: add some internal notes on the filename regex here (what are the plus marks, what does everything mean?
+
 data_dir = "data/data"  # Replace with your actual path
 #pattern = re.compile(r"AREC_b(\d+)_([-\d]+)_.*\.csv")
 pattern = re.compile(r"^AREC_b(\d+)_(\d+)_(\d+uH)_(\d+)(?:\.csv)?$")

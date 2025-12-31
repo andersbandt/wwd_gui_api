@@ -56,8 +56,8 @@ def parse_autoconnect_config():
 
 
 class MainApplication(ThemedApp):
-    def __init__(self, window, height, width, theme_file, autoconnect):
-        super().__init__(window, theme_file)
+    def __init__(self, window, height, width, theme_file, autoconnect, compact):
+        super().__init__(window, theme_file, compact=compact)
         self.autoconnect = autoconnect
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
@@ -90,13 +90,13 @@ class MainApplication(ThemedApp):
             autoconnect = [False for i in range(8)]
 
         # create Tab objects
-        self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,"config/darcula.json", autoconnect[0])
-        self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab3 = guiTab_3_DMM.TabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[2])
-        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab5 = guiTab_5_USB.TabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[4])
-        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[5])
-        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", autoconnect[6])
+        self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,self.theme_config, autoconnect[0])
+        self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab3 = guiTab_3_DMM.TabDMM(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[2])
+        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab5 = guiTab_5_USB.TabUSB(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[4])
+        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[5])
+        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
 
         # Define an array of tab names
         self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE"]
@@ -144,8 +144,6 @@ def main(autoconnect):
     window.title("WWD GUI API")
 
     # Get screen size
-    # TODO: this could be a big ask ... but can I dynamically size elements if the screen size is small?
-    #   bonus points if I can update the theme_config based on sizing
     ws = window.winfo_screenwidth()
     hs = window.winfo_screenheight()
 
@@ -153,9 +151,17 @@ def main(autoconnect):
     w = min(desired_w, max(300, ws - margin_w))
     h = min(desired_h, max(300, hs - margin_h))
 
+    # dynamic sizing check
+    if (w < 0.8*desired_w) or (h < 0.8*desired_h):
+        compact=True
+        print("Using compact sizing")
+    else:
+        compact=False
+
     # Center placement
     x = (ws / 2) - (w / 4)
     y = 20
+
 
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
@@ -164,7 +170,8 @@ def main(autoconnect):
                           h,
                           w,
                           "config/darcula.json",
-                          autoconnect)
+                          autoconnect,
+                          compact)
 
     # run application
     window.mainloop()

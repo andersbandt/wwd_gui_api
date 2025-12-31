@@ -38,6 +38,7 @@ class tabXDS110(guic.ThemedFrame):
 
         # set up prompt
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "XDS110 Comms",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])

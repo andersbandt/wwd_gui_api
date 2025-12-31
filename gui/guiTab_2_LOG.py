@@ -20,6 +20,7 @@ from gui.gui_class import ColorCircle
 
 
 class TabLog(guic.ThemedFrame):
+    # TODO: eventually need to go through all my classes and move `theme_file` to `theme_config`
     def __init__(self, master, class_controller, basefilepath, theme_file):
         super().__init__(master, theme_file)
         self.master = master
@@ -44,6 +45,7 @@ class TabLog(guic.ThemedFrame):
 
         # set up prompt
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
@@ -96,17 +98,17 @@ class TabLog(guic.ThemedFrame):
         btn_set_directory = tk.Button(self.fr_setup, text="Set directory",
                                  command=lambda: self.set_record_directory(),
                                  bg=self.theme_config["light_1"], fg="black", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_set_directory.grid(row=2, column=1, padx=15, pady=22)
+        btn_set_directory.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add output file name box
         tk.Label(self.fr_setup, text="Output file name").grid(row=2, column=2, padx=5, pady=20)
         self.output_file_name = tk.Text(self.fr_setup, height=2, width=20)
-        self.output_file_name.grid(row=2, column=3, pady=20)
+        self.output_file_name.grid(row=2, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add serial parameters box
         tk.Label(self.fr_setup, text="Serial parameters").grid(row=3, column=0, padx=5, pady=5)
         self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
-        self.serial_log_params.grid(row=3, column=1)
+        self.serial_log_params.grid(row=3, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add check boxes for the various options
         self.var_use_ser = tk.IntVar()
@@ -114,7 +116,7 @@ class TabLog(guic.ThemedFrame):
                         text="Use Serial",
                         variable=self.var_use_ser,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=0, pady=self.theme_config["size"]["ypad_s"])
+                        offvalue=0).grid(row=4, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         self.var_use_dmm = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
@@ -133,28 +135,28 @@ class TabLog(guic.ThemedFrame):
         # speed recording options
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(self.fr_setup, options)
-        self.optRecSpd.grid(row=5, column=0)
+        self.optRecSpd.grid(row=5, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button START recording
         btn_start_entry = tk.Button(self.fr_setup, text="Start Record",
                                  command=lambda: self.start_record(),
                                  bg=self.theme_config["success"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_start_entry.grid(row=5, column=1, padx=1, pady=self.theme_config["size"]["ypad_s"])
+        btn_start_entry.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button STOP recording
         btn_stop_entry = tk.Button(self.fr_setup, text="Stop Record",
                                 command=lambda: self.stop_record(),
                                 bg=self.theme_config["error"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_stop_entry.grid(row=5, column=2, padx=self.theme_config["size"]["ypad_s"], pady=1)
+        btn_stop_entry.grid(row=5, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         self.labelRNums = ttk.Label(self.fr_setup, text='', width=8, relief='sunken')
-        self.labelRNums.grid(row=5, column=3, padx=1, pady=self.theme_config["size"]["ypad_s"], sticky='W')
+        self.labelRNums.grid(row=5, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
 
         # set up button START live GRAPH
         btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
                                 command=lambda: None,
                                 bg=self.theme_config["dark_3"], fg="white", height=2, width=self.theme_config["size"]["w_button"])
-        btn_live_graph.grid(row=6, column=1, pady=self.theme_config["size"]["ypad_s"])
+        btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_analysis(self):
         # Create a StringVar to hold the selected file path

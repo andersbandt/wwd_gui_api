@@ -59,6 +59,7 @@ class TabDMM(guic.ThemedFrame):
 
         # set up prompt
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "DMM Console Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
@@ -69,6 +70,7 @@ class TabDMM(guic.ThemedFrame):
         # set up port
         self.fr_port = guic.SerialConnFrame(
             self,
+            self.theme_config,
             self.cc,
             "DMM_Serial",
             self.port_init,
@@ -173,11 +175,10 @@ class TabDMM(guic.ThemedFrame):
         self.range_drop[0].grid(row=2, column=1, pady=self.theme_config["size"]["ypad_s"])
         self.sample_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
 
+    # TODO: for this and PS. How can I add some dynamic unit conversions?
     def gui_refresh_DMM(self, kind="partial"):
         if not self.fr_port.status:
             return
-
-        print(f"Updating ({kind}) dmm ...")
 
         # TODO: let's figure out how to add all of these things back with my new abstraction
         self.dmm_Meas1 = self.dmm.read_value()
@@ -198,7 +199,6 @@ class TabDMM(guic.ThemedFrame):
             self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
             self.valueMeas2.config(text=self.dmm_Meas2)
 
-
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
 
@@ -215,75 +215,21 @@ class TabDMM(guic.ThemedFrame):
     def dmm_set_mode(self):
         if self.dmm is not None:
             mode = self.mode_drop[1].get()
+            self.prompt.print(f"Setting DMM mode to {mode}")
             self.dmm.set_mode(mode)
 
     def dmm_set_range(self):
         if self.dmm is not None:
             dmm_range = self.range_drop[1].get()
+            self.prompt.print(f"Setting DMM range to {dmm_range}")
             self.dmm.set_range(dmm_range)
 
     def dmm_set_sample(self):
         if self.dmm is not None:
             sample_speed = self.sample_drop[1].get()
+            self.prompt.print(f"Setting DMM sample speed to {sample_speed}")
             self.dmm.set_sample_speed(sample_speed)
 
-
-    ##############################################################################
-    ####      PT100 FUNCTIONS        ############################################
-    ##############################################################################
-
-    # def DoPT100Unit(self, event=None):
-    #     """
-    #         changes the unit for PT100
-    #     """
-    #     self.PT100_Unit = self.PT100UnitVal.get()
-    #
-    # def DoPT100(self, event=None):
-    #     """
-    #         enables PT100 mode. i.e. we convert a 100+ ohm value into
-    #         a temperature
-    #     """
-    #     if self.Fu1.upper() == 'RES' and self.Range.upper() == '500 OHM':
-    #         self.PT100_On = not self.PT100_On
-    #         if self.PT100_On:
-    #             self.buttonPT100.config(relief='sunken')
-    #         else:
-    #             self.buttonPT100.config(relief='raised')
-    #     else:
-    #         tkmb.showinfo('info', 'switch to 500 Ohm RES mode with REL to compensate for wire res.')
-    #
-    # def update_PT100(self):
-    #     def PT100_temp_convert(self, ohm, vnull=0.0):
-    #         """
-    #             convert a resistance reading of a standard PT100 probe to
-    #             a temperature in celsius. The resistance must be >=100 Ohm
-    #         """
-    #         TC = 0.00385
-    #         A = 3.9083E-03
-    #         B = 5.775E-07
-    #         C = -4.183E-12
-    #         R0 = 100.0
-    #         return (-A + math.sqrt(A * A - 4 * B * (1 - (ohm - vnull) / R0))) / (2 * B)
-    #
-    #     if self.PT100_On:
-    #         if self.Range.upper() == '500 OHM':
-    #             if (self.Meas1 >= 100) and (self.Meas1 < 550):
-    #                 self.Fu2 = 'PT100'
-    #                 self.Meas2 = PT100_temp_convert(self.Meas1)
-    #                 if self.PT100_Unit == 'F':
-    #                     self.Meas2 = 32 + self.Meas2 * (9 / 5)
-    #                 elif self.PT100_Unit == 'K':
-    #                     self.Meas2 = 273.15 + self.Meas2
-    #
-    #             else:
-    #                 tkmb.showinfo('info', 'resistance out of range for PT100')
-    #                 self.PT100_On = False
-    #                 self.buttonPT100.config(relief='raised')
-    #
-    #         else:
-    #             tkmb.showinfo('info', 'must be in 500 Ohm range to use PT100')
-    #             self.PT100_On = False
-    #             self.buttonPT100.config(relief='raised')
 
     ##############################################################################
     ####      RECORDING FUNCTIONS        #########################################

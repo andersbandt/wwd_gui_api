@@ -38,13 +38,14 @@ class TabUSB(guic.ThemedFrame):
         l1.grid(row=0, column=0, columnspan=2)
 
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "Debug serial",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)

@@ -59,6 +59,7 @@ class TabPS(guic.ThemedFrame):
 
         # set up prompt
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "PS Console Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
@@ -74,12 +75,12 @@ class TabPS(guic.ThemedFrame):
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
+                                            self.theme_config,
                                             self.cc,
                                             "PS_PyVISA",
                                             self.port_init,
                                             self.port_close,
                                             port_func=3)
-        self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
@@ -89,6 +90,7 @@ class TabPS(guic.ThemedFrame):
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()
+        print("\t... done initializing")
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)

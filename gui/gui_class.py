@@ -14,6 +14,7 @@ from tkinter import scrolledtext
 
 import json
 import threading
+import copy
 import xml.etree.ElementTree as ET
 
 # import user created modules
@@ -21,26 +22,73 @@ from gui import gui_helper as guih
 from common import serial_api
 
 
+# TODO: ask an actual AI agent to cleanup this function
+def scale_theme(theme_cfg: dict, factor: float, key_paths: list[list[str]]) -> dict:
+    """
+    Scale numeric values at given key paths by 'factor' and round to integers.
+    Non-numeric values are left as-is. Returns a new dict.
+    """
+    scaled = copy.deepcopy(theme_cfg)
+
+    for path in key_paths:
+        cur = scaled
+        for key in path[:-1]:
+            if not isinstance(cur, dict) or key not in cur:
+                cur = None
+                break
+            cur = cur[key]
+        if cur is None:
+            continue
+
+        leaf = path[-1]
+        if leaf in cur:
+            val = cur[leaf]
+            try:
+                num = float(val) * factor
+                # Round to nearest int (you can switch to floor/ceil if preferred)
+                cur[leaf] = int(round(num))
+            except Exception:
+                # Non-numeric; leave as-is
+                pass
+
+    return scaled
+
+
+
 ##########################################
 ### APP AND FRAMES       #################
 ##########################################
 
 class ThemedApp:
-    def __init__(self, root, theme_file):
+    def __init__(self, root, theme_file, compact):
         self.root = root
         self.style = ttk.Style(self.root)
+        self.theme_config = None
 
         # Set the theme to use (optional, 'clam' is a common choice for consistency)
         self.style.theme_use('clam')
 
-        # Load the initial theme
-        self.load_theme(theme_file)
+        # Load and apply the theme
+        self.load_theme(theme_file, compact=compact)
+        self.apply_theme()
 
-    def load_theme(self, theme_file):
-        """Load and apply theme from a JSON file."""
+
+    def load_theme(self, theme_file, compact=False):
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
-        self.apply_theme()
+
+        factor = 1
+        if compact:
+            factor *= 0.75
+
+        KEY_PATHS = [
+            # ["font", "size"],
+            ["pad", "xpad_s"],
+            ["pad", "ypad_s"],
+        ]
+
+        self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
+
 
     def apply_theme(self):
         """Apply the current theme configuration."""
@@ -52,39 +100,28 @@ class ThemedApp:
                              font=(self.theme_config["font"]["family"],
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]),
-                             padding=(self.theme_config["padding"]["horizontal"],
-                                      self.theme_config["padding"]["vertical"]))
-
+                             padding=(self.theme_config["pad"]["horizontal"],
+                                      self.theme_config["pad"]["vertical"]))
         self.style.map("TNotebook.Tab",
                        background=[("selected", self.theme_config["selected_tab_background"])],
                        foreground=[("selected", self.theme_config["selected_tab_foreground"])])
 
-    def update_theme(self, new_theme_file):
-        """Update the theme from a different theme file."""
-        self.load_theme(new_theme_file)
 
 
 class ThemedFrame(tk.Frame):
-    def __init__(self, root, theme_file, *args, **kwargs):
+    def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
         self.root = root
+        self.theme_config = theme_config
+
+        # TODO: how often am I using this?
         self.style = ttk.Style(self.root)
         self.style.configure("TButtonOn.TButton", background="green")
         self.style.configure("TButtonOff.TButton", background="red")
 
-        self.theme_config = None
-        self.load_theme(theme_file)
-        self.configure(bg=self.theme_config["bg_dark"])
+        self.set_bg(bg=self.theme_config["bg_dark"])
 
-        # Set the theme to use (optional, 'clam' is a common choice for consistency)
-        # self.style.theme_use('clam')
-
-    def load_theme(self, theme_file):
-        """Load and apply theme from a JSON file."""
-        with open(theme_file, 'r') as f:
-            self.theme_config = json.load(f)
-        self.apply_theme()
-
+    # TODO: should I just apply the theme once in the ThemedApp? Not have two functions to manage (confusing)
     def apply_theme(self):
         """Apply the theme to the current frame."""
         # Configure Button styles
@@ -135,18 +172,13 @@ class ThemedFrame(tk.Frame):
                                    self.theme_config["h1"]["size"],
                                    self.theme_config["h1"]["style"]))
 
-    def update_theme(self, new_theme_file):
-        """Update the theme from a different theme file."""
-        self.load_theme(new_theme_file)
-
     def set_bg(self, bg):
         self.configure(bg=bg)
 
 
 class Prompt(ThemedFrame):
-    def __init__(self, master, title, height, width):
-        self.theme_file = "config/darcula.json"  #tag:hardcode
-        super().__init__(master, self.theme_file, height=height, width=width)
+    def __init__(self, master, theme_config, title, height, width):
+        super().__init__(master, theme_config, height=height, width=width)
         self.height = height
         self.width = width
         self.set_bg(self.theme_config["light_4"])
@@ -200,9 +232,8 @@ class ColorCircle(tk.Canvas):
 ##########################################
 
 class ConnFrame(ThemedFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd):
-        self.theme_file = "config/darcula.json"  #tag:hardcode
-        super().__init__(master, self.theme_file)
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
+        super().__init__(master, theme_config)
         self.master = master
         self.name = name
         self.connect_cmd = connect_cmd
@@ -246,8 +277,8 @@ class ConnFrame(ThemedFrame):
 
 
 class SerialConnFrame(ConnFrame):
-    def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
-        super().__init__(master, name, connect_cmd, disconnect_cmd)
+    def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
+        super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd)
         self.cc = class_controller
 
         # set up connection options
@@ -367,9 +398,9 @@ class SerialConnFrame(ConnFrame):
 
 
 class AutoConnFrame(ConnFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd):
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
         self.master = master
-        super().__init__(self.master, name, connect_cmd, disconnect_cmd)
+        super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd)
 
     def init_fr(self):
         self.canvas1.grid(row=1, column=2, padx=15, pady=22)

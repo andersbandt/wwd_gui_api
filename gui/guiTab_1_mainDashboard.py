@@ -25,8 +25,8 @@ from gui import gui_helper as guih
 
 
 class TabMainDashboard(guic.ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.grid(row=0, column=0)
@@ -36,7 +36,7 @@ class TabMainDashboard(guic.ThemedFrame):
         self.relay_btns = []
 
         # init frames within tab
-        self.fr_main_status = guic.AutoConnFrame(self, "Relay", self.relay_autoconnect, None)
+        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None)
         self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
         self.fr_main_status.status = self.cc.relay.status
         self.fr_control = tk.Frame(self, bg="#00bcd4")
@@ -49,6 +49,7 @@ class TabMainDashboard(guic.ThemedFrame):
 
         # setup prompt
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "Main",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
@@ -59,7 +60,7 @@ class TabMainDashboard(guic.ThemedFrame):
 
         # init serial port
         self.ser_obj = None
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "ATE_serial", self.port_init, self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=1, padx=30, pady=12)

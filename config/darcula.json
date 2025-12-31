@@ -22,9 +22,13 @@
         "size": 12,
         "style": "bold"
     },
-    "padding": {
+    "pad": {
         "horizontal": 10,
-        "vertical": 5
+        "vertical": 5,
+        "xpad_s": 2,
+        "ypad_s": 5,
+        "xpad_l": 5,
+        "ypad_l": 10
     },
     "tab1_background": "#3C3F41",
     "tab2_background": "#2B2B2B",

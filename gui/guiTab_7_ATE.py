@@ -39,6 +39,7 @@ class TabATE(guic.ThemedFrame):
 
         # set up prompt
         self.prompt = guic.Prompt(self,
+                                  self.theme_config,
                                    "ATE Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
@@ -54,6 +55,7 @@ class TabATE(guic.ThemedFrame):
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
+                                            self.theme_config,
                                             self.cc,
                                             "Generic_ATE",
                                             self.port_init,

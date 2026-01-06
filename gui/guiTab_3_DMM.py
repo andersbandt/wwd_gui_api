@@ -49,14 +49,6 @@ class TabDMM(guic.ThemedFrame):
         self.dmm_Fu2 = ''
         self.dmm_Meas2 = ''
 
-        # set up recording information
-        self.record_speed = 1
-        self.record_status = False
-        self.recCnt = 0
-        self.recName = ''
-        self.data_dir = "data/dmm_data/"
-        self.csvh = None
-
         # set up prompt
         self.prompt = guic.Prompt(self,
                                   self.theme_config,
@@ -230,99 +222,6 @@ class TabDMM(guic.ThemedFrame):
             self.prompt.print(f"Setting DMM sample speed to {sample_speed}")
             self.dmm.set_sample_speed(sample_speed)
 
-
-    ##############################################################################
-    ####      RECORDING FUNCTIONS        #########################################
-    ##############################################################################
-
-    # starts the DMM recording
-    def record_DMM(self):
-        # conditionally STOP / START the recording
-        if not self.record_status:
-            if self.fr_port.status:
-                # SETUP DMM
-                # self.cc.dmm.set_range_auto() # ensure we are in AUTO mode
-
-                # START RECORDING
-                self.change_record_speed()
-                self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S', localtime()) + '.csv'
-                self.prompt.print(f"Starting DMM record every {self.record_speed} seconds ...")
-                self.csvh = CSVHelper(self.data_dir + self.recName)
-                self.csvh.initialize_file(["Time", "Range", "Func1", "Meas1"])
-
-                self.btn_record.config(relief='sunken')
-                self.labelRecFn.config(text='{:24s}'.format(self.recName))
-                self.recCnt = 0
-                self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
-
-                # start the thread
-                self.record_status = True
-                threading.Thread(target=lambda: self.thread_record_dmm()).start()
-            else:
-                guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
-        else:
-            # STOP RECORDING
-            self.prompt.print("Stopped DMM record !")
-            self.record_status = False
-            self.btn_record.config(relief='raised')
-
-        # successful exit of record function
-        return True
-
-    def change_record_speed(self):
-        # changes the recording speed based on recording speed GUI element
-        def parse_time_to_seconds(time_str):
-            """Convert a time string to seconds.
-
-            Args:
-                time_str (str): Time string to convert. Should end with 's', 'm', or 'h'.
-
-            Returns:
-                int: Time in seconds.
-            """
-            if not isinstance(time_str, str):
-                raise ValueError("Input should be a string.")
-
-            time_str = time_str.strip().lower()
-            if time_str.endswith('s'):
-                return int(time_str[:-1])
-            elif time_str.endswith('m'):
-                return int(time_str[:-1]) * 60
-            elif time_str.endswith('h'):
-                return int(time_str[:-1]) * 3600
-            else:
-                raise ValueError("Time string should end with 's', 'm', or 'h'.")
-
-        self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
-
-    #################################
-    #### THREADS SHIT    ############
-    #################################
-
-    def thread_record_dmm(self):
-        print("Starting DMM record!")
-
-        while self.record_status and self.fr_port.status:
-            print("Taking DMM measurement ...")
-            val_str = self.cc.dmm.read_val1_str()
-            print(f"\tDMM: {val_str}")
-
-            # add row to data file
-            if val_str is not None:
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                self.csvh.add_row([timestamp, "xxx_range", "xxx_func", xdm1041helper.parse_voltage_str(val_str)])
-
-                # update value counter
-                self.recCnt += 1
-                self.labelRNums.config(text='#{:7n}'.format(self.recCnt))
-
-            time.sleep(self.record_speed)
-
-        # if serial disconnect caused termination, call the start/stop record function
-        if self.record_status:
-            self.record_DMM()
-
-        print("DMM record thread exiting.")
 
     #################################
     #### SERIAL (COM)  ##############

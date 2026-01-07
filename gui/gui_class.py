@@ -117,7 +117,6 @@ class ThemedApp:
                        foreground=[("selected", self.theme_config["selected_tab_foreground"])])
 
 
-
 class ThemedFrame(tk.Frame):
     def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)

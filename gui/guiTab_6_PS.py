@@ -89,7 +89,6 @@ class TabPS(guic.ThemedFrame):
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()
-        print("\t... done initializing")
 
     # TODO: dynamic hiding / showing based on power supply channel count
     def init_fr_info(self):

@@ -46,6 +46,7 @@ class TabDMM(guic.ThemedFrame):
         self.dmm_Range = ''
         self.dmm_Fu1 = ''
         self.dmm_Meas1 = ''
+        self.meas1_scale = 1
         self.dmm_Fu2 = ''
         self.dmm_Meas2 = ''
 
@@ -85,6 +86,8 @@ class TabDMM(guic.ThemedFrame):
         self.init_fr_control()
 
     def init_fr_info(self):
+        fr_m = self.fr_info
+
         self.labelInfo = ttk.Label(self.fr_info, text='DMM_Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
@@ -131,10 +134,17 @@ class TabDMM(guic.ThemedFrame):
         self.valueFu2 = tk.Label(self.fr_info, width=9, text='', relief='sunken', anchor='w')
         self.valueMeas2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
+        # add some drop-downs for unit handling
+        # mode control
+        self.unitMeas1_drop = guih.generate_drop_down(fr_m,
+                                                   ["uV", "mV", "V"],
+                                                   callback_func=self.set_meas1_unit)
+
         # Position the value labels
         self.valueRange.grid(row=3, column=1, sticky='W', padx=5, pady=2)
         self.valueFu1.grid(row=4, column=1, sticky='W', padx=5, pady=2)
         self.valueMeas1.grid(row=5, column=1, sticky='W', padx=5, pady=2)
+        self.unitMeas1_drop[0].grid(row=5, column=2)
         self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
 
@@ -167,21 +177,18 @@ class TabDMM(guic.ThemedFrame):
         self.range_drop[0].grid(row=2, column=1, pady=self.theme_config["size"]["ypad_s"])
         self.sample_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
 
-    # TODO: for this and PS. How can I add some dynamic unit conversions?
     def gui_refresh_DMM(self, kind="partial"):
         if not self.fr_port.status:
             return
 
-        # TODO: let's figure out how to add all of these things back with my new abstraction
         self.dmm_Meas1 = self.dmm.read_value()
-        # self.dmm_Meas2 = self.dmm.read_val2_str().strip("\n")
+        self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
 
         if kind == "full":
             pass
             # self.dmm_Auto = self.dmm.get_range_auto()
-            # self.dmm_Range = self.dmm.get_range().strip("\n")
-            # self.dmm_Fu1 = self.dmm.get_func1()
-            # self.dmm_Fu2 = self.dmm.get_func2()
+            self.dmm_Range = self.dmm.get_range().strip("\n")
+            self.dmm_Fu1 = self.dmm.get_func1()
 
         # update Label
         if self.fr_port.status:
@@ -203,6 +210,15 @@ class TabDMM(guic.ThemedFrame):
     ##############################################################################
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
+
+    def set_meas1_unit(self):
+        unit = self.unitMeas1_drop[1].get()
+        self.prompt.print(f"Setting measurement 1 units to {unit}")
+        if unit == "mV":
+            self.meas1_scale = 10e-3
+        elif unit == "V":
+            self.meas1_scale = 1
+
 
     def dmm_set_mode(self):
         if self.dmm is not None:

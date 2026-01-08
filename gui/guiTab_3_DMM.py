@@ -22,7 +22,6 @@ from datetime import datetime
 from analysis.csv_helper import CSVHelper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
-from EEequipment.XDM1041 import xdm1041helper # TODO: phase out this import module
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -135,7 +134,6 @@ class TabDMM(guic.ThemedFrame):
         self.valueMeas2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
         # add some drop-downs for unit handling
-        # mode control
         self.unitMeas1_drop = guih.generate_drop_down(fr_m,
                                                    ["uV", "mV", "V"],
                                                    callback_func=self.set_meas1_unit)
@@ -185,10 +183,8 @@ class TabDMM(guic.ThemedFrame):
         self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
 
         if kind == "full":
-            pass
-            # self.dmm_Auto = self.dmm.get_range_auto()
-            self.dmm_Range = self.dmm.get_range().strip("\n")
-            self.dmm_Fu1 = self.dmm.get_func1()
+            self.dmm_Range = self.dmm.get_range()
+            self.dmm_Fu1 = self.dmm.get_mode()
 
         # update Label
         if self.fr_port.status:
@@ -215,10 +211,11 @@ class TabDMM(guic.ThemedFrame):
         unit = self.unitMeas1_drop[1].get()
         self.prompt.print(f"Setting measurement 1 units to {unit}")
         if unit == "mV":
-            self.meas1_scale = 10e-3
+            self.meas1_scale = 1e3
+        elif unit == "uV":
+            self.meas1_scale = 1e6
         elif unit == "V":
             self.meas1_scale = 1
-
 
     def dmm_set_mode(self):
         if self.dmm is not None:

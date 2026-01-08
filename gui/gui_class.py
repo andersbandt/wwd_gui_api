@@ -193,7 +193,7 @@ class Prompt(ThemedFrame):
         self.set_bg(self.theme_config["light_4"])
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
-        clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
+        clear_button = tk.Button(self, text="Clear console", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
 
         # set up text_data box for user communication
@@ -307,6 +307,7 @@ class SerialConnFrame(ConnFrame):
         self.initialize_fr()
 
     def initialize_fr(self):
+        # TODO: add back the button to refresh ports
         # initialize port connection method dropdown
         self.port_func_drop = guih.generate_drop_down(
             self,

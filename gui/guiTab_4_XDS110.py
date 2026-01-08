@@ -73,8 +73,7 @@ class tabXDS110(guic.ThemedFrame):
 
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
-        btn_check_xds110 = ttk.Button(self.fr_xds110, text="XDS110 Check", style="TGreenButton.TButton",
-                                      command=lambda: threading.Thread(target=self.check_xds110).start())
+        btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check", command=lambda: threading.Thread(target=self.check_xds110).start())
         btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
         self.status_xds110.grid(row=3, column=2, padx=15, pady=22)
 

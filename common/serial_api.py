@@ -36,8 +36,7 @@ def get_ports(method=None):
                 pass
 
     elif method == 3:
-        # TODO: do I need to add the logic here to conditionally select the ResourceManager backend thingy?
-        rm = pyvisa.ResourceManager('@py')
+        rm = pyvisa.ResourceManager()
         ports = rm.list_resources()
     else:
         ports = None

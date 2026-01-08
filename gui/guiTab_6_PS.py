@@ -45,6 +45,8 @@ class TabPS(guic.ThemedFrame):
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
+        self.ch1_scale = 1
+        self.ch2_scale = 1
         self.ps_v1s = "?"
         self.ps_v2s = "?"
         self.ps_v1r = 0
@@ -90,7 +92,7 @@ class TabPS(guic.ThemedFrame):
         self.init_fr_control()
         self.init_fr_status()
 
-    # TODO: dynamic hiding / showing based on power supply channel count
+
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
@@ -131,9 +133,10 @@ class TabPS(guic.ThemedFrame):
         self.labelV1_s.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelV1_r.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelI1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
-        self.labelV2_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
-        self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
-        self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
+        if self.channel_count == 2:
+            self.labelV2_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+            self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
+            self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for range and measurements
         self.valueV1_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
@@ -144,16 +147,27 @@ class TabPS(guic.ThemedFrame):
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
+        # add some drop-downs for unit handling
+        self.unitCH1_drop = guih.generate_drop_down(self.fr_info,
+                                                   ["uA", "mA", "A"],
+                                                   callback_func=self.set_ch1_unit)
+        self.unitCH2_drop = guih.generate_drop_down(self.fr_info,
+                                                   ["uA", "mA", "A"],
+                                                   callback_func=self.set_ch2_unit)
+
         # Position the value labels
         self.valueV1_s.grid(row=3, column=1, sticky='E', padx=5, pady=2)
         self.valueV1_r.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueI1.grid(row=5, column=1, sticky='E', padx=5, pady=2)
-        self.valueV2_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
-        self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
-        self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
+        self.unitCH1_drop[0].grid(row=5, column=2, sticky='W', padx=5, pady=2)
+        if self.channel_count == 2:
+            self.valueV2_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+            self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
+            self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
+            self.unitCH2_drop[0].grid(row=8, column=2, sticky='W', padx=5, pady=2)
 
         # ADD A REFRESH
-        self.btn_update = ttk.Button(self.fr_info, text='UPDATE PS', command=lambda: self.update_PS())
+        self.btn_update = tk.Button(self.fr_info, text='UPDATE PS', command=lambda: self.update_PS())
         self.btn_update.grid(row=9, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
@@ -162,9 +176,8 @@ class TabPS(guic.ThemedFrame):
         # CHANNEL 1 CONTROLS
         self.ch1_label = ttk.Label(fr_m, text="Channel 1", style="TLabel")
         self.ch1_voltage = tk.Entry(fr_m)
-        self.ch1_set_btn = ttk.Button(fr_m, text="Set Voltage", style="TButton",
-                                      command=lambda: self.set_voltage(1, self.ch1_voltage.get())
-                                      )
+        self.ch1_set_btn = tk.Button(fr_m, text="Set Voltage",
+                                      command=lambda: self.set_voltage(1, self.ch1_voltage.get()))
 
         self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
         self.ch1_label.grid(row=0, column=0, padx=10, pady=10)
@@ -175,7 +188,7 @@ class TabPS(guic.ThemedFrame):
         # CHANNEL 2 CONTROLS
         self.ch2_label = ttk.Label(fr_m, text="Channel 2", style="TLabel")
         self.ch2_voltage = tk.Entry(fr_m)
-        self.ch2_set_btn = ttk.Button(fr_m, text="Set Voltage", style="TButton",
+        self.ch2_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(2, self.ch2_voltage.get())
                                       )
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
@@ -189,7 +202,7 @@ class TabPS(guic.ThemedFrame):
             fr_m,
             [1, 2],
         )
-        self.plot_current_btn = ttk.Button(fr_m, text="Live Plot current", style="TButton",
+        self.plot_current_btn = tk.Button(fr_m, text="Live Plot current",
                                            command=lambda: self.plot_current(),
                                            )
         self.var_record = tk.IntVar()
@@ -269,6 +282,27 @@ class TabPS(guic.ThemedFrame):
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
+
+    def set_ch1_unit(self):
+        unit = self.unitCH1_drop[1].get()
+        self.prompt.print(f"Setting channel 1 units to {unit}")
+        if unit == "mA":
+            self.ch1_scale = 1e3
+        elif unit == "uA":
+            self.ch1_scale = 1e6
+        elif unit == "A":
+            self.ch1_scale = 1
+
+    def set_ch2_unit(self):
+        unit = self.unitCH2_drop[1].get()
+        self.prompt.print(f"Setting channel 2 units to {unit}")
+        if unit == "mA":
+            self.ch2_scale = 1e3
+        elif unit == "uA":
+            self.ch2_scale = 1e6
+        elif unit == "A":
+            self.ch2_scale = 1
+
 
     def update_PS(self):
         if self.fr_port.status:
@@ -380,6 +414,11 @@ class TabPS(guic.ThemedFrame):
             return False
 
         if self.id:  # CONNECTION SUCCESS
+            # re-initialize channel count dependent frames
+            self.init_fr_info()
+            self.init_fr_control()
+
+            # start doing stuff
             self.prompt.print(f"Connected to PS with id: {self.id}")
             self.labelIDValue.config(text=self.id)
             self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
@@ -392,7 +431,7 @@ class TabPS(guic.ThemedFrame):
             self.ch1_on = 0
             self.ch2_on = 0
 
-            # gui refresh
+            # gui_refresh
             self.gui_refresh_channel_state()
             return True
         else:  # BAD ID received

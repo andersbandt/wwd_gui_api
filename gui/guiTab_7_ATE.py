@@ -108,16 +108,16 @@ class TabATE(guic.ThemedFrame):
         # GENERAL CONTROLS
         self.cmd_label = ttk.Label(fr_m, text="Command", style="TLabel")
         self.cmd_entry = tk.Entry(fr_m)
-        self.cmd_button = ttk.Button(fr_m, text="Send", style="TButton",
+        self.cmd_button = tk.Button(fr_m, text="Send",
                                       command=lambda: self.ate_command(self.cmd_entry.get())
                                       )
-        self.qry_button = ttk.Button(fr_m, text="Query", style="TButton",
+        self.qry_button = tk.Button(fr_m, text="Query",
                                       command=lambda: self.ate_query(self.cmd_entry.get())
                                       )
 
 
         # MISC CONTROL
-        self.benchmark = ttk.Button(fr_m, text="Benchmark", style="TButton",
+        self.benchmark = tk.Button(fr_m, text="Benchmark",
                                       command=lambda: self.ate_benchmark()
                                       )
 
@@ -144,7 +144,6 @@ class TabATE(guic.ThemedFrame):
             res = self.ate.query(command_str)
             self.prompt.print(f"Got response: {res}")
 
-    # TODO: might need a drop down on the benchark method choice... some equipment test_conn doesn't work?
     def ate_benchmark(self):
         if self.ate is not None:
             self.prompt.print("Running benchmark with the `test_conn` function")

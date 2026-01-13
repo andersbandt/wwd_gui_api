@@ -26,7 +26,7 @@ from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
 from gui import guiTab_6_PS
 from gui import guiTab_7_ATE
-
+from gui import guiTab_8_GRAPH
 
 
 def parse_autoconnect_config():
@@ -70,13 +70,6 @@ class MainApplication(ThemedApp):
         )
         time.sleep(2)
 
-        self.tab1 = None
-        self.tab2 = None
-        self.tab3 = None
-        self.tab4 = None
-        self.tab5 = None
-        self.tab6 = None
-        self.tab7 = None
         self.tab_names = []
         self.setTabs()
 
@@ -97,10 +90,11 @@ class MainApplication(ThemedApp):
         self.tab5 = guiTab_5_USB.TabUSB(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[4])
         self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[5])
         self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
+        self.tab8 = guiTab_8_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE"]
-        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7]
+        self.tab_names = ["MAIN", "Logger", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE", "GRAPH"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8]
 
         # Add tabs dynamically using a loop
         for tab, name in zip(tabs, self.tab_names):

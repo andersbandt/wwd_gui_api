@@ -27,6 +27,9 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
 
+# TODO: large (can I have it import a script to execute. For example how do I make my thermopile ramp saveable and repeatable
+
+
 class TabPS(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)
@@ -149,10 +152,10 @@ class TabPS(guic.ThemedFrame):
 
         # add some drop-downs for unit handling
         self.unitCH1_drop = guih.generate_drop_down(self.fr_info,
-                                                   ["uA", "mA", "A"],
+                                                   ["A", "mA", "uA"],
                                                    callback_func=self.set_ch1_unit)
         self.unitCH2_drop = guih.generate_drop_down(self.fr_info,
-                                                   ["uA", "mA", "A"],
+                                                   ["A", "mA", "uA"],
                                                    callback_func=self.set_ch2_unit)
 
         # Position the value labels
@@ -167,7 +170,7 @@ class TabPS(guic.ThemedFrame):
             self.unitCH2_drop[0].grid(row=8, column=2, sticky='W', padx=5, pady=2)
 
         # ADD A REFRESH
-        self.btn_update = tk.Button(self.fr_info, text='UPDATE PS', command=lambda: self.update_PS())
+        self.btn_update = tk.Button(self.fr_info, text='UPDATE PS', command=self.update_PS)
         self.btn_update.grid(row=9, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
@@ -192,10 +195,11 @@ class TabPS(guic.ThemedFrame):
                                       command=lambda: self.set_voltage(2, self.ch2_voltage.get())
                                       )
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
-        self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
-        self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
-        self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
-        self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
+        if self.channel_count == 2:
+            self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
+            self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
+            self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
+            self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
         # MISC CONTROL
         self.channelRecord_drop = guih.generate_drop_down(
@@ -226,8 +230,9 @@ class TabPS(guic.ThemedFrame):
         self.labelCh2Mode = ttk.Label(self.fr_status, width=10, text='Ch 2 Mode', style="TLabel", anchor='w')
         self.ch2_mode = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelCh2Mode.grid(row=0, column=1, pady=15, padx=15)
-        self.ch2_mode.grid(row=1, column=1, pady=15, padx=15)
+        if self.channel_count == 2:
+            self.labelCh2Mode.grid(row=0, column=1, pady=15, padx=15)
+            self.ch2_mode.grid(row=1, column=1, pady=15, padx=15)
 
     def gui_refresh_info(self):
         if self.fr_port.status:
@@ -303,13 +308,16 @@ class TabPS(guic.ThemedFrame):
         elif unit == "A":
             self.ch2_scale = 1
 
-
     def update_PS(self):
         if self.fr_port.status:
             self.ps_v1r = self.cc.ps.get_voltage(1)
-            self.ps_v2r = self.cc.ps.get_voltage(2)
             self.ps_i1 = self.cc.ps.get_current(1)
-            self.ps_i2 = self.cc.ps.get_current(2)
+            self.ps_i1 = self.ps_i1 * self.ch1_scale
+            if self.channel_count == 2:
+                self.ps_v2r = self.cc.ps.get_voltage(2)
+                self.ps_i2 = self.cc.ps.get_current(2)
+                self.ps_i2 = self.ps_i2 * self.ch2_scale
+            self.gui_refresh_info()
 
     def toggle_channel(self, channel):
         if not self.cc.get_ps_status():
@@ -417,6 +425,7 @@ class TabPS(guic.ThemedFrame):
             # re-initialize channel count dependent frames
             self.init_fr_info()
             self.init_fr_control()
+            self.init_fr_status()
 
             # start doing stuff
             self.prompt.print(f"Connected to PS with id: {self.id}")

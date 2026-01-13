@@ -27,6 +27,8 @@
         "vertical": 5,
         "xpad_s": 2,
         "ypad_s": 5,
+        "xpad_m": 4,
+        "ypad_m": 7,
         "xpad_l": 5,
         "ypad_l": 10
     },

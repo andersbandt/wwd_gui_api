@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 
+# TODO: finish extracting the rest of this stuff as a file
+
 
 data_dir = "data/data"  # Replace with your actual path
 #pattern = re.compile(r"AREC_b(\d+)_([-\d]+)_.*\.csv")
@@ -120,7 +122,6 @@ for filepath, vars_dict, df in files:
             legend_added.add(label_val)
 
         ax.plot(df_pwm[x_var], df_pwm[y_var] * y_scale, label=label, color=color)
-
 
 
 # show plot

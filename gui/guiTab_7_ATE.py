@@ -21,6 +21,8 @@ from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
+# TODO: add some accuracy calculation section? or maybe that would be better in the respective equipment sections? if I can make it generic enough it can life here
+
 
 class TabATE(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):

@@ -18,6 +18,13 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
 
+# TODO: logging with "stimulus" is not that hard. Simply create an array of stimulus (example, PS voltage), then iterate across that and log at each sample point.
+#   the hard part will be creating the stimulus array and adding timing in a user friendly manner
+#   let's start simple
+
+# TODO: I should really abstract away most of the logging logic
+
+
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)
@@ -102,32 +109,41 @@ class TabLog(guic.ThemedFrame):
         self.output_file_name = tk.Text(self.fr_setup, height=2, width=20)
         self.output_file_name.grid(row=2, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-        # add serial parameters box
-        tk.Label(self.fr_setup, text="Serial parameters").grid(row=3, column=1, padx=5, pady=5)
-        self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
-        self.serial_log_params.grid(row=3, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-
         # add check boxes for the various options
         self.var_use_ser = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use Serial",
                         variable=self.var_use_ser,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+                        offvalue=0,
+                        command=self.toggle_use_ser).grid(row=3, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
 
         self.var_use_dmm = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use DMM",
                         variable=self.var_use_dmm,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=1)
+                        offvalue=0).grid(row=3, column=1)
 
         self.var_use_ps = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use PS",
                         variable=self.var_use_ps,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=2)
+                        offvalue=0).grid(row=3, column=2)
+
+        # add serial parameters box
+        self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial parameters")
+        self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
+        self.serial_log_params.insert("1.0", "placeholder")
+        self.serial_log_params.tag_add("placeholder", "1.0", "end")
+        self.serial_log_params.tag_config("placeholder", foreground="gray")
+
+        self.lbl_use_ser.grid(row=4, column=1, padx=5, pady=5)
+        self.serial_log_params.grid(row=4, column=2, padx=self.theme_config["pad"]["xpad_s"],
+                                    pady=self.theme_config["pad"]["ypad_s"])
+        self.toggle_use_ser() # NOTE: initial state should be OFF so serial parameters should be hidden
 
         # speed recording options
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
@@ -208,6 +224,15 @@ class TabLog(guic.ThemedFrame):
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
+    # NOTE: some of these are linked to Checkbuttons
+
+    def toggle_use_ser(self):
+        if self.var_use_ser.get():
+            self.lbl_use_ser.grid()
+            self.serial_log_params.grid()
+        else:
+            self.lbl_use_ser.grid_remove()
+            self.serial_log_params.grid_remove()
 
     def start_record(self):
         # Organize parameters first
@@ -386,39 +411,4 @@ class TabLog(guic.ThemedFrame):
             time.sleep(self.record_speed)
 
 
-
-    # def analyze_file(self, filename):
-    #     print("Analyzing file")
-    #     file_path = self.basefilepath + self.data_folder + filename
-    #
-    #     # imu_data = processor.load_csv(file_path)
-    #     # if imu_data is None:
-    #     #     gui_helper.alert_user("Something wrong with data!",
-    #     #                           "Couldn't load data, something wrong",
-    #     #                           kind="error")
-    #     #     return False
-    #
-    #     imu_stats = imu_analysis.analyze_imu(file_path)
-    #     # output_frame = tk.Frame(self.master)
-    #     # output_frame.grid(row=4, column=0)
-    #     text_box = tk.Text(self.fr_analysis, height=17)
-    #     text_box.grid(row=5, column=0, padx=15, pady=15)
-    #
-    #     # Add the dictionary contents to the Text widget
-    #     for key, value in imu_stats.items():
-    #         text_box.insert(tk.END, f"{key}: {value}\n")
-    #     return True
-
-
-
-    # def graph_file(self, filename):
-    #     print("Graphing file")
-    #
-    #     file_path = self.basefilepath + self.data_folder + filename
-    #     imu_data = processor.load_csv(file_path)
-    #     if imu_data is None:
-    #         gui_helper.alert_user("Something wrong with IMU data!",
-    #                               "Couldn't load data, something wrong",
-    #                               kind="error")
-    #         return False
 

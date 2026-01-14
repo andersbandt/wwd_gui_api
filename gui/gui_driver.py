@@ -153,7 +153,8 @@ def main(autoconnect):
         compact=False
 
     # Center placement
-    x = (ws / 2) - (w / 4)
+    # x = (ws / 2) - (w / 4) # NOTE: I think this was when I wanted to be like 3/4 of the way right?
+    x = 20
     y = 20
 
 

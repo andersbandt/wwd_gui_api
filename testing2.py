@@ -24,6 +24,8 @@ group_schema = {
     1: ("var1", str),   # e.g., board number as string
     2: ("var2", float), # e.g., temperature as float
 }
+
+
 x_var = "Duty"
 y_var = "P_out"
 y_scale = 10**3

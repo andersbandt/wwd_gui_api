@@ -1,10 +1,13 @@
 
+
 # import needed packages
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 import os
+from pathlib import Path
+import re
 
 # import needed GUI packages
 import tkinter as tk
@@ -20,9 +23,13 @@ from gui import gui_class as guic
 
 
 # TODO: have saveable setup configs
+
 # TODO: add option to only select certain files from the Listbox in analysis
 
-# TODO: is there an option to tab to the next Entry box ... probably not ....
+
+def focus_next_widget(event):
+    event.widget.tk_focusNext().focus()
+    return("break")
 
 
 
@@ -94,6 +101,14 @@ class TabGraph(guic.ThemedFrame):
         self.x_var = tk.Text(self.fr_setup, height=1, width=20)
         self.y_var = tk.Text(self.fr_setup, height=1, width=20)
 
+        self.title.bind("<Tab>", focus_next_widget)
+        self.x_label.bind("<Tab>", focus_next_widget)
+        self.y_label.bind("<Tab>", focus_next_widget)
+        self.x_scale.bind("<Tab>", focus_next_widget)
+        self.y_scale.bind("<Tab>", focus_next_widget)
+        self.x_var.bind("<Tab>", focus_next_widget)
+        self.y_var.bind("<Tab>", focus_next_widget)
+
         # Widgets
         self.title.grid(row=2, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
         self.x_label.grid(row=3, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
@@ -103,7 +118,7 @@ class TabGraph(guic.ThemedFrame):
         self.x_var.grid(row=7, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
         self.y_var.grid(row=8, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-        # add check boxes for the various options
+        # add check box and text field to filter files by string
         self.var_use_file_regex = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use Filename Filter",
@@ -113,18 +128,28 @@ class TabGraph(guic.ThemedFrame):
         self.file_filter = tk.Text(self.fr_setup, height=1, width=20)
         self.file_filter.grid(row=9, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
+        # add check box and text field to label graphs by string in filename
+        self.var_use_file_labeler = tk.IntVar()
+        ttk.Checkbutton(self.fr_setup,
+                        text="Use Filename Labeler",
+                        variable=self.var_use_file_labeler,
+                        onvalue=1,
+                        offvalue=0).grid(row=10, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.file_labeler = tk.Text(self.fr_setup, height=1, width=20)
+        self.file_labeler.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
         # set up button SHOW_FILES
         btn_start_entry = tk.Button(self.fr_setup, text="Refresh Files",
                                  command=lambda: self.refresh_files(),
                                  bg=self.theme_config["success"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_start_entry.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        btn_start_entry.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
 
         # set up button START GRAPH
         btn_start_entry = tk.Button(self.fr_setup, text="Load fields (not working)",
                                  command=None,
                                  bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_start_entry.grid(row=10, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        btn_start_entry.grid(row=11, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_analysis(self):
         self.file_listbox = tk.Listbox(self.fr_analysis, width=50, height=15)
@@ -140,25 +165,12 @@ class TabGraph(guic.ThemedFrame):
         # plot button
         graph_button = tk.Button(self.fr_analysis,
                                  text="Graph files",
-                                 command=lambda: self.graph_files(self.file_filter.get("1.0", "end"))
+                                 command=self.graph_files
                                  )
         graph_button.grid(row=4, column=1, padx=10, pady=10)
 
     def gui_refresh(self, event):
-        if event == "auto":
-            if self.cc.get_ser_status():
-                self.ser_status.set_color(self.theme_config["success"])
-            else:
-                self.ser_status.set_color(self.theme_config["error"])
-            if self.cc.get_dmm_status():
-                self.dmm_status.set_color(self.theme_config["success"])
-            else:
-                self.dmm_status.set_color(self.theme_config["error"])
-            if self.cc.get_ps_status():
-                self.ps_status.set_color(self.theme_config["success"])
-            else:
-                self.ps_status.set_color(self.theme_config["error"])
-
+        pass
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -170,41 +182,33 @@ class TabGraph(guic.ThemedFrame):
 
     def refresh_files(self):
         files = [] # list of (filepath, vars_dict)
-        vars_dict = {}
-
-        # TODO: make this group_schema an option in the GUI interface
-        group_schema = {
-            1: ("var1", str),  # e.g., board number as string
-            2: ("var2", float),  # e.g., temperature as float
-        }
 
         def grab_files():
             for filename in os.listdir(self.data_dir):
+                # check if CSV file
                 if not filename.endswith(".csv"):
                     continue
+
+                # filename filtering
                 if self.var_use_file_regex.get():
-                    pass
-                    # TODO: add some pattern matching here
-                    # m = pattern.match(filename)
-                    # if not m:
-                    #     continue
+                    sr_str = "_" + self.file_filter.get("1.0", "end").strip("\n") + "_"
+                    if sr_str not in filename:
+                        continue
 
-                # Build a vars dict from the regex match dynamically
-                # for idx, (name, caster) in group_schema.items():
-                #     if self.var_use_file_regex.get():
-                #         try:
-                #             vars_dict[name] = caster(m.group(idx))
-                #         except (IndexError, ValueError) as ex:
-                #             # If a group is missing or cast fails, skip this file
-                #             # (You can log/print ex if desired)
-                #             vars_dict = None
-                #             break
-                #     else:
-                #         vars_dict = None
+                # extract vars_dict from filename (may contain things like board number, temperature, etc)
+                stem = Path(filename).stem
+                parts = stem.split('_')
 
+                # extract Pandas df
                 filepath = os.path.join(self.data_dir, filename)
                 df = pd.read_csv(filepath)
-                files.append((filename, filepath, vars_dict, df))
+
+                # append to running list of files
+                files.append((
+                    filename,
+                    filepath,
+                    parts,
+                    df))
             return files
 
         # update file list
@@ -214,35 +218,7 @@ class TabGraph(guic.ThemedFrame):
         for file in self.files:
             self.file_listbox.insert(tk.END, file[0])
 
-    def graph_files(self, filter_value):
-        # TODO: make this a user input
-        filter_by = "var1"
-        label_var = "PWM"
-        legend_added = set()
-        label_values = []
-
-        for _, _, _, df in self.files:
-            if label_var not in df.columns:
-                raise KeyError(f"Column '{label_var}' not found in one of the CSV files.")
-                # TODO: user error handling here
-            label_values.extend(df[label_var].dropna().unique())
-
-        # Unique + sorted (for consistent coloring)
-        unique_labels = sorted(set(label_values))
-
-        # TODO: evaluate this color normalization more
-        try:
-            # Attempt numeric normalization (e.g., PWM values like 0, 25, 50, 75, 100)
-            lbl_arr = np.array(unique_labels, dtype=float)
-            vmin, vmax = lbl_arr.min(), lbl_arr.max()
-            norm_lbl = mcolors.Normalize(vmin=vmin, vmax=vmax)
-            cmap_lbl = plt.get_cmap('tab10')  # or 'viridis', 'plasma' etc.
-            color_for_label = {val: cmap_lbl(norm_lbl(float(val))) for val in unique_labels}
-        except Exception:
-            # Fallback: categorical colors (e.g., strings)
-            cmap_lbl = plt.get_cmap('tab10')
-            color_for_label = {val: cmap_lbl(i % 10) for i, val in enumerate(unique_labels)}
-
+    def graph_files(self):
         # set up plot
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.set_xlabel(self.x_label.get("1.0", "end"))
@@ -251,41 +227,38 @@ class TabGraph(guic.ThemedFrame):
         ax.grid(True)
         plt.tight_layout()
 
-        for _, filepath, vars_dict, df in self.files:
-            if self.var_use_file_regex.get():
-                if filter_value is not None:
-                    if vars_dict[filter_by] != filter_value:
-                        continue
+        # iterate across all files
+        for filename, filepath, file_parts, df in self.files:
+            # setup X and Y data
+            x_key = self.x_var.get("1.0", "end").strip("\n")
+            y_key = self.y_var.get("1.0", "end").strip("\n")
+            try:
+                x_data = df[x_key]
+                y_data = df[y_key]
+            except KeyError as e:
+                guih.alert_user("Key error in data file", f"Key {e} is not found", "error")
+                return False
+            try:
+                x_scale = int(self.x_scale.get())
+                y_scale = int(self.y_scale.get())
+            except ValueError as e:
+                guih.alert_user("Scale factor not integer", e, "error")
+                return False
 
-            for label_val in sorted(df[label_var].dropna().unique()):
-                df_pwm = df[df[label_var] == label_val]
+            # set up labeling
+            if self.var_use_file_labeler.get():
+                file_label_idx = int(self.file_labeler.get("1.0", "end"))
+                label = file_parts[file_label_idx]
+            else:
+                label = filename
 
-                color = color_for_label[label_val]
-
-                # Only add one legend entry per PWM value
-                label = f"{label_var}={label_val}" if label_val not in legend_added else None
-                if label is not None:
-                    legend_added.add(label_val)
-
-                try:
-                    x_data = df_pwm[self.x_var.get("1.0", "end").strip("\n")]
-                    y_data = df_pwm[self.y_var.get("1.0", "end").strip("\n")]
-                except KeyError as e:
-                    guih.alert_user("Key error in data file", e, "error")
-                    return False
-                try:
-                    x_scale = int(self.x_scale.get())
-                    y_scale = int(self.y_scale.get())
-                except ValueError as e:
-                    guih.alert_user("Scale factor not integer", e, "error")
-                    return False
-
-                ax.plot(
-                     x_data * x_scale,
-                     y_data * y_scale,
-                    label=label,
-                    color=color
-                )
+            # plot on axis
+            ax.plot(
+                 x_data * x_scale,
+                 y_data * y_scale,
+                label=label,
+                # color=color
+            )
 
         # show plot
         ax.legend()
@@ -294,7 +267,7 @@ class TabGraph(guic.ThemedFrame):
 
     def analyze_files(self):
         print("Analyzing file")
-        file_path = self.basefilepath + self.data_folder + filename
+        file_path = self.basefilepath + self.data_dir + filename
 
         # imu_data = processor.load_csv(file_path)
         # if imu_data is None:

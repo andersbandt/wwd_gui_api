@@ -6,11 +6,10 @@ from tkinter import filedialog
 import threading
 import os
 import time
-from time import localtime, strftime
 from datetime import datetime
 
 # import user defined modules
-from analysis.csv_helper import CSVHelper
+from common import logger
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -21,8 +20,6 @@ from gui.gui_class import ColorCircle
 # TODO: logging with "stimulus" is not that hard. Simply create an array of stimulus (example, PS voltage), then iterate across that and log at each sample point.
 #   the hard part will be creating the stimulus array and adding timing in a user friendly manner
 #   let's start simple
-
-# TODO: I should really abstract away most of the logging logic
 
 
 class TabLog(guic.ThemedFrame):
@@ -241,34 +238,32 @@ class TabLog(guic.ThemedFrame):
         self.recCnt = 0
 
         # Check Serial if requested
-        if self.record_config["use_ser"]:
+        if self.record_config.use_ser:
             if not self.cc.get_ser_status():
                 guih.alert_user("Can't start record!", "Serial connection is not valid!", "error")
                 return
-            print("Serial is ready.")
-            self.record_status = True
 
         # Check DMM if requested
-        if self.record_config["use_dmm"]:
+        if self.record_config.use_dmm:
             if not self.cc.get_dmm_status():
                 guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
                 return
-            self.record_status = True
 
         # Check Power Supply if requested
-        if self.record_config["use_ps"]:
+        if self.record_config.use_ps:
             if not self.cc.get_ps_status():
                 guih.alert_user("Can't start record!", "Power Supply connection is not valid!", "error")
                 return
-            self.record_status = True
 
         if not self.record_status:
             guih.alert_user("Can't start record!", "No instruments selected", "error")
             return
 
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument
-        self.prompt.print(f"Starting Logging record every {self.record_speed} seconds ...")
+        logger.start_recording(self.csvh)
         self.record_status = True
+        self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
+        self.prompt.print(f"Recording every {self.record_speed} seconds ...")
         threading.Thread(target=self.thread_record).start()
 
     def stop_record(self):
@@ -310,72 +305,28 @@ class TabLog(guic.ThemedFrame):
 
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
-    def get_record_config(self):
-        self.record_config = {
-            "use_ser": self.var_use_ser.get(),
-            "use_dmm": self.var_use_dmm.get(),
-            "use_ps": self.var_use_ps.get(),
-            "ps_channel": 1,
-        }
-
     def organize_record_params(self):
-        # FILENAME SETUP
-        self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S',localtime())
-        file_str_ext = self.output_file_name.get("1.0", "end").strip("\n")
-        if file_str_ext != "":
-            self.recName += "_" + file_str_ext
-            self.prompt.print(f"Using filename extension: {file_str_ext}")
-        self.recName += ".csv"
-        self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
+        # get all needed GUI elements
+        prefix = "AREC"
+        data_dir = self.data_dir
+        ext_text = self.output_file_name.get("1.0", "end").strip("\n")
 
-        # CALL HELPER FUNCTIONS
-        self.set_record_speed()
-        self.get_record_config()
+        # create recording config
+        self.record_config = logger.create_record_config(
+            self.var_use_ser.get(),
+            self.var_use_dmm.get(),
+            self.var_use_ps.get(),
+            1,
+            self.serial_log_params.get("1.0", "end").strip()
+        )
 
-        # SETUP CSV HEADER PARAMETERS
-        headers = ["Time"]
-
-        # Serial/user-entered metadata (if selected)
-        if self.record_config["use_ser"]:
-            raw = self.serial_log_params.get("1.0", "end").strip()
-            if not raw:
-                guih.alert_user("No serial params entered", "The serial parameters are blank", "warning")
-
-            # Split by commas; do not tolerate trailing commas or empty segments
-            parts = raw.split(",")
-            # Strip whitespace from each part
-            parts = [p.strip() for p in parts]
-
-            # Check for empty entries (e.g., double commas or leading/trailing commas)
-            if any(p == "" for p in parts):
-                guih.alert_user("Invalid serial format", "Make sure there are no consecutive commas and no leading/trailing commas.\n"
-                    "Example: SN,BoardRev,FW", "error")
-
-            headers += parts
-
-        # DMM selected?
-        if self.record_config["use_dmm"]:
-            # dmm_params = ["DMM_Range", "DMM_Func1", "DMM_Meas1"]
-            dmm_params = ["DMM_Meas1"]
-            headers += dmm_params
-
-        # Power Supply selected?
-        if self.record_config["use_ps"]:
-            ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
-
-            if self.cc.get_ps_status():
-                if self.cc.ps.channel_count > 1:
-                        res = guih.promptYesNo("Use all power supply channels?",
-                                               f"Power supply has {self.cc.ps.channel_count} channels, use 2 of them?")
-                        if res:
-                            ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
-                            self.record_config["ps_channels"] = 2
-
-            headers += ps_params
-
-        # SETUP CSV
-        self.csvh = CSVHelper(self.data_dir + self.recName)
-        self.csvh.initialize_file(headers)
+        # setup recording
+        self.recName, self.csvh = logger.setup_recording(
+                data_dir,
+                prefix,
+                ext_text,
+                self.record_config
+        )
 
     def thread_record(self):
         while self.record_status:
@@ -409,6 +360,9 @@ class TabLog(guic.ThemedFrame):
 
             # Wait for next sample
             time.sleep(self.record_speed)
+
+
+
 
 
 

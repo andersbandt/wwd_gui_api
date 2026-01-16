@@ -7,18 +7,34 @@
 
 # import needed modules
 import logging
-import csv
+from analysis import csv_helper as csvh
 import os
+from time import strftime, localtime
 from fpdf import FPDF
 from datetime import datetime
+from dataclasses import dataclass
 
+from analysis.csv_helper import CSVHelper
 
 log_folder = "data" # master program folder for all output data. tag:hardcode
 
 
+#################################
+#### file stuff  ################
+#################################
+
+def build_log_name(prefix, file_str_ext):
+    # FILENAME SETUP
+    recName = prefix + "_" + strftime('%Y%m%d%H%M%S', localtime())
+    if file_str_ext is not None:
+        recName += "_" + file_str_ext
+    recName += ".csv"
+    return recName
+
+
+# TODO: evaluate this function compared to the more recent one above
 def get_filename(basefilepath, folder, name_ext, extension):
     current_datetime = datetime.now()
-    # date_strf = "%Y%m%d_%H%M%S"
     date_strf = "%Y%m%d"
     formatted_datetime = current_datetime.strftime(date_strf)
     if name_ext is None:
@@ -28,31 +44,7 @@ def get_filename(basefilepath, folder, name_ext, extension):
 
 
 #################################
-#### logging  ###################
-#################################
-
-def init_log(logname, filename):
-    logging.basicConfig(filename=filename,
-                        filemode='a',
-                        format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                        datefmt='%H:%M:%S',
-                        level=logging.DEBUG)
-    logging.info(f"Running {logname}")
-    logger = logging.getLogger(logname)
-    return logger
-
-
-def append_info(logger, line):
-    logger.info(line)
-
-
-def append_debug(logger, line):
-    logger.debug(line)
-
-
-
-#################################
-#### .log (text_data)  ###############
+#### .log (text_data)  ##########
 #################################
 
 def init_text(basefilepath, data_folder, start_msg):
@@ -76,57 +68,94 @@ def append_text(filename, data):
         file.write(data)
 
 
-#################################
-#### csv  #######################
-#################################
+#################################################
+#### AAL (advanced abstracted logging  ##########
+#################################################
 
-def init_csv(basefilepath, name_type, name_ext, parameters):
-    filename = get_filename(basefilepath,  # basefilepath
-                            name_type,  # name_type (output folder)
-                            name_ext,  # name_ext
-                            "csv")  # .extension
-
-    open_csv(filename, parameters)
-    return filename
-
-
-# open_csv: basically opens a .csv file with text_data in header columns
-def open_csv(filename, headers):
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(headers)
+@dataclass
+class RecordConfig:
+    use_ser: bool = False
+    use_dmm: bool = False
+    use_ps: bool = False
+    ps_channels: int = 1  # will be set to 2 if user confirms and PS supports it
+    serial_params: str = None
 
 
-def append_csv(filename, row_data):
-    with open(filename, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows([row_data])
+def create_record_config(use_ser, use_dmm, use_ps, ps_channels, serial_params):
+    config = RecordConfig(use_ser=use_ser, use_dmm=use_dmm, use_ps=use_ps, ps_channels=ps_channels, serial_params=serial_params)
+    return config
 
 
+def parse_serial_params(raw: str):
+    """
+    Parse comma-separated serial params. Raises ValueError if format is invalid.
+    Rules:
+      - No empty segments (no leading/trailing commas, no consecutive commas)
+      - Whitespace around names is allowed and stripped
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        # Let caller decide how to warn; return empty list to keep logic simple.
+        return []
 
-#################################
-#### pdf  #######################
-#################################
-
-def generate_summary_pdf(image_folder, output_pdf):
-    # Create a PDF document
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-
-    # Get the list of PNG files in the folder
-    image_files = [f for f in os.listdir(image_folder) if f.endswith('.png')]
-
-    # Add each PNG file as a page to the PDF document
-    for image_file in image_files:
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=image_file, ln=True)
-
-        # Add the PNG image to the PDF page
-        pdf.image(os.path.join(image_folder, image_file), x=10, y=20, w=180)
-
-    # Save the PDF document
-    pdf.output(output_pdf)
+    parts = [p.strip() for p in raw.split(",")]
+    if any(p == "" for p in parts):
+        raise ValueError(
+            "Invalid serial parameter format. "
+            "No consecutive or leading/trailing commas allowed. Example: SN,BoardRev,FW"
+        )
+    return parts
 
 
+def build_headers(record_config: RecordConfig):
+    # SETUP CSV HEADER PARAMETERS
+    headers = ["Time"]
 
+    # Serial/user-entered metadata (if selected)
+    if record_config.use_ser:
+        parts = parse_serial_params(record_config.serial_params)
+        if parts is None:
+            return False
+        headers += parts
+
+    # DMM selected?
+    if record_config.use_dmm:
+        # dmm_params = ["DMM_Range", "DMM_Func1", "DMM_Meas1"]
+        dmm_params = ["DMM_Meas1"]
+        headers += dmm_params
+
+    # Power Supply selected?
+    if record_config.use_ps:
+        ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
+
+        # TODO: have to get creative about detecting status
+        # if self.cc.get_ps_status():
+        if 1:
+            if record_config.ps_channels > 1:
+                ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
+
+        headers += ps_params
+
+    return headers
+
+
+# ---------------------------
+# Orchestrator (single call)
+# ---------------------------
+
+def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig):
+    """
+    High-level setup that:
+      1) Creates the filename
+      2) Builds the headers (may alert/confirm via callbacks)
+      3) Initializes the CSV file
+    Returns: (filename, headers, csv_helper, updated_config)
+    """
+    rec_name = build_log_name(prefix, ext_text)
+    headers = build_headers(config)
+    csvobj = csvh.init_csvh(data_dir, rec_name, headers)
+    return rec_name, csvobj
+
+
+def start_recording(csvobj: CSVHelper):
+    csvobj.initialize_file()

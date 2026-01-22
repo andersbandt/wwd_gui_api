@@ -7,6 +7,7 @@ class ClassController:
         self.dmm = None
         self.ps = None
         self.relay = None
+        self.fg = None
 
         self.ports_used = {}
 
@@ -21,6 +22,9 @@ class ClassController:
 
     def set_relay(self, relay):
         self.relay = relay
+
+    def set_fg(self, fg):
+        self.fg = fg
 
 
     def get_ser_status(self):
@@ -47,12 +51,22 @@ class ClassController:
         else:
             return self.relay.status
 
+    def get_fg_status(self):
+        if self.fg is None:
+            return False
+        else:
+            return self.fg.status
 
-    # TODO: I don't think this thing can add or even detect if the XML tag isn't in there (say if I add a new tab)
-    # TODO: I don't think this thing can handle multiple tabs having the same port either ... ?
+
     def set_used_port(self, port, usage):
+        """
+        Save the port used by a specific tab/usage to XML config.
+        If the port is already used by a different tab, it will be reassigned.
+        If the usage already has a port, it will be updated.
+        """
         self.ports_used[port] = usage
 
+        # Load or create XML tree
         try:
             tree = ET.parse("config/ports_used.xml")
             root = tree.getroot()
@@ -60,27 +74,35 @@ class ClassController:
             root = ET.Element("PortsUsed")
             tree = ET.ElementTree(root)
 
-        # check for already existing port
-        port_elements = {child.text: child for child in root}
-        if port in port_elements:
-            print(f"Can't save XML element {usage}@{port}, port already in config file (not an issue).")
-            return False
+        # Remove any OTHER usage that currently has this port
+        # (allows port to be reassigned from one tab to another)
+        for child in root:
+            if child.text == port and child.tag != usage:
+                root.remove(child)
+                print(f"Port {port} reassigned from {child.tag} to {usage}")
 
-        # Update or create the appropriate element
-        usage_elements = {child.tag: child for child in root}
-        if usage in usage_elements:
-            # If an element with the same usage already exists, update its value
-            port_element = usage_elements[usage]
-            port_element.text = str(port)
+        # Update or create the element for this usage
+        usage_element = root.find(usage)
+        if usage_element is not None:
+            # Update existing element
+            old_port = usage_element.text
+            usage_element.text = str(port)
+            if old_port != port:
+                print(f"Updated {usage}: {old_port} -> {port}")
         else:
-            # Create a new element if the usage does not exist
-            port_element = ET.SubElement(root, usage)
-            port_element.text = str(port)
+            # Create new element for this usage
+            usage_element = ET.SubElement(root, usage)
+            usage_element.text = str(port)
+            print(f"Created new port mapping: {usage} -> {port}")
+
+        # Pretty-print the XML with indentation
+        ET.indent(root, space="    ", level=0)
 
         # Write back to the XML file
         with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file)
-            return True
+            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
+
+        return True
 
 
 

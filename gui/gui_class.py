@@ -22,34 +22,40 @@ from gui import gui_helper as guih
 from common import serial_api
 
 
-# TODO: ask an actual AI agent to cleanup this function
-def scale_theme(theme_cfg: dict, factor: float, key_paths: list[list[str]]) -> dict:
+def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     """
     Scale numeric values at given key paths by 'factor' and round to integers.
-    Non-numeric values are left as-is. Returns a new dict.
+
+    Args:
+        theme_cfg: The theme configuration dictionary
+        factor: Scaling factor to apply
+        *key_paths: Dot-notation paths to scale (e.g., "pad.xpad_s", "size.h_button")
+
+    Returns:
+        A new dictionary with scaled values
+
+    Example:
+        scaled = scale_theme(config, 0.75, "pad.xpad_s", "pad.ypad_s", "size.w_prompt")
     """
     scaled = copy.deepcopy(theme_cfg)
 
     for path in key_paths:
-        cur = scaled
-        for key in path[:-1]:
-            if not isinstance(cur, dict) or key not in cur:
-                cur = None
-                break
-            cur = cur[key]
-        if cur is None:
-            continue
+        keys = path.split('.')
 
-        leaf = path[-1]
-        if leaf in cur:
-            val = cur[leaf]
-            try:
-                num = float(val) * factor
-                # Round to nearest int (you can switch to floor/ceil if preferred)
-                cur[leaf] = int(round(num))
-            except Exception:
-                # Non-numeric; leave as-is
-                pass
+        # Navigate to the parent dict
+        current = scaled
+        for key in keys[:-1]:
+            if not isinstance(current, dict) or key not in current:
+                break  # Path doesn't exist, skip
+            current = current[key]
+        else:
+            # Successfully navigated to parent, now scale the leaf value
+            leaf_key = keys[-1]
+            if leaf_key in current:
+                try:
+                    current[leaf_key] = int(round(float(current[leaf_key]) * factor))
+                except (ValueError, TypeError):
+                    pass  # Non-numeric value, leave as-is
 
     return scaled
 
@@ -77,32 +83,25 @@ class ThemedApp:
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
 
-        # do more "normal" scaling
-        factor = 1
         if compact:
-            factor *= 0.75
+            # Scale padding and prompt sizes to 75%
+            self.theme_config = scale_theme(
+                self.theme_config, 0.75,
+                "pad.xpad_s",
+                "pad.ypad_s",
+                "size.w_prompt",
+                "size.h_prompt"
+            )
 
-        KEY_PATHS = [
-            ["pad", "xpad_s"],
-            ["pad", "ypad_s"],
-            ["size", "w_prompt"],
-            ["size", "h_prompt"]
-        ]
-
-        self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
-
-        # do some other scaling on weird things with smaller values
-        if compact:
-            factor = 0.45
-        KEY_PATHS = [
-            ["size", "h_button"],
-        ]
-        self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
-
+            # Scale button height more aggressively to 45%
+            self.theme_config = scale_theme(
+                self.theme_config, 0.45,
+                "size.h_button"
+            )
 
     def apply_theme(self):
-        """Apply the current theme configuration."""
-        # Configure styles for notebook and tabs
+        """Apply the current theme configuration to all UI elements."""
+        # Configure notebook and tab styles
         self.style.configure('TNotebook', background=self.theme_config["bg_dark"])
         self.style.configure('TNotebook.Tab',
                              background=self.theme_config["tab_background"],
@@ -116,24 +115,7 @@ class ThemedApp:
                        background=[("selected", self.theme_config["selected_tab_background"])],
                        foreground=[("selected", self.theme_config["selected_tab_foreground"])])
 
-
-class ThemedFrame(tk.Frame):
-    def __init__(self, root, theme_config, *args, **kwargs):
-        super().__init__(root, *args, **kwargs)
-        self.root = root
-        self.theme_config = theme_config
-
-        # TODO: how often am I using this?
-        self.style = ttk.Style(self.root)
-        self.style.configure("TButtonOn.TButton", background="green")
-        self.style.configure("TButtonOff.TButton", background="red")
-
-        self.set_bg(bg=self.theme_config["bg_dark"])
-
-    # TODO: should I just apply the theme once in the ThemedApp? Not have two functions to manage (confusing)
-    def apply_theme(self):
-        """Apply the theme to the current frame."""
-        # Configure Button styles
+        # Configure button styles
         self.style.configure('TButton',
                              background=self.theme_config["button"]["background"],
                              foreground=self.theme_config["button"]["foreground"],
@@ -155,11 +137,14 @@ class ThemedFrame(tk.Frame):
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
+        self.style.configure("TButtonOn.TButton", background=self.theme_config["success"])
+        self.style.configure("TButtonOff.TButton", background=self.theme_config["error"])
+
         self.style.map('TButton',
                        background=[('active', self.theme_config["button"]["active_background"])],
                        foreground=[('active', self.theme_config["button"]["active_foreground"])])
 
-        # Configure Label styles
+        # Configure label styles
         self.style.configure('TLabel',
                              background=self.theme_config["label"]["background"],
                              foreground=self.theme_config["label"]["foreground"],
@@ -180,6 +165,14 @@ class ThemedFrame(tk.Frame):
                              font=(self.theme_config["h1"]["family"],
                                    self.theme_config["h1"]["size"],
                                    self.theme_config["h1"]["style"]))
+
+
+class ThemedFrame(tk.Frame):
+    def __init__(self, root, theme_config, *args, **kwargs):
+        super().__init__(root, *args, **kwargs)
+        self.root = root
+        self.theme_config = theme_config
+        self.set_bg(bg=self.theme_config["bg_dark"])
 
     def set_bg(self, bg):
         self.configure(bg=bg)

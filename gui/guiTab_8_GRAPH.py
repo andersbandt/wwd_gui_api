@@ -32,7 +32,6 @@ def focus_next_widget(event):
     return("break")
 
 
-
 class TabGraph(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)
@@ -152,21 +151,45 @@ class TabGraph(guic.ThemedFrame):
         btn_start_entry.grid(row=11, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_analysis(self):
-        self.file_listbox = tk.Listbox(self.fr_analysis, width=50, height=15)
-        self.file_listbox.grid(row=0, column=0, padx=self.theme_config["pad"]["xpad_m"], pady=self.theme_config["pad"]["ypad_m"])
+        # Create Listbox with multi-select support and scrollbar
+        listbox_frame = tk.Frame(self.fr_analysis)
+        listbox_frame.grid(row=0, column=0, padx=self.theme_config["pad"]["xpad_m"], pady=self.theme_config["pad"]["ypad_m"])
+
+        scrollbar = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
+        self.file_listbox = tk.Listbox(
+            listbox_frame,
+            selectmode=tk.EXTENDED,  # Enable multi-select
+            width=50,
+            height=15,
+            yscrollcommand=scrollbar.set
+        )
+        scrollbar.config(command=self.file_listbox.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.file_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Bind selection event
+        self.file_listbox.bind('<<ListboxSelect>>', self.on_file_select)
+
+        # Selection info label
+        self.file_selection_label = tk.Label(self.fr_analysis, text="0 files selected", relief='sunken')
+        self.file_selection_label.grid(row=1, column=0, padx=10, pady=5, sticky='ew')
 
         # analyze button
         open_button = tk.Button(self.fr_analysis,
-                                text="Analyze file data",
-                                command=self.analyze_files
-                                )
+                                text="Analyze Selected Files",
+                                command=self.analyze_files,
+                                bg=self.theme_config["dark_2"], fg="white",
+                                height=self.theme_config["size"]["h_button"],
+                                width=self.theme_config["size"]["w_button"])
         open_button.grid(row=3, column=1, padx=10, pady=10)
 
         # plot button
         graph_button = tk.Button(self.fr_analysis,
-                                 text="Graph files",
-                                 command=self.graph_files
-                                 )
+                                 text="Graph Selected Files",
+                                 command=self.graph_files,
+                                 bg=self.theme_config["dark_3"], fg="white",
+                                 height=self.theme_config["size"]["h_button"],
+                                 width=self.theme_config["size"]["w_button"])
         graph_button.grid(row=4, column=1, padx=10, pady=10)
 
     def gui_refresh(self, event):
@@ -179,6 +202,31 @@ class TabGraph(guic.ThemedFrame):
     def set_directory(self):
         self.data_dir = filedialog.askdirectory()
         self.lbl_data_directory.config(text=self.data_dir)
+
+    def on_file_select(self, event):
+        """Update the selection label when files are selected"""
+        selected_indices = self.file_listbox.curselection()
+        num_selected = len(selected_indices)
+
+        if num_selected == 0:
+            self.file_selection_label.config(text="0 files selected")
+        elif num_selected == 1:
+            self.file_selection_label.config(text="1 file selected")
+        else:
+            self.file_selection_label.config(text=f"{num_selected} files selected")
+
+    def get_selected_files(self):
+        """Get list of selected file data tuples"""
+        selected_indices = self.file_listbox.curselection()
+        if not selected_indices:
+            return []
+
+        selected_files = []
+        for idx in selected_indices:
+            if idx < len(self.files):
+                selected_files.append(self.files[idx])
+
+        return selected_files
 
     def refresh_files(self):
         files = [] # list of (filepath, vars_dict)
@@ -218,17 +266,28 @@ class TabGraph(guic.ThemedFrame):
         for file in self.files:
             self.file_listbox.insert(tk.END, file[0])
 
+        self.prompt.print(f"Loaded {len(self.files)} files")
+
     def graph_files(self):
+        # Get selected files
+        selected_files = self.get_selected_files()
+
+        if not selected_files:
+            guih.alert_user("No Files Selected", "Please select one or more files to graph", "warning")
+            return False
+
+        self.prompt.print(f"Graphing {len(selected_files)} selected file(s)...")
+
         # set up plot
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.set_xlabel(self.x_label.get("1.0", "end"))
-        ax.set_ylabel(self.y_label.get("1.0", "end"))
-        ax.set_title(self.title.get("1.0", "end"))
+        ax.set_xlabel(self.x_label.get("1.0", "end").strip("\n"))
+        ax.set_ylabel(self.y_label.get("1.0", "end").strip("\n"))
+        ax.set_title(self.title.get("1.0", "end").strip("\n"))
         ax.grid(True)
         plt.tight_layout()
 
-        # iterate across all files
-        for filename, filepath, file_parts, df in self.files:
+        # iterate across selected files only
+        for filename, filepath, file_parts, df in selected_files:
             # setup X and Y data
             x_key = self.x_var.get("1.0", "end").strip("\n")
             y_key = self.y_var.get("1.0", "end").strip("\n")
@@ -236,19 +295,23 @@ class TabGraph(guic.ThemedFrame):
                 x_data = df[x_key]
                 y_data = df[y_key]
             except KeyError as e:
-                guih.alert_user("Key error in data file", f"Key {e} is not found", "error")
-                return False
+                guih.alert_user("Key error in data file", f"Key {e} is not found in {filename}", "error")
+                self.prompt.print(f"Error: Column '{e}' not found in {filename}", "error")
+                continue
             try:
                 x_scale = int(self.x_scale.get())
                 y_scale = int(self.y_scale.get())
             except ValueError as e:
-                guih.alert_user("Scale factor not integer", e, "error")
+                guih.alert_user("Scale factor not integer", str(e), "error")
                 return False
 
             # set up labeling
             if self.var_use_file_labeler.get():
-                file_label_idx = int(self.file_labeler.get("1.0", "end"))
-                label = file_parts[file_label_idx]
+                try:
+                    file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
+                    label = file_parts[file_label_idx]
+                except (ValueError, IndexError):
+                    label = filename
             else:
                 label = filename
 
@@ -257,34 +320,48 @@ class TabGraph(guic.ThemedFrame):
                  x_data * x_scale,
                  y_data * y_scale,
                 label=label,
-                # color=color
+                marker='o',
+                markersize=3
             )
+
+            self.prompt.print(f"Plotted {filename}")
 
         # show plot
         ax.legend()
         plt.show()
+        self.prompt.print("Graph complete!")
         return True
 
     def analyze_files(self):
-        print("Analyzing file")
-        file_path = self.basefilepath + self.data_dir + filename
+        # Get selected files
+        selected_files = self.get_selected_files()
 
-        # imu_data = processor.load_csv(file_path)
-        # if imu_data is None:
-        #     gui_helper.alert_user("Something wrong with data!",
-        #                           "Couldn't load data, something wrong",
-        #                           kind="error")
-        #     return False
+        if not selected_files:
+            guih.alert_user("No Files Selected", "Please select one or more files to analyze", "warning")
+            return False
 
-        imu_stats = imu_analysis.analyze_imu(file_path)
-        # output_frame = tk.Frame(self.master)
-        # output_frame.grid(row=4, column=0)
-        text_box = tk.Text(self.fr_analysis, height=17)
-        text_box.grid(row=5, column=0, padx=15, pady=15)
+        self.prompt.print(f"Analyzing {len(selected_files)} selected file(s)...")
 
-        # Add the dictionary contents to the Text widget
-        for key, value in imu_stats.items():
-            text_box.insert(tk.END, f"{key}: {value}\n")
+        # Analyze each selected file
+        for filename, filepath, file_parts, df in selected_files:
+            self.prompt.print(f"\n=== Analysis of {filename} ===")
+
+            # Basic statistics
+            self.prompt.print(f"Rows: {len(df)}")
+            self.prompt.print(f"Columns: {', '.join(df.columns.tolist())}")
+
+            # Show statistics for numeric columns
+            numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+            if len(numeric_cols) > 0:
+                self.prompt.print("\nStatistics:")
+                for col in numeric_cols:
+                    mean_val = df[col].mean()
+                    std_val = df[col].std()
+                    min_val = df[col].min()
+                    max_val = df[col].max()
+                    self.prompt.print(f"  {col}: mean={mean_val:.4f}, std={std_val:.4f}, min={min_val:.4f}, max={max_val:.4f}")
+
+        self.prompt.print("\nAnalysis complete!")
         return True
 
 

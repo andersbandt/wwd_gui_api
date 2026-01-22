@@ -95,7 +95,6 @@ class TabPS(guic.ThemedFrame):
         self.init_fr_control()
         self.init_fr_status()
 
-
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)

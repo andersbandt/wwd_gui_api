@@ -27,6 +27,7 @@ from gui import guiTab_5_USB
 from gui import guiTab_6_PS
 from gui import guiTab_7_ATE
 from gui import guiTab_8_GRAPH
+from gui import guiTab_9_FG
 
 
 def parse_autoconnect_config():
@@ -45,7 +46,7 @@ def parse_autoconnect_config():
 
     # read in parameters from the config file
     autoconn_vars = []
-    for i in range(1, 8):
+    for i in range(1, 9):
         tmp = config["AUTOCONNECT"][f"tab_{i}"]
         if tmp.strip().upper() == "YES":
             autoconn_vars.append(True)
@@ -80,7 +81,7 @@ class MainApplication(ThemedApp):
         if self.autoconnect:
             autoconnect = parse_autoconnect_config()
         else:
-            autoconnect = [False for i in range(8)]
+            autoconnect = [False for i in range(9)]
 
         # create Tab objects
         self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,self.theme_config, autoconnect[0])
@@ -91,10 +92,11 @@ class MainApplication(ThemedApp):
         self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[5])
         self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
         self.tab8 = guiTab_8_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab9 = guiTab_9_FG.TabFG(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[8])
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "Logger", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE", "GRAPH"]
-        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8]
+        self.tab_names = ["MAIN", "Logger", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE", "GRAPH", "FG Control"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8, self.tab9]
 
         # Add tabs dynamically using a loop
         for tab, name in zip(tabs, self.tab_names):
@@ -117,6 +119,8 @@ class MainApplication(ThemedApp):
             guiTab_6_PS.TabPS.gui_refresh(self.tab6, "auto")
         elif selected_tab == self.tab_names[6]:
             guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
+        elif selected_tab == self.tab_names[8]:
+            guiTab_9_FG.TabFG.gui_refresh(self.tab9, "auto")
 
 
 ###########################################################
@@ -150,6 +154,7 @@ def main(autoconnect):
         compact=True
         print("Using compact sizing")
     else:
+        print("Using standard window size")
         compact=False
 
     # Center placement

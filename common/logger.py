@@ -15,6 +15,8 @@ from datetime import datetime
 from dataclasses import dataclass
 
 from analysis.csv_helper import CSVHelper
+from enum import Enum
+import numpy as np
 
 log_folder = "data" # master program folder for all output data. tag:hardcode
 
@@ -77,13 +79,129 @@ class RecordConfig:
     use_ser: bool = False
     use_dmm: bool = False
     use_ps: bool = False
+    use_fg: bool = False
     ps_channels: int = 1  # will be set to 2 if user confirms and PS supports it
     serial_params: str = None
 
 
-def create_record_config(use_ser, use_dmm, use_ps, ps_channels, serial_params):
-    config = RecordConfig(use_ser=use_ser, use_dmm=use_dmm, use_ps=use_ps, ps_channels=ps_channels, serial_params=serial_params)
+def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_params):
+    config = RecordConfig(use_ser=use_ser, use_dmm=use_dmm, use_ps=use_ps, use_fg=use_fg, ps_channels=ps_channels, serial_params=serial_params)
     return config
+
+
+#################################
+#### STIMULUS LOGGING  ##########
+#################################
+
+class StimulusType(Enum):
+    """Types of stimulus that can be swept"""
+    NONE = "None"
+    PS_VOLTAGE = "PS Voltage"
+    FG_FREQUENCY = "FG Frequency"
+    FG_DUTY_CYCLE = "FG Duty Cycle"
+
+
+class SweepMode(Enum):
+    """How the sweep progresses"""
+    LINEAR = "Linear"
+    LOGARITHMIC = "Logarithmic"
+
+
+@dataclass
+class StimulusConfig:
+    """Configuration for stimulus-based logging"""
+    enabled: bool = False
+    stimulus_type: StimulusType = StimulusType.NONE
+    sweep_mode: SweepMode = SweepMode.LINEAR
+    start_value: float = 0.0
+    stop_value: float = 0.0
+    step_value: float = 0.0
+    settling_time: float = 0.5  # Time to wait after changing stimulus before logging (seconds)
+    ps_channel: int = 1  # Which PS channel to sweep (if PS_VOLTAGE)
+
+    def validate(self):
+        """Validate the stimulus configuration"""
+        if not self.enabled:
+            return True, ""
+
+        if self.stimulus_type == StimulusType.NONE:
+            return False, "Please select a stimulus type"
+
+        if self.start_value == self.stop_value:
+            return False, "Start and stop values cannot be the same"
+
+        if self.step_value <= 0:
+            return False, "Step value must be positive"
+
+        if self.settling_time < 0:
+            return False, "Settling time cannot be negative"
+
+        # Check that step is reasonable
+        if abs(self.stop_value - self.start_value) < self.step_value:
+            return False, "Step size is larger than sweep range"
+
+        return True, ""
+
+
+class StimulusGenerator:
+    """Generates stimulus values for a sweep"""
+
+    def __init__(self, config: StimulusConfig):
+        self.config = config
+        self.values = self._generate_values()
+        self.current_index = 0
+
+    def _generate_values(self):
+        """Generate array of stimulus values based on configuration"""
+        if not self.config.enabled:
+            return []
+
+        start = self.config.start_value
+        stop = self.config.stop_value
+        step = self.config.step_value
+
+        if self.config.sweep_mode == SweepMode.LINEAR:
+            # Linear sweep
+            num_steps = int(abs(stop - start) / step) + 1
+            values = np.linspace(start, stop, num_steps)
+
+        elif self.config.sweep_mode == SweepMode.LOGARITHMIC:
+            # Logarithmic sweep
+            if start <= 0 or stop <= 0:
+                raise ValueError("Logarithmic sweep requires positive values")
+
+            # Calculate number of steps in log space
+            log_start = np.log10(start)
+            log_stop = np.log10(stop)
+            num_steps = int(abs(log_stop - log_start) / np.log10(1 + step/start)) + 1
+            values = np.logspace(log_start, log_stop, num_steps)
+
+        else:
+            raise ValueError(f"Unknown sweep mode: {self.config.sweep_mode}")
+
+        return values.tolist()
+
+    def __iter__(self):
+        """Make the generator iterable"""
+        self.current_index = 0
+        return self
+
+    def __next__(self):
+        """Get next stimulus value"""
+        if self.current_index >= len(self.values):
+            raise StopIteration
+
+        value = self.values[self.current_index]
+        self.current_index += 1
+        return value
+
+    def __len__(self):
+        """Return total number of steps"""
+        return len(self.values)
+
+    def get_progress(self):
+        """Get current progress (current step, total steps)"""
+        return self.current_index, len(self.values)
 
 
 def parse_serial_params(raw: str):
@@ -107,7 +225,7 @@ def parse_serial_params(raw: str):
     return parts
 
 
-def build_headers(record_config: RecordConfig):
+def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig = None):
     # SETUP CSV HEADER PARAMETERS
     headers = ["Time"]
 
@@ -136,6 +254,15 @@ def build_headers(record_config: RecordConfig):
 
         headers += ps_params
 
+    # Function Generator selected?
+    if record_config.use_fg:
+        fg_params = ["FG_Freq", "FG_Waveform"]
+        headers += fg_params
+
+    # Stimulus columns (if stimulus mode enabled)
+    if stimulus_config and stimulus_config.enabled:
+        headers += ["Stimulus_Value", "Stimulus_Step"]
+
     return headers
 
 
@@ -143,7 +270,7 @@ def build_headers(record_config: RecordConfig):
 # Orchestrator (single call)
 # ---------------------------
 
-def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig):
+def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig, stimulus_config: StimulusConfig = None):
     """
     High-level setup that:
       1) Creates the filename
@@ -152,7 +279,7 @@ def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordCon
     Returns: (filename, headers, csv_helper, updated_config)
     """
     rec_name = build_log_name(prefix, ext_text)
-    headers = build_headers(config)
+    headers = build_headers(config, stimulus_config)
     csvobj = csvh.init_csvh(data_dir, rec_name, headers)
     return rec_name, csvobj
 

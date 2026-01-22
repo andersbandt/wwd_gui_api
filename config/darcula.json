@@ -22,9 +22,15 @@
         "size": 12,
         "style": "bold"
     },
-    "padding": {
+    "pad": {
         "horizontal": 10,
-        "vertical": 5
+        "vertical": 5,
+        "xpad_s": 2,
+        "ypad_s": 5,
+        "xpad_m": 4,
+        "ypad_m": 7,
+        "xpad_l": 5,
+        "ypad_l": 10
     },
     "tab1_background": "#3C3F41",
     "tab2_background": "#2B2B2B",
@@ -41,6 +47,16 @@
     "label": {
         "background": "#2B2B2B",
         "foreground": "#A9B7C6"
+    },
+    "size": {
+      "h_button": 2,
+      "w_button": 20,
+      "ypad_s": 2,
+      "ypad_m": 5,
+      "ypad_l": 10,
+      "xpad": 5,
+      "w_prompt": 110,
+      "h_prompt": 14
     },
     "light_1": "#FF79C6",
     "light_2": "#282A36",

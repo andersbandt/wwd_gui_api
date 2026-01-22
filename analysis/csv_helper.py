@@ -1,19 +1,31 @@
 
+
+# import needed modules
 import csv
 from typing import Dict, Any, Optional
 from pathlib import Path
+import os
+
+
+def init_csvh(data_dir: str, filename: str, headers):
+    """
+    Create CSVHelper and initialize file. Returns the CSVHelper instance.
+    """
+    full_path = os.path.join(data_dir, filename)
+    csvh = CSVHelper(full_path, headers)
+    return csvh
+
 
 class CSVHelper:
-    def __init__(self, file_path):
+    def __init__(self, file_path, headers):
         self.file_path = Path(file_path)
-        self.headers = None
-
-    def initialize_file(self, headers):
-        """Initialize the CSV file with headers."""
         self.headers = headers
+
+    def initialize_file(self):
+        """Initialize the CSV file with headers."""
         with open(self.file_path, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(headers)
+            writer.writerow(self.headers)
 
     def add_row(self, row):
         """Add a single row of data to the CSV file."""

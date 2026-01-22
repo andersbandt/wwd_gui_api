@@ -13,45 +13,20 @@ import tkinter.messagebox as tkmb
 # import uGUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
-from gui.guiTab_parent import ThemedFrame
 
 # import needed packages
 from datetime import datetime
 import time
-import pyvisa.errors
+from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
-import EEequipment
-from EEequipment.TestEquipment import TestEquipment
-import inspect, pkgutil, importlib
+# TODO: add some accuracy calculation section? or maybe that would be better in the respective equipment sections? if I can make it generic enough it can life here
 
 
-
-ALLOWED_BASES = (TestEquipment,)  # add DMMBase, PowerSupplyBase, etc., if available
-
-def get_instruments():
-    """Return {display_name: class_obj} by walking subpackages and filtering."""
-    reg = {}
-    base_pkg = EEequipment.__name__
-    for m in pkgutil.walk_packages(EEequipment.__path__, prefix=f"{base_pkg}."):
-        modname = m.name
-        try:
-            module = importlib.import_module(modname)
-        except Exception:
-            continue
-        for name, obj in inspect.getmembers(module, inspect.isclass):
-            if obj.__module__ != modname:
-                continue
-            if any(obj is base or issubclass(obj, base) for base in ALLOWED_BASES) and obj not in ALLOWED_BASES:
-                display = name  # or f"{modname}.{name}" for uniqueness
-                reg[display] = obj
-    return reg
-
-
-
-class TabATE(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+class TabATE(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
@@ -65,7 +40,12 @@ class TabATE(ThemedFrame):
         self.ate = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "ATE Output", height=18, width=140)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "ATE Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # initialize tab content
         self.initTabContent()
@@ -77,6 +57,7 @@ class TabATE(ThemedFrame):
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
+                                            self.theme_config,
                                             self.cc,
                                             "Generic_ATE",
                                             self.port_init,
@@ -96,9 +77,8 @@ class TabATE(ThemedFrame):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
 
-
         # add equipment selector dropdown
-        self.registry = get_instruments()
+        self.registry = equipment_manager.get_instruments("all")
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -130,16 +110,16 @@ class TabATE(ThemedFrame):
         # GENERAL CONTROLS
         self.cmd_label = ttk.Label(fr_m, text="Command", style="TLabel")
         self.cmd_entry = tk.Entry(fr_m)
-        self.cmd_button = ttk.Button(fr_m, text="Send", style="TButton",
+        self.cmd_button = tk.Button(fr_m, text="Send",
                                       command=lambda: self.ate_command(self.cmd_entry.get())
                                       )
-        self.qry_button = ttk.Button(fr_m, text="Query", style="TButton",
+        self.qry_button = tk.Button(fr_m, text="Query",
                                       command=lambda: self.ate_query(self.cmd_entry.get())
                                       )
 
 
         # MISC CONTROL
-        self.benchmark = ttk.Button(fr_m, text="Benchmark", style="TButton",
+        self.benchmark = tk.Button(fr_m, text="Benchmark",
                                       command=lambda: self.ate_benchmark()
                                       )
 
@@ -149,6 +129,9 @@ class TabATE(ThemedFrame):
         self.cmd_button.grid(row=1, column=2, padx=10, pady=10)
         self.qry_button.grid(row=1, column=3, padx=10, pady=10)
         self.benchmark.grid(row=2, column=0, padx=10, pady=10)
+
+    def gui_refresh(self, event):
+        self.fr_port.refresh_ports()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -163,8 +146,6 @@ class TabATE(ThemedFrame):
             res = self.ate.query(command_str)
             self.prompt.print(f"Got response: {res}")
 
-
-    # TODO: might need a drop down on the benchark method choice... some equipment test_conn doesn't work?
     def ate_benchmark(self):
         if self.ate is not None:
             self.prompt.print("Running benchmark with the `test_conn` function")
@@ -188,8 +169,7 @@ class TabATE(ThemedFrame):
         try:
             import usb
             self.id = self.ate.test_conn()
-            # TODO: standardize the error exceptions below?
-        except (AttributeError, pyvisa.errors.VisaIOError, usb.core.USBError) as e:
+        except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't connect to VISA", e, "warning")
             self.fr_port.set_status(False)
             return False
@@ -203,7 +183,7 @@ class TabATE(ThemedFrame):
             self.fr_port.set_status(True)
 
             # gui refresh
-            self.gui_refresh()
+            self.gui_refresh("call")
             return True
         else:  # BAD ID received
             self.ate = None

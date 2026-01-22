@@ -56,6 +56,7 @@ class SerialReader(SerialGeneral.SerialGeneral):
         self.procStatus = True
 
         # INIT OF LOG FILE
+        # TODO: need to refactor back in CSV logging here. Or just scrap it because I'm logging with a different method?
         if data_mode == "data":
             log_text = logger.init_csv(basefilepath, data_folder, name_ext, parameters)
         elif data_mode == "raw" or data_mode == "timestamp":
@@ -84,7 +85,6 @@ class SerialReader(SerialGeneral.SerialGeneral):
                 else:
                     raise BaseException("ERROR: undefined data mode for SerialReader")
 
-    # TODO: this really shouldn't have things specific to text processing in it ...
     def stop_process(self):
         if self.procStatus:
             self.procStatus = False

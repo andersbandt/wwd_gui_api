@@ -5,6 +5,8 @@
 @brief    used for control of my WWD device through a GUI
 """
 
+# TODO: audit (and remove) all usages of ttk.Button
+
 # needed modules
 import argparse
 import logging

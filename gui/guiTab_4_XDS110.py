@@ -7,11 +7,8 @@
 
 # import needed packages
 import time
-import tkinter as tk
 from tkinter import *
-from tkinter import ttk
 from tkinter import filedialog
-import threading
 import configparser
 import os
 
@@ -22,12 +19,11 @@ from common import subprocessor as subp
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
-from gui.guiTab_parent import ThemedFrame
 
 
-class tabXDS110(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file):
-        super().__init__(master, theme_file)
+class tabXDS110(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.grid(row=0, column=0)
@@ -41,7 +37,11 @@ class tabXDS110(ThemedFrame):
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "XDS110 Comms", height=22, width=140)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "XDS110 Comms",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
@@ -66,15 +66,14 @@ class tabXDS110(ThemedFrame):
         self.parse_target_config("default.ini")
 
     def initTabContent(self):
-        print("Initializing tab XDS110 content")
+        print("Initializing tab 4 (XDS110) content")
         self.init_fr_xds110()
         self.init_fr_target()
         self.init_fr_firmware()
 
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
-        btn_check_xds110 = ttk.Button(self.fr_xds110, text="XDS110 Check", style="TGreenButton.TButton",
-                                      command=lambda: threading.Thread(target=self.check_xds110).start())
+        btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check", command=lambda: threading.Thread(target=self.check_xds110).start())
         btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
         self.status_xds110.grid(row=3, column=2, padx=15, pady=22)
 

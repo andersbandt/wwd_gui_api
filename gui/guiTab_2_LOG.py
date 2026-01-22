@@ -6,23 +6,25 @@ from tkinter import filedialog
 import threading
 import os
 import time
-from time import localtime, strftime
 from datetime import datetime
 
 # import user defined modules
-from imu import imu_analysis
-from analysis.csv_helper import CSVHelper
+from common import logger
 
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
-from gui.guiTab_parent import ThemedFrame
 
 
-class TabLog(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file):
-        super().__init__(master, theme_file)
+# TODO: logging with "stimulus" is not that hard. Simply create an array of stimulus (example, PS voltage), then iterate across that and log at each sample point.
+#   the hard part will be creating the stimulus array and adding timing in a user friendly manner
+#   let's start simple
+
+
+class TabLog(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
@@ -33,9 +35,9 @@ class TabLog(ThemedFrame):
         self.record_speed = 1
         self.record_status = False
         self.recCnt = 0
-        #self.recName = ''
         self.data_dir = basefilepath + "/data/"
         self.csvh = None
+        self.record_config = None
 
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_setup = tk.Frame(self, bg=self.theme_config["light_4"])
@@ -43,16 +45,20 @@ class TabLog(ThemedFrame):
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "Data Logger Output", height=18, width=115)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "Data Logger Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
 
         # initialize tab content
         self.initTabContent()
 
         # place everything in grid
         self.fr_status.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_setup.grid(row=1, column=1, rowspan=2, pady=15, padx=15)
+        self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
         self.fr_analysis.grid(row=2, column=0, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=12)
 
     def initTabContent(self):
         print("Initializing tab 2 (Logger) content")
@@ -71,20 +77,20 @@ class TabLog(ThemedFrame):
         self.labelSerStat = ttk.Label(self.fr_status, width=10, text='Serial', style="TLabel", anchor='w')
         self.ser_status = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelSerStat.grid(row=0, column=0, pady=15, padx=15)
-        self.ser_status.grid(row=0, column=1, pady=15, padx=15)
+        self.labelSerStat.grid(row=0, column=0)
+        self.ser_status.grid(row=0, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # DMM connection status
         self.labelDmmStat = ttk.Label(self.fr_status, width=10, text='DMM', style="TLabel", anchor='w')
         self.dmm_status = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelDmmStat.grid(row=1, column=0, pady=15, padx=15)
-        self.dmm_status.grid(row=1, column=1, pady=15, padx=15)
+        self.labelDmmStat.grid(row=1, column=0)
+        self.dmm_status.grid(row=1, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # PS connection status
         self.labelPsStat = ttk.Label(self.fr_status, width=10, text='PS', style="TLabel", anchor='w')
         self.ps_status = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelPsStat.grid(row=2, column=0, pady=15, padx=15)
-        self.ps_status.grid(row=2, column=1, pady=15, padx=15)
+        self.labelPsStat.grid(row=2, column=0)
+        self.ps_status.grid(row=2, column=1, pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_setup(self):
         # add directory search
@@ -92,18 +98,13 @@ class TabLog(ThemedFrame):
         self.lbl_data_directory.grid(row=2, column=0)
         btn_set_directory = tk.Button(self.fr_setup, text="Set directory",
                                  command=lambda: self.set_record_directory(),
-                                 bg=self.theme_config["light_1"], fg="black", height=1, width=10)
-        btn_set_directory.grid(row=1, column=0, padx=15, pady=22)
+                                 bg=self.theme_config["light_1"], fg="black", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_set_directory.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add output file name box
         tk.Label(self.fr_setup, text="Output file name").grid(row=2, column=2, padx=5, pady=20)
         self.output_file_name = tk.Text(self.fr_setup, height=2, width=20)
-        self.output_file_name.grid(row=2, column=3, pady=20)
-
-        # add serial parameters box
-        tk.Label(self.fr_setup, text="Serial parameters").grid(row=3, column=0, padx=5, pady=5)
-        self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
-        self.serial_log_params.grid(row=3, column=1)
+        self.output_file_name.grid(row=2, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add check boxes for the various options
         self.var_use_ser = tk.IntVar()
@@ -111,47 +112,61 @@ class TabLog(ThemedFrame):
                         text="Use Serial",
                         variable=self.var_use_ser,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=0, pady=2)
+                        offvalue=0,
+                        command=self.toggle_use_ser).grid(row=3, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
 
         self.var_use_dmm = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use DMM",
                         variable=self.var_use_dmm,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=1)
+                        offvalue=0).grid(row=3, column=1)
 
         self.var_use_ps = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use PS",
                         variable=self.var_use_ps,
                         onvalue=1,
-                        offvalue=0).grid(row=4, column=2)
+                        offvalue=0).grid(row=3, column=2)
+
+        # add serial parameters box
+        self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial parameters")
+        self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
+        self.serial_log_params.insert("1.0", "placeholder")
+        self.serial_log_params.tag_add("placeholder", "1.0", "end")
+        self.serial_log_params.tag_config("placeholder", foreground="gray")
+
+        self.lbl_use_ser.grid(row=4, column=1, padx=5, pady=5)
+        self.serial_log_params.grid(row=4, column=2, padx=self.theme_config["pad"]["xpad_s"],
+                                    pady=self.theme_config["pad"]["ypad_s"])
+        self.toggle_use_ser() # NOTE: initial state should be OFF so serial parameters should be hidden
 
         # speed recording options
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(self.fr_setup, options)
-        self.optRecSpd.grid(row=5, column=0, padx=3)
+        self.optRecSpd.grid(row=5, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button START recording
         btn_start_entry = tk.Button(self.fr_setup, text="Start Record",
                                  command=lambda: self.start_record(),
-                                 bg=self.theme_config["success"], fg="white", height=2, width=15)
-        btn_start_entry.grid(row=5, column=1, padx=15, pady=5)
+                                 bg=self.theme_config["success"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_start_entry.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button STOP recording
         btn_stop_entry = tk.Button(self.fr_setup, text="Stop Record",
                                 command=lambda: self.stop_record(),
-                                bg=self.theme_config["error"], fg="white", height=2, width=15)
-        btn_stop_entry.grid(row=5, column=2, padx=15, pady=5)
+                                bg=self.theme_config["error"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_stop_entry.grid(row=5, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         self.labelRNums = ttk.Label(self.fr_setup, text='', width=8, relief='sunken')
-        self.labelRNums.grid(row=5, column=3, padx=10, pady=10, sticky='W')
+        self.labelRNums.grid(row=5, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
 
         # set up button START live GRAPH
         btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
                                 command=lambda: None,
-                                bg=self.theme_config["dark_3"], fg="white", height=2, width=15)
-        btn_live_graph.grid(row=6, column=1, pady=5)
+                                bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_analysis(self):
         # Create a StringVar to hold the selected file path
@@ -206,6 +221,15 @@ class TabLog(ThemedFrame):
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
+    # NOTE: some of these are linked to Checkbuttons
+
+    def toggle_use_ser(self):
+        if self.var_use_ser.get():
+            self.lbl_use_ser.grid()
+            self.serial_log_params.grid()
+        else:
+            self.lbl_use_ser.grid_remove()
+            self.serial_log_params.grid_remove()
 
     def start_record(self):
         # Organize parameters first
@@ -214,35 +238,33 @@ class TabLog(ThemedFrame):
         self.recCnt = 0
 
         # Check Serial if requested
-        if self.record_config["use_ser"]:
+        if self.record_config.use_ser:
             if not self.cc.get_ser_status():
                 guih.alert_user("Can't start record!", "Serial connection is not valid!", "error")
                 return
-            print("Serial is ready.")
-            self.record_status = True
 
         # Check DMM if requested
-        if self.record_config["use_dmm"]:
+        if self.record_config.use_dmm:
             if not self.cc.get_dmm_status():
                 guih.alert_user("Can't start record!", "DMM connection is not valid!", "error")
                 return
-            self.record_status = True
 
         # Check Power Supply if requested
-        if self.record_config["use_ps"]:
+        if self.record_config.use_ps:
             if not self.cc.get_ps_status():
                 guih.alert_user("Can't start record!", "Power Supply connection is not valid!", "error")
                 return
-            self.record_status = True
 
         if not self.record_status:
             guih.alert_user("Can't start record!", "No instruments selected", "error")
             return
 
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument
-        self.prompt.print(f"Starting Logging record every {self.record_speed} seconds ...")
+        logger.start_recording(self.csvh)
         self.record_status = True
-        threading.Thread(target=self.thread_record, daemon=True).start() # TODO: added this daemon thing, do we need it?
+        self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
+        self.prompt.print(f"Recording every {self.record_speed} seconds ...")
+        threading.Thread(target=self.thread_record).start()
 
     def stop_record(self):
         self.record_status = False
@@ -283,63 +305,28 @@ class TabLog(ThemedFrame):
 
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
-    def get_record_status(self):
-        self.record_config = {
-            "use_ser": self.var_use_ser.get(),
-            "use_dmm": self.var_use_dmm.get(),
-            "use_ps": self.var_use_ps.get()
-        }
-
     def organize_record_params(self):
-        # FILENAME SETUP
-        self.recName = 'AREC_' + strftime('%Y%m%d%H%M%S',localtime())
-        file_str_ext = self.output_file_name.get("1.0", "end").strip("\n")
-        if file_str_ext != "":
-            self.recName += "_" + file_str_ext
-            self.prompt.print(f"Using filename extension: {file_str_ext}")
-        self.recName += ".csv"
-        self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
+        # get all needed GUI elements
+        prefix = "AREC"
+        data_dir = self.data_dir
+        ext_text = self.output_file_name.get("1.0", "end").strip("\n")
 
-        # CALL HELPER FUNCTIONS
-        self.set_record_speed()
-        self.get_record_status()
+        # create recording config
+        self.record_config = logger.create_record_config(
+            self.var_use_ser.get(),
+            self.var_use_dmm.get(),
+            self.var_use_ps.get(),
+            1,
+            self.serial_log_params.get("1.0", "end").strip()
+        )
 
-        # SETUP CSV HEADER PARAMETERS
-        headers = ["Time"]
-
-        # Serial/user-entered metadata (if selected)
-        if self.record_config["use_ser"]:
-            raw = self.serial_log_params.get("1.0", "end").strip()
-            if not raw:
-                guih.alert_user("No serial params entered", "The serial parameters are blank", "warning")
-
-            # Split by commas; do not tolerate trailing commas or empty segments
-            parts = raw.split(",")
-            # Strip whitespace from each part
-            parts = [p.strip() for p in parts]
-
-            # Check for empty entries (e.g., double commas or leading/trailing commas)
-            if any(p == "" for p in parts):
-                guih.alert_user("Invalid serial format", "Make sure there are no consecutive commas and no leading/trailing commas.\n"
-                    "Example: SN,BoardRev,FW", "error")
-
-            headers += parts
-
-        # DMM selected?
-        if self.record_config["use_dmm"]:
-            # dmm_params = ["DMM_Range", "DMM_Func1", "DMM_Meas1"]
-            dmm_params = ["DMM_Meas1"]
-            headers += dmm_params
-
-        # Power Supply selected?
-        if self.record_config["use_ps"]:
-            # TODO: add multiple channel support for power supplies
-            ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
-            headers += ps_params
-
-        # SETUP CSV
-        self.csvh = CSVHelper(self.data_dir + self.recName)
-        self.csvh.initialize_file(headers)
+        # setup recording
+        self.recName, self.csvh = logger.setup_recording(
+                data_dir,
+                prefix,
+                ext_text,
+                self.record_config
+        )
 
     def thread_record(self):
         while self.record_status:
@@ -359,6 +346,10 @@ class TabLog(ThemedFrame):
                 row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
                 row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
                 row["PS_Imeas1"] = self.cc.ps.get_current(1)
+                if self.record_config["ps_channels"] == 2:
+                    row["PS_Vset2"] = self.cc.ps.get_set_voltage(2)
+                    row["PS_Vmeas2"] = self.cc.ps.get_set_voltage(2)
+                    row["PS_Imeas1"] = self.cc.ps.get_current(1)
 
             # Update record counter and UI
             self.recCnt += 1
@@ -370,36 +361,8 @@ class TabLog(ThemedFrame):
             # Wait for next sample
             time.sleep(self.record_speed)
 
-    def analyze_file(self, filename):
-        print("Analyzing file")
-        file_path = self.basefilepath + self.data_folder + filename
 
-        # imu_data = processor.load_csv(file_path)
-        # if imu_data is None:
-        #     gui_helper.alert_user("Something wrong with data!",
-        #                           "Couldn't load data, something wrong",
-        #                           kind="error")
-        #     return False
 
-        imu_stats = imu_analysis.analyze_imu(file_path)
-        # output_frame = tk.Frame(self.master)
-        # output_frame.grid(row=4, column=0)
-        text_box = tk.Text(self.fr_analysis, height=17)
-        text_box.grid(row=5, column=0, padx=15, pady=15)
 
-        # Add the dictionary contents to the Text widget
-        for key, value in imu_stats.items():
-            text_box.insert(tk.END, f"{key}: {value}\n")
-        return True
 
-    def graph_file(self, filename):
-        print("Graphing file")
-
-        file_path = self.basefilepath + self.data_folder + filename
-        imu_data = processor.load_csv(file_path)
-        if imu_data is None:
-            gui_helper.alert_user("Something wrong with IMU data!",
-                                  "Couldn't load data, something wrong",
-                                  kind="error")
-            return False
 

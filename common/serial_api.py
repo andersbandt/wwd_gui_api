@@ -38,7 +38,6 @@ def get_ports(method=None):
     elif method == 3:
         rm = pyvisa.ResourceManager()
         ports = rm.list_resources()
-
     else:
         ports = None
 

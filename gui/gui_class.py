@@ -12,38 +12,188 @@ from tkinter import ttk
 from tkinter import Text, INSERT
 from tkinter import scrolledtext
 
+import json
 import threading
+import copy
 import xml.etree.ElementTree as ET
 
 # import user created modules
 from gui import gui_helper as guih
-from gui.guiTab_parent import ThemedFrame
 from common import serial_api
 
 
-class ColorCircle(tk.Canvas):
-    def __init__(self, master, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
-        self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+# TODO: ask an actual AI agent to cleanup this function
+def scale_theme(theme_cfg: dict, factor: float, key_paths: list[list[str]]) -> dict:
+    """
+    Scale numeric values at given key paths by 'factor' and round to integers.
+    Non-numeric values are left as-is. Returns a new dict.
+    """
+    scaled = copy.deepcopy(theme_cfg)
 
-    def set_color(self, color):
-        self.itemconfig(self.status_oval, fill=color)
+    for path in key_paths:
+        cur = scaled
+        for key in path[:-1]:
+            if not isinstance(cur, dict) or key not in cur:
+                cur = None
+                break
+            cur = cur[key]
+        if cur is None:
+            continue
+
+        leaf = path[-1]
+        if leaf in cur:
+            val = cur[leaf]
+            try:
+                num = float(val) * factor
+                # Round to nearest int (you can switch to floor/ceil if preferred)
+                cur[leaf] = int(round(num))
+            except Exception:
+                # Non-numeric; leave as-is
+                pass
+
+    return scaled
+
 
 
 ##########################################
-### FRAMES (VARIOUS)     #################
+### APP AND FRAMES       #################
 ##########################################
+
+class ThemedApp:
+    def __init__(self, root, theme_file, compact):
+        self.root = root
+        self.style = ttk.Style(self.root)
+        self.theme_config = None
+
+        # Set the theme to use (optional, 'clam' is a common choice for consistency)
+        self.style.theme_use('clam')
+
+        # Load and apply the theme
+        self.load_theme(theme_file, compact=compact)
+        self.apply_theme()
+
+
+    def load_theme(self, theme_file, compact=False):
+        with open(theme_file, 'r') as f:
+            self.theme_config = json.load(f)
+
+        # do more "normal" scaling
+        factor = 1
+        if compact:
+            factor *= 0.75
+
+        KEY_PATHS = [
+            ["pad", "xpad_s"],
+            ["pad", "ypad_s"],
+            ["size", "w_prompt"],
+            ["size", "h_prompt"]
+        ]
+
+        self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
+
+        # do some other scaling on weird things with smaller values
+        if compact:
+            factor = 0.45
+        KEY_PATHS = [
+            ["size", "h_button"],
+        ]
+        self.theme_config = scale_theme(self.theme_config, factor, KEY_PATHS)
+
+
+    def apply_theme(self):
+        """Apply the current theme configuration."""
+        # Configure styles for notebook and tabs
+        self.style.configure('TNotebook', background=self.theme_config["bg_dark"])
+        self.style.configure('TNotebook.Tab',
+                             background=self.theme_config["tab_background"],
+                             foreground=self.theme_config["tab_foreground"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]),
+                             padding=(self.theme_config["pad"]["horizontal"],
+                                      self.theme_config["pad"]["vertical"]))
+        self.style.map("TNotebook.Tab",
+                       background=[("selected", self.theme_config["selected_tab_background"])],
+                       foreground=[("selected", self.theme_config["selected_tab_foreground"])])
+
+
+class ThemedFrame(tk.Frame):
+    def __init__(self, root, theme_config, *args, **kwargs):
+        super().__init__(root, *args, **kwargs)
+        self.root = root
+        self.theme_config = theme_config
+
+        # TODO: how often am I using this?
+        self.style = ttk.Style(self.root)
+        self.style.configure("TButtonOn.TButton", background="green")
+        self.style.configure("TButtonOff.TButton", background="red")
+
+        self.set_bg(bg=self.theme_config["bg_dark"])
+
+    # TODO: should I just apply the theme once in the ThemedApp? Not have two functions to manage (confusing)
+    def apply_theme(self):
+        """Apply the theme to the current frame."""
+        # Configure Button styles
+        self.style.configure('TButton',
+                             background=self.theme_config["button"]["background"],
+                             foreground=self.theme_config["button"]["foreground"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]))
+
+        self.style.configure('TGreenButton.TButton',
+                             background=self.theme_config["dark_2"],
+                             foreground=self.theme_config["button"]["foreground"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]))
+
+        self.style.configure('TYellowButton.TButton',
+                             background="#F1FA8C",
+                             foreground=self.theme_config["fg_dark"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]))
+
+        self.style.map('TButton',
+                       background=[('active', self.theme_config["button"]["active_background"])],
+                       foreground=[('active', self.theme_config["button"]["active_foreground"])])
+
+        # Configure Label styles
+        self.style.configure('TLabel',
+                             background=self.theme_config["label"]["background"],
+                             foreground=self.theme_config["label"]["foreground"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]))
+
+        self.style.configure('TSpunkLabel.TLabel',
+                             background=self.theme_config["dark_1"],
+                             foreground=self.theme_config["fg_light"],
+                             font=(self.theme_config["font"]["family"],
+                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["style"]))
+
+        self.style.configure('TPinkLabel.TLabel',
+                             background=self.theme_config["light_1"],
+                             foreground="white",
+                             font=(self.theme_config["h1"]["family"],
+                                   self.theme_config["h1"]["size"],
+                                   self.theme_config["h1"]["style"]))
+
+    def set_bg(self, bg):
+        self.configure(bg=bg)
+
 
 class Prompt(ThemedFrame):
-    def __init__(self, master, title, height, width):
-        self.theme_file = "config/darcula.json"  #tag:hardcode
-        super().__init__(master, self.theme_file, height=height, width=width)
+    def __init__(self, master, theme_config, title, height, width):
+        super().__init__(master, theme_config, height=height, width=width)
         self.height = height
         self.width = width
         self.set_bg(self.theme_config["light_4"])
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
-        clear_button = ttk.Button(self, text="Clear console", style="TYellowButton.TButton", command=self.clear)
+        clear_button = tk.Button(self, text="Clear console", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
 
         # set up text_data box for user communication
@@ -74,13 +224,25 @@ class Prompt(ThemedFrame):
 
 
 ##########################################
-### CONNECTION FRAMES    #################
+### CANVAS               #################
+##########################################
+
+class ColorCircle(tk.Canvas):
+    def __init__(self, master, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+
+    def set_color(self, color):
+        self.itemconfig(self.status_oval, fill=color)
+
+
+##########################################
+### CONNECTION FRAMES            #########
 ##########################################
 
 class ConnFrame(ThemedFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd):
-        self.theme_file = "config/darcula.json"  #tag:hardcode
-        super().__init__(master, self.theme_file)
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
+        super().__init__(master, theme_config)
         self.master = master
         self.name = name
         self.connect_cmd = connect_cmd
@@ -123,12 +285,9 @@ class ConnFrame(ThemedFrame):
         self.canvas1.itemconfig(self.status_oval, fill=color)
 
 
-# SerialConnFrame: just a basic serial connection frame
-# TODO: make some drop down where I can select connection method?
-# TODO: automatically refresh port list when I tab into a tab
 class SerialConnFrame(ConnFrame):
-    def __init__(self, master, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
-        super().__init__(master, name, connect_cmd, disconnect_cmd)
+    def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
+        super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd)
         self.cc = class_controller
 
         # set up connection options
@@ -148,18 +307,14 @@ class SerialConnFrame(ConnFrame):
         self.initialize_fr()
 
     def initialize_fr(self):
+        # TODO: add back the button to refresh ports
         # initialize port connection method dropdown
         self.port_func_drop = guih.generate_drop_down(
             self,
-            list(self.port_func_options.keys())
+            list(self.port_func_options.keys()),
+            callback_func=self.set_port_func
         )
         self.port_func_drop[0].grid(row=0, column=1, padx=3, pady=10)
-
-        # add Button for refreshing port list
-        update_conn_button = tk.Button(self, text="Update method",
-                                   command=self.set_port_func,
-                                   bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
-        update_conn_button.grid(row=0, column=2, pady=1)
 
         # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",
@@ -198,7 +353,7 @@ class SerialConnFrame(ConnFrame):
     def set_port_func(self):
         selected_label = self.port_func_drop[1].get()
         self.port_func = self.port_func_options[selected_label]
-        self.refresh_ports()
+        self.refresh_ports(first_run=True)
 
     def refresh_ports(self, first_run=False):
         menu = self.com_drop[0]["menu"]
@@ -213,7 +368,10 @@ class SerialConnFrame(ConnFrame):
                              command=lambda value=string: self.com_drop[1].set(value))
 
         if not self.status:
-            self.com_drop[1].set(ports[0])
+            try:
+                self.com_drop[1].set(ports[0])
+            except IndexError:
+                self.com_drop[1].set(None)
 
         # set value to previously used port (if available)
         if first_run:
@@ -250,9 +408,9 @@ class SerialConnFrame(ConnFrame):
 
 
 class AutoConnFrame(ConnFrame):
-    def __init__(self, master, name, connect_cmd, disconnect_cmd):
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
         self.master = master
-        super().__init__(self.master, name, connect_cmd, disconnect_cmd)
+        super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd)
 
     def init_fr(self):
         self.canvas1.grid(row=1, column=2, padx=15, pady=22)
@@ -270,7 +428,7 @@ class AutoConnFrame(ConnFrame):
 
 
 ##########################################
-### THREADS#######      ##################
+### THREADS             ##################
 ##########################################
 
 class StoppableThread(threading.Thread):

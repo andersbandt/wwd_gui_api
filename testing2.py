@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
 
-# TODO: add some internal notes on the filename regex here (what are the plus marks, what does everything mean?
+# TODO: finish extracting the rest of this stuff as a file
+
+
 data_dir = "data/data"  # Replace with your actual path
 #pattern = re.compile(r"AREC_b(\d+)_([-\d]+)_.*\.csv")
 pattern = re.compile(r"^AREC_b(\d+)_(\d+)_(\d+uH)_(\d+)(?:\.csv)?$")
@@ -22,6 +24,8 @@ group_schema = {
     1: ("var1", str),   # e.g., board number as string
     2: ("var2", float), # e.g., temperature as float
 }
+
+
 x_var = "Duty"
 y_var = "P_out"
 y_scale = 10**3
@@ -120,7 +124,6 @@ for filepath, vars_dict, df in files:
             legend_added.add(label_val)
 
         ax.plot(df_pwm[x_var], df_pwm[y_var] * y_scale, label=label, color=color)
-
 
 
 # show plot

@@ -19,12 +19,11 @@ from datetime import datetime
 from common.SerialReader import SerialReader
 from gui import gui_helper as guih
 from gui import gui_class as guic
-from gui.guiTab_parent import ThemedFrame
 
 
-class tabUSB(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+class TabUSB(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.grid(row=0, column=0)
@@ -38,11 +37,15 @@ class tabUSB(ThemedFrame):
                        font=("Arial", 16))
         l1.grid(row=0, column=0, columnspan=2)
 
-        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=140)
-        self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "Debug serial",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
@@ -98,6 +101,18 @@ class tabUSB(ThemedFrame):
         self.output_file_name = Text(self.fr_state, height=2, width=20)
         self.output_file_name.grid(row=3, column=3)
 
+    def gui_refresh(self, event):
+        self.fr_port.refresh_ports()
+
+        if self.ser_obj is not None:
+            if self.ser_obj.serStatus is False:
+                # TODO: here is where I can add back that printout to the log that like "USB DISCONNECTED"
+                self.ser_obj.stop_process()
+                self.fr_port.set_status(False)
+                self.t1.stop()
+        else:
+            self.fr_port.set_status(True)
+
     ##############################################################################
     ####      BUTTON ACTION FUNCTIONS        #####################################
     ##############################################################################
@@ -105,19 +120,19 @@ class tabUSB(ThemedFrame):
     def activate_test_mode(self):
         command = "DAGA"  # tag:HARDCODE
         my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.prompt1.print(f"INFO: issuing command {command} ...")
+        self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj.serStatus:
             # send the TEST MODE command for ACTIVATION
             self.ser_obj.send_data(command)
-            self.prompt1.print(f"INFO: issued command!\n")
+            self.prompt.print(f"INFO: issued command!\n")
             self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
         else:
-            self.prompt1.print("ERROR: can't issue command, no serial connection\n")
+            self.prompt.print("ERROR: can't issue command, no serial connection\n")
             self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
 
     def set_test_type(self):
         test_type_command = self.test_drop[1].get()
-        self.prompt1.print(f"INFO: test type {test_type_command} ...")
+        self.prompt.print(f"INFO: test type {test_type_command} ...")
         if test_type_command == "flash-read":
             command = "FR91"
         elif test_type_command == "flash-read-all":
@@ -133,35 +148,27 @@ class tabUSB(ThemedFrame):
             print("Fuck man no known test command")
             return False
 
-        self.prompt1.print(f"INFO: issuing command {command} ...")
+        self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj.serStatus:
             self.ser_obj.send_data(command)
-            self.prompt1.print(f"INFO: issued command!\n")
+            self.prompt.print(f"INFO: issued command!\n")
             return True
         else:
-            self.prompt1.print("ERROR: can't issue command, no serial connection\n")
+            self.prompt.print("ERROR: can't issue command, no serial connection\n")
             return False
 
     #################################
     #### THREADS SHIT    ############
     #################################
 
-    def gui_refresh(self, event):
-        if self.ser_obj.serStatus is False:
-            self.ser_obj.stop_process()
-            self.fr_port.set_status(False)
-            self.t1.stop()
-        else:
-            self.fr_port.set_status(True)
-
-    # TODO ATE (low-priority with new FTDI module implementation): try to flow flush this auto-reconnect thread. Problem right now is probably the performance hit with threading
-    def manage_connection(self):
-        status = True
-        while status:
-            if self.ser_obj.serStatus is False:
-                print("Attempt to reopen serial ...")
-                self.ser_obj.reopen()
-                time.sleep(3)
+    # NOTE: autoconnect attempt. Problem right now is probably the performance hit with threading
+    # def manage_connection(self):
+    #     status = True
+    #     while status:
+    #         if self.ser_obj.serStatus is False:
+    #             print("Attempt to reopen serial ...")
+    #             self.ser_obj.reopen()
+    #             time.sleep(3)
 
     def thread_print_display(self):
         # TODO ATE: get "RunTimeError: main thread is not in main loop error"
@@ -192,23 +199,22 @@ class tabUSB(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.prompt1.print(f"Init with port: {port}")
+        self.prompt.print(f"Init with port: {port}")
         try:
             self.ser_obj = SerialReader(port, 115200)
         except serial.serialutil.SerialException as e:
-            self.prompt1.print(f"ERROR: {e}")
-            self.prompt1.print(f"Can't init with port\n")
+            self.prompt.print(f"ERROR: {e}")
+            self.prompt.print(f"Can't init with port\n")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
         threading.Thread(target=self.thread_print_display).start()
         # threading.Timer(1.0, self.thread_print_display).start() # NOTE: I possiblyy had this 1 second delayyy in there for a reason?
-        self.prompt1.print("Init successful!\n")
+        self.prompt.print("Init successful!\n")
         return True
 
     def port_close(self):
-        print("xxxx seial cclose")
-        self.prompt1.print("Serial close!")
+        self.prompt.print("Serial close!")
         self.ser_obj.stop_process()
         self.fr_port.set_status(False)
         self.t2.stop()

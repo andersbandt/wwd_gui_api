@@ -5,22 +5,20 @@
 @brief    critical GUI code to launch Tkinter notebook
 """
 
-# TODO: add some scrollbars to each of the frames
-
-# TODO: autoconnect somehow needs an option to toggle which tabs get autconnected
 
 # import needed packages
 import tkinter as tk
 from tkinter import ttk
 import os
 import time
+import configparser
 
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
-from gui.guiTab_parent import ThemedApp
+from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_LOG
 from gui import guiTab_3_DMM
@@ -28,12 +26,38 @@ from gui import guiTab_4_XDS110
 from gui import guiTab_5_USB
 from gui import guiTab_6_PS
 from gui import guiTab_7_ATE
+from gui import guiTab_8_GRAPH
 
 
-# TODO: (small) change all the class names to CamelCase with TabXxx
+def parse_autoconnect_config():
+    # initialize the config parser
+    config_file_path = "config/master.ini"
+    if os.path.exists(config_file_path):
+        config = configparser.ConfigParser()
+        config.read(config_file_path)
+    else:
+        print(f"Configuration file {config_file_path} does not exist.")
+        raise BaseException
+
+    # Ensure the section and option exist
+    if "AUTOCONNECT" not in config:
+        raise KeyError("Missing [AUTOCONNECT] section in config.")
+
+    # read in parameters from the config file
+    autoconn_vars = []
+    for i in range(1, 8):
+        tmp = config["AUTOCONNECT"][f"tab_{i}"]
+        if tmp.strip().upper() == "YES":
+            autoconn_vars.append(True)
+        else:
+            autoconn_vars.append(False)
+    return autoconn_vars
+
+
+
 class MainApplication(ThemedApp):
-    def __init__(self, window, height, width, theme_file, autoconnect):
-        super().__init__(window, theme_file)
+    def __init__(self, window, height, width, theme_file, autoconnect, compact):
+        super().__init__(window, theme_file, compact=compact)
         self.autoconnect = autoconnect
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
@@ -46,30 +70,31 @@ class MainApplication(ThemedApp):
         )
         time.sleep(2)
 
-        self.tab1 = None
-        self.tab2 = None
-        self.tab3 = None
-        self.tab4 = None
-        self.tab5 = None
-        self.tab6 = None
-        self.tab7 = None
         self.tab_names = []
         self.setTabs()
 
     def setTabs(self):
         print("Creating tab nav bar and initializing tab content")
-        self.tab1 = guiTab_1_mainDashboard.tabMainDashboard(self.nb, self.controller, self.basefilepath,
-                                                            "config/darcula.json", self.autoconnect)
-        self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab3 = guiTab_3_DMM.tabDMM(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, "config/darcula.json")
-        self.tab5 = guiTab_5_USB.tabUSB(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
-        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, "config/darcula.json", self.autoconnect)
+
+        # setup autoconnect array
+        if self.autoconnect:
+            autoconnect = parse_autoconnect_config()
+        else:
+            autoconnect = [False for i in range(8)]
+
+        # create Tab objects
+        self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,self.theme_config, autoconnect[0])
+        self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab3 = guiTab_3_DMM.TabDMM(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[2])
+        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab5 = guiTab_5_USB.TabUSB(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[4])
+        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[5])
+        self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
+        self.tab8 = guiTab_8_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "Logger Utility", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE"]
-        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7]
+        self.tab_names = ["MAIN", "Logger", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE", "GRAPH"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8]
 
         # Add tabs dynamically using a loop
         for tab, name in zip(tabs, self.tab_names):
@@ -81,13 +106,17 @@ class MainApplication(ThemedApp):
     def on_tab_changed(self, event):
         selected_tab = event.widget.tab(event.widget.select(), "text")
         if selected_tab == self.tab_names[0]:
-            guiTab_1_mainDashboard.tabMainDashboard.gui_refresh(self.tab1, "auto")
-        if selected_tab == self.tab_names[1]:
+            guiTab_1_mainDashboard.TabMainDashboard.gui_refresh(self.tab1, "auto")
+        elif selected_tab == self.tab_names[1]:
             guiTab_2_LOG.TabLog.gui_refresh(self.tab2, "auto")
-        if selected_tab == self.tab_names[2]:
-            guiTab_3_DMM.tabDMM.gui_refresh(self.tab3, "auto")
+        elif selected_tab == self.tab_names[2]:
+            guiTab_3_DMM.TabDMM.gui_refresh(self.tab3, "auto")
+        elif selected_tab == self.tab_names[3]:
+            guiTab_5_USB.TabUSB.gui_refresh(self.tab5, "auto")
         elif selected_tab == self.tab_names[5]:
             guiTab_6_PS.TabPS.gui_refresh(self.tab6, "auto")
+        elif selected_tab == self.tab_names[6]:
+            guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
 
 
 ###########################################################
@@ -109,7 +138,6 @@ def main(autoconnect):
     window.title("WWD GUI API")
 
     # Get screen size
-    # TODO: this could be a big ask ... but can I dynamically size elements if the screen size is small?
     ws = window.winfo_screenwidth()
     hs = window.winfo_screenheight()
 
@@ -117,9 +145,18 @@ def main(autoconnect):
     w = min(desired_w, max(300, ws - margin_w))
     h = min(desired_h, max(300, hs - margin_h))
 
+    # dynamic sizing check
+    if (w < 0.8*desired_w) or (h < 0.8*desired_h):
+        compact=True
+        print("Using compact sizing")
+    else:
+        compact=False
+
     # Center placement
-    x = (ws / 2) - (w / 4)
+    # x = (ws / 2) - (w / 4) # NOTE: I think this was when I wanted to be like 3/4 of the way right?
+    x = 20
     y = 20
+
 
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
@@ -128,7 +165,8 @@ def main(autoconnect):
                           h,
                           w,
                           "config/darcula.json",
-                          autoconnect)
+                          autoconnect,
+                          compact)
 
     # run application
     window.mainloop()

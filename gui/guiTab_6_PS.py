@@ -11,31 +11,28 @@ from tkinter import ttk
 import tkinter.messagebox as tkmb
 
 # import needed packages
-import logging
 import time
 from datetime import datetime
-import pyvisa.errors
-import usb.core
 
-import EEequipment.E3640A.E3640A
-from analysis.csv_helper import CSVHelper
-import configparser
-import os
 
 # import user defined modules
 from common import plotter
-from EEequipment.SPD3303X import SPD3303X
+from analysis.csv_helper import CSVHelper
+from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
-from gui.guiTab_parent import ThemedFrame
 
 
-class TabPS(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+# TODO: large (can I have it import a script to execute. For example how do I make my thermopile ramp saveable and repeatable
+
+
+class TabPS(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
@@ -47,10 +44,12 @@ class TabPS(ThemedFrame):
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up serial / PS variables
-        self.ps = None
+        self.channel_count = 0
         self.id = None
         self.ch1_on = False
         self.ch2_on = False
+        self.ch1_scale = 1
+        self.ch2_scale = 1
         self.ps_v1s = "?"
         self.ps_v2s = "?"
         self.ps_v1r = 0
@@ -63,7 +62,11 @@ class TabPS(ThemedFrame):
         self.data_dir = "data/ps_data/"
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "PSConsole Output", height=18, width=140)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "PS Console Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
 
         # initialize tab content
         self.initTabContent()
@@ -76,12 +79,12 @@ class TabPS(ThemedFrame):
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
+                                            self.theme_config,
                                             self.cc,
                                             "PS_PyVISA",
                                             self.port_init,
                                             self.port_close,
                                             port_func=3)
-        self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)
@@ -92,9 +95,18 @@ class TabPS(ThemedFrame):
         self.init_fr_control()
         self.init_fr_status()
 
+
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Power Supply Info', style="TPinkLabel.TLabel", width=15)
         self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
+
+        # add equipment selector dropdown
+        self.registry = equipment_manager.get_instruments("ps")
+        self.ate_drop = guih.generate_drop_down(
+            self.fr_info,
+            sorted(self.registry.keys())
+        )
+        self.ate_drop[0].grid(row=0, column=2, padx=15)
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -124,9 +136,10 @@ class TabPS(ThemedFrame):
         self.labelV1_s.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelV1_r.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelI1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
-        self.labelV2_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
-        self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
-        self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
+        if self.channel_count == 2:
+            self.labelV2_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+            self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
+            self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for range and measurements
         self.valueV1_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
@@ -137,16 +150,27 @@ class TabPS(ThemedFrame):
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
+        # add some drop-downs for unit handling
+        self.unitCH1_drop = guih.generate_drop_down(self.fr_info,
+                                                   ["A", "mA", "uA"],
+                                                   callback_func=self.set_ch1_unit)
+        self.unitCH2_drop = guih.generate_drop_down(self.fr_info,
+                                                   ["A", "mA", "uA"],
+                                                   callback_func=self.set_ch2_unit)
+
         # Position the value labels
         self.valueV1_s.grid(row=3, column=1, sticky='E', padx=5, pady=2)
         self.valueV1_r.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueI1.grid(row=5, column=1, sticky='E', padx=5, pady=2)
-        self.valueV2_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
-        self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
-        self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
+        self.unitCH1_drop[0].grid(row=5, column=2, sticky='W', padx=5, pady=2)
+        if self.channel_count == 2:
+            self.valueV2_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+            self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
+            self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
+            self.unitCH2_drop[0].grid(row=8, column=2, sticky='W', padx=5, pady=2)
 
         # ADD A REFRESH
-        self.btn_update = ttk.Button(self.fr_info, text='UPDATE PS', command=lambda: self.update_PS(kind="full"))
+        self.btn_update = tk.Button(self.fr_info, text='UPDATE PS', command=self.update_PS)
         self.btn_update.grid(row=9, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
@@ -155,9 +179,8 @@ class TabPS(ThemedFrame):
         # CHANNEL 1 CONTROLS
         self.ch1_label = ttk.Label(fr_m, text="Channel 1", style="TLabel")
         self.ch1_voltage = tk.Entry(fr_m)
-        self.ch1_set_btn = ttk.Button(fr_m, text="Set Voltage", style="TButton",
-                                      command=lambda: self.set_voltage(1, self.ch1_voltage.get())
-                                      )
+        self.ch1_set_btn = tk.Button(fr_m, text="Set Voltage",
+                                      command=lambda: self.set_voltage(1, self.ch1_voltage.get()))
 
         self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
         self.ch1_label.grid(row=0, column=0, padx=10, pady=10)
@@ -168,21 +191,22 @@ class TabPS(ThemedFrame):
         # CHANNEL 2 CONTROLS
         self.ch2_label = ttk.Label(fr_m, text="Channel 2", style="TLabel")
         self.ch2_voltage = tk.Entry(fr_m)
-        self.ch2_set_btn = ttk.Button(fr_m, text="Set Voltage", style="TButton",
+        self.ch2_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(2, self.ch2_voltage.get())
                                       )
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
-        self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
-        self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
-        self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
-        self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
+        if self.channel_count == 2:
+            self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
+            self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
+            self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
+            self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
         # MISC CONTROL
         self.channelRecord_drop = guih.generate_drop_down(
             fr_m,
             [1, 2],
         )
-        self.plot_current_btn = ttk.Button(fr_m, text="Live Plot current", style="TButton",
+        self.plot_current_btn = tk.Button(fr_m, text="Live Plot current",
                                            command=lambda: self.plot_current(),
                                            )
         self.var_record = tk.IntVar()
@@ -206,16 +230,11 @@ class TabPS(ThemedFrame):
         self.labelCh2Mode = ttk.Label(self.fr_status, width=10, text='Ch 2 Mode', style="TLabel", anchor='w')
         self.ch2_mode = ColorCircle(self.fr_status, width=50, height=50,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.labelCh2Mode.grid(row=0, column=1, pady=15, padx=15)
-        self.ch2_mode.grid(row=1, column=1, pady=15, padx=15)
+        if self.channel_count == 2:
+            self.labelCh2Mode.grid(row=0, column=1, pady=15, padx=15)
+            self.ch2_mode.grid(row=1, column=1, pady=15, padx=15)
 
-    def gui_refresh_info(self, event):
-        # refresh DMM information
-        if self.fr_port.status:
-            if event == "auto":
-                self.update_PS("full")
-
-        # update Label
+    def gui_refresh_info(self):
         if self.fr_port.status:
             self.valueV1_s.config(text='{:8s}'.format(str(self.ps_v1s)))
             self.valueV1_r.config(text='{:8s}'.format(str(self.ps_v1r)))
@@ -226,82 +245,99 @@ class TabPS(ThemedFrame):
 
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
-        if self.ps is not None:
-            status_decode = self.ps.check_status()
-        else:
-            return
-
-        if status_decode["ch1_state"] == "ON":
-            self.ch1_toggle_btn.config(bg=self.theme_config["success"])
-        else:
-            self.ch1_toggle_btn.config(bg=self.theme_config["error"])
-
-        # TODO: elegantly handle multi-channel power supplies here
-        # if status_decode["ch2_state"] == "ON":
-        #     self.ch2_toggle_btn.config(bg=self.theme_config["success"])
-        # else:
-        #     self.ch2_toggle_btn.config(bg=self.theme_config["error"])
-
-    def gui_refresh_channel_mode(self):
-        # TODO: I'm not properly stt
-        if self.ps is not None:
-            status_decode = self.ps.check_status()
+        if self.cc.get_ps_status():
+            status_decode = self.cc.ps.check_status()
         else:
             return
 
         try:
+            if status_decode["ch1_state"] == "ON":
+                self.ch1_toggle_btn.config(bg=self.theme_config["success"])
+            else:
+                self.ch1_toggle_btn.config(bg=self.theme_config["error"])
+
             if status_decode["ch1_mode"] == "CV":
                 self.ch1_mode.set_color("green")
             else:
                 self.ch1_mode.set_color("red")
 
-            if status_decode["ch2_mode"] == "CV":
-                self.ch2_mode.set_color("green")
-            else:
-                self.ch2_mode.set_color("red")
-        # TODO: need more elegant way to handle the status_decode key errors here
-        except KeyError:
-            logging.error("Can't set channel CC and CV states because of KeyError")
+            # if we have 2-channel PS
+            if self.channel_count > 1:
+                if status_decode["ch2_state"] == "ON":
+                    self.ch2_toggle_btn.config(bg=self.theme_config["success"])
+                else:
+                    self.ch2_toggle_btn.config(bg=self.theme_config["error"])
+
+                if status_decode["ch2_mode"] == "CV":
+                    self.ch2_mode.set_color("green")
+                else:
+                    self.ch2_mode.set_color("red")
+
+        except KeyError as e:
+            guih.alert_user("Can't set channel CC/CV states", f"KeyError:{e}", "error")
             self.ch1_mode.set_color("black")
             self.ch2_mode.set_color("black")
 
     def gui_refresh(self, event):
-        self.gui_refresh_info(event)
-        self.gui_refresh_channel_mode()
+        if event == "auto":
+            self.fr_port.refresh_ports()
+        self.gui_refresh_info()
         self.gui_refresh_channel_state()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
 
-    def update_PS(self, kind="partial"):
-        if self.fr_port.status:
-            self.ps_v1r = self.ps.get_voltage(1)
-            self.ps_v2r = self.ps.get_voltage(2)
-            self.ps_i1 = self.ps.get_current(1)
-            self.ps_i2 = self.ps.get_current(2)
+    def set_ch1_unit(self):
+        unit = self.unitCH1_drop[1].get()
+        self.prompt.print(f"Setting channel 1 units to {unit}")
+        if unit == "mA":
+            self.ch1_scale = 1e3
+        elif unit == "uA":
+            self.ch1_scale = 1e6
+        elif unit == "A":
+            self.ch1_scale = 1
 
-        self.gui_refresh("call")
+    def set_ch2_unit(self):
+        unit = self.unitCH2_drop[1].get()
+        self.prompt.print(f"Setting channel 2 units to {unit}")
+        if unit == "mA":
+            self.ch2_scale = 1e3
+        elif unit == "uA":
+            self.ch2_scale = 1e6
+        elif unit == "A":
+            self.ch2_scale = 1
+
+    def update_PS(self):
+        if self.fr_port.status:
+            self.ps_v1r = self.cc.ps.get_voltage(1)
+            self.ps_i1 = self.cc.ps.get_current(1)
+            self.ps_i1 = self.ps_i1 * self.ch1_scale
+            if self.channel_count == 2:
+                self.ps_v2r = self.cc.ps.get_voltage(2)
+                self.ps_i2 = self.cc.ps.get_current(2)
+                self.ps_i2 = self.ps_i2 * self.ch2_scale
+            self.gui_refresh_info()
 
     def toggle_channel(self, channel):
-        if self.ps is None:
+        if not self.cc.get_ps_status():
             guih.alert_user("Can't toggle channel", "No PS connection!", "error")
             return False
 
         try:
             if channel == 1:
                 if self.ch1_on is True:
-                    self.ps.output_off(channel)
+                    self.cc.ps.output_off(channel)
                     self.ch1_on = False
                 else:
-                    self.ps.output_on(channel)
+                    self.cc.ps.output_on(channel)
                     self.ch1_on = True
             elif channel == 2:
                 if self.ch2_on is True:
-                    self.ps.output_off(channel)
+                    self.cc.ps.output_off(channel)
                     self.ch2_on = False
                 else:
-                    self.ps.output_on(channel)
+                    self.cc.ps.output_on(channel)
                     self.ch2_on = True
             else:
                 raise ValueError("Wrong channel input")
@@ -319,15 +355,19 @@ class TabPS(ThemedFrame):
         self.gui_refresh("call")
 
     def set_voltage(self, channel, voltage_str):
-        if self.ps is not None:
+        if self.cc.get_ps_status():
             # have to format input text_data box into float
             voltage = float(voltage_str)
-            self.ps.set_voltage(voltage)
+            self.cc.ps.set_voltage(voltage)
             self.prompt.print(f"Set voltage on channel {channel} to {voltage} V")
             if channel == 1:
                 self.ps_v1s = voltage
             elif channel == 2:
                 self.ps_v2s = voltage
+
+            # refresh statistics and update GUI info
+            self.update_PS()
+            self.gui_refresh_info()
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
 
@@ -346,7 +386,7 @@ class TabPS(ThemedFrame):
         def animate(i):
             for j in range(0, 10):
                 # Retrieve the current reading and the timestamp
-                reading = self.ps.get_current(int(self.channelRecord_drop[1].get()))
+                reading = self.cc.ps.get_current(int(self.channelRecord_drop[1].get()))
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                 currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
@@ -371,47 +411,47 @@ class TabPS(ThemedFrame):
         self.prompt.print("Connect to PYVISA resource!")
         port = self.fr_port.get_port()
 
-        # TODO: this thing needs to be dynamic ... copy my tab7 shit
-        self.ps = SPD3303X.SPD3303X(port)
-        # self.ps = EEequipment.E3640A.E3640A.E3640A(port)
+        ate_temp = self.registry[self.ate_drop[1].get()]
+        self.cc.set_ps(ate_temp(self.fr_port.get_port()))
 
         try:
-            self.id = self.ps.test_conn()
-        except (pyvisa.errors.VisaIOError, usb.core.USBError) as e:
-            guih.alert_user("Can't connect to VISA", e, "warning")
+            self.id = self.cc.ps.test_conn()
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't connect to PS", e, "warning")
             self.fr_port.set_status(False)
             return False
 
         if self.id:  # CONNECTION SUCCESS
+            # re-initialize channel count dependent frames
+            self.init_fr_info()
+            self.init_fr_control()
+            self.init_fr_status()
+
+            # start doing stuff
             self.prompt.print(f"Connected to PS with id: {self.id}")
-            self.cc.set_ps(self.ps)
             self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(
-                text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-            )
+            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
             self.fr_port.set_status(True)
+            self.channel_count = self.cc.ps.channel_count
 
             # turn channels off and set voltages
-            self.ps.output_off(1)
-            self.ps.output_off(2)
+            self.cc.ps.output_off(1)
+            self.cc.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
 
-            # gui refresh
+            # gui_refresh
             self.gui_refresh_channel_state()
             return True
         else:  # BAD ID received
-            self.ps = None
+            self.cc.set_ps(None)
             self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
             return False
 
     def port_close(self):
         self.prompt.print(f"Closing PYVISA resource!")
-        self.ps.disconnect()
+        self.cc.ps.disconnect()
         self.fr_port.set_status(False)
-
-        # TODO: big change. Can I just completely rely on one or the other variable here? just self.cc probably?
         self.cc.set_ps(None)
-        self.ps = None
         self.prompt.print(f"Connection is closed.")

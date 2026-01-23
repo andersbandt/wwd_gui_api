@@ -10,7 +10,6 @@ import logging
 from analysis import csv_helper as csvh
 import os
 from time import strftime, localtime
-from fpdf import FPDF
 from datetime import datetime
 from dataclasses import dataclass
 
@@ -25,24 +24,25 @@ log_folder = "data" # master program folder for all output data. tag:hardcode
 #### file stuff  ################
 #################################
 
+# TODO: play around with file name creation
 def build_log_name(prefix, file_str_ext):
     # FILENAME SETUP
     recName = prefix + "_" + strftime('%Y%m%d%H%M%S', localtime())
-    if file_str_ext is not None:
+    if file_str_ext is not None or '':
         recName += "_" + file_str_ext
     recName += ".csv"
     return recName
 
 
 # TODO: evaluate this function compared to the more recent one above
-def get_filename(basefilepath, folder, name_ext, extension):
-    current_datetime = datetime.now()
-    date_strf = "%Y%m%d"
-    formatted_datetime = current_datetime.strftime(date_strf)
-    if name_ext is None:
-        name_ext = ""
-    filename = f"{basefilepath}/{log_folder}/{folder}/_{formatted_datetime}_{name_ext}.{extension}"
-    return filename
+# def get_filename(basefilepath, folder, name_ext, extension):
+#     current_datetime = datetime.now()
+#     date_strf = "%Y%m%d"
+#     formatted_datetime = current_datetime.strftime(date_strf)
+#     if name_ext is None:
+#         name_ext = ""
+#     filename = f"{basefilepath}/{log_folder}/{folder}/_{formatted_datetime}_{name_ext}.{extension}"
+#     return filename
 
 
 #################################
@@ -83,6 +83,36 @@ class RecordConfig:
     ps_channels: int = 1  # will be set to 2 if user confirms and PS supports it
     serial_params: str = None
 
+    def pretty(self) -> str:
+        """
+        Return a human-friendly, aligned summary of the configuration.
+        """
+        # Build display dictionary (you can rename keys for clarity)
+        display = {
+            "Use Serial (SER)": self.use_ser,
+            "Use DMM": self.use_dmm,
+            "Use Power Supply (PS)": self.use_ps,
+            "Use Function Generator (FG)": self.use_fg,
+            "PS Channels": self.ps_channels,
+            "Serial Params": self.serial_params or "(not set)",
+        }
+
+        # Compute column width for neat alignment
+        key_width = max(len(k) for k in display.keys())
+        lines = ["Record Configuration".upper(), "-" * (key_width + 24)]
+        for k, v in display.items():
+            # Pretty format booleans as On/Off
+            if isinstance(v, bool):
+                v_fmt = "On" if v else "Off"
+            else:
+                v_fmt = str(v)
+            lines.append(f"{k:<{key_width}} : {v_fmt}")
+        return "\n".join(lines)
+
+    def print(self) -> None:
+        """Print the pretty summary to stdout."""
+        print(self.pretty())
+
 
 def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_params):
     config = RecordConfig(use_ser=use_ser, use_dmm=use_dmm, use_ps=use_ps, use_fg=use_fg, ps_channels=ps_channels, serial_params=serial_params)
@@ -93,6 +123,7 @@ def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_p
 #### STIMULUS LOGGING  ##########
 #################################
 
+# TODO: really this should be grouped into my RecordConfig. Everything should be in RecordConfig
 class StimulusType(Enum):
     """Types of stimulus that can be swept"""
     NONE = "None"
@@ -260,8 +291,14 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
         headers += fg_params
 
     # Stimulus columns (if stimulus mode enabled)
+    # TODO: clean the setting of this up? Because I reference the same header in guiTab2_LOG? maybe recordconfig class should cotain these?
     if stimulus_config and stimulus_config.enabled:
-        headers += ["Stimulus_Value", "Stimulus_Step"]
+        headers += ["Stimulus_Step"]
+        if stimulus_config.stimulus_type == StimulusType.PS_VOLTAGE:
+            headers += ["Stimulus_PS_V"]
+        elif stimulus_config.stimulus_type == StimulusType.FG_FREQUENCY:
+            headers += ["Stimulus_FG_F"]
+
 
     return headers
 

@@ -78,7 +78,6 @@ class ThemedApp:
         self.load_theme(theme_file, compact=compact)
         self.apply_theme()
 
-
     def load_theme(self, theme_file, compact=False):
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
@@ -221,9 +220,11 @@ class Prompt(ThemedFrame):
 ##########################################
 
 class ColorCircle(tk.Canvas):
-    def __init__(self, master, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
-        self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+    def __init__(self, master, width, height, bg, *args, **kwargs):
+        super().__init__(master, width=width, height=height, bg=bg, *args, **kwargs)
+        # TODO: have this sizing be dynamic with compact screen option
+        # self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+        self.status_oval = self.create_oval(25 * .25, 25 * .25, 25 * .75, 25 * 0.75)  # x0, y0, x1, y1
 
     def set_color(self, color):
         self.itemconfig(self.status_oval, fill=color)
@@ -244,8 +245,7 @@ class ConnFrame(ThemedFrame):
         self.port = None
 
         self.status = False
-        self.canvas1 = tk.Canvas(self, width=50, height=50, bg=self.theme_config["bg_dark"])  # create a Canvas widget
-        self.status_oval = self.canvas1.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+        self.status_oval = ColorCircle(self, 50, 50, bg=self.theme_config["bg_dark"])
 
         self.set_bg(self.theme_config["light_4"])
         self.init_base_fr()
@@ -267,9 +267,9 @@ class ConnFrame(ThemedFrame):
 
     def set_status(self, status):
         if status:
-            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["success"])
+            self.status_oval.set_color(self.theme_config["success"])
         else:
-            self.canvas1.itemconfig(self.status_oval, fill=self.theme_config["error"])
+            self.status_oval.set_color(self.theme_config["error"])
 
     def gui_refresh(self):
         self.set_status(self.status)
@@ -278,6 +278,7 @@ class ConnFrame(ThemedFrame):
         self.canvas1.itemconfig(self.status_oval, fill=color)
 
 
+# TODO: I need to prevent connections to test instruments that already have an active connection
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
         super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd)
@@ -300,7 +301,6 @@ class SerialConnFrame(ConnFrame):
         self.initialize_fr()
 
     def initialize_fr(self):
-        # TODO: add back the button to refresh ports
         # initialize port connection method dropdown
         self.port_func_drop = guih.generate_drop_down(
             self,
@@ -336,7 +336,7 @@ class SerialConnFrame(ConnFrame):
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 
         # place CONNECT button and STATUS indicator
-        self.canvas1.grid(row=5, column=2, padx=15, pady=3)
+        self.status_oval.grid(row=5, column=2, padx=15, pady=3)
 
     def connect(self, set_used_port=True):
         super().connect()
@@ -360,11 +360,13 @@ class SerialConnFrame(ConnFrame):
             menu.add_command(label=string,
                              command=lambda value=string: self.com_drop[1].set(value))
 
+        # if we aren't connected, adjust the port
         if not self.status:
-            try:
-                self.com_drop[1].set(ports[0])
-            except IndexError:
-                self.com_drop[1].set(None)
+            if self.com_drop[1].get() not in ports:
+                try:
+                    self.com_drop[1].set(ports[0])
+                except IndexError:
+                    self.com_drop[1].set(None)
 
         # set value to previously used port (if available)
         if first_run:
@@ -406,7 +408,7 @@ class AutoConnFrame(ConnFrame):
         super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd)
 
     def init_fr(self):
-        self.canvas1.grid(row=1, column=2, padx=15, pady=22)
+        self.status_oval.grid(row=1, column=2, padx=15, pady=22)
 
         tk.Button(
             self, text=f"Auto-connect", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],

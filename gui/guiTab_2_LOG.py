@@ -4,7 +4,6 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 import threading
-import os
 import time
 from datetime import datetime
 
@@ -17,6 +16,7 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
 
+# TODO: the labelnums printout isn't sized correctly for stimulus mode (needs to be wider)
 
 
 class TabLog(guic.ThemedFrame):
@@ -56,8 +56,7 @@ class TabLog(guic.ThemedFrame):
         # place everything in grid
         self.fr_status.grid(row=1, column=0, pady=15, padx=15)
         self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
-        self.fr_stimulus.grid(row=1, column=2, pady=15, padx=15)
-        self.fr_analysis.grid(row=2, column=0, pady=15, padx=15)
+        self.fr_stimulus.grid(row=2, column=0, pady=15, padx=15)
         self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=12)
 
     def initTabContent(self):
@@ -71,30 +70,30 @@ class TabLog(guic.ThemedFrame):
         self.init_fr_status()
         self.init_fr_setup()
         self.init_fr_stimulus()
-        self.init_fr_analysis()
 
     def init_fr_status(self):
         # Serial connection status
         self.labelSerStat = ttk.Label(self.fr_status, width=10, text='Serial', style="TLabel", anchor='w')
-        self.ser_status = ColorCircle(self.fr_status, width=50, height=50,
+        # TODO: make these width and heights conditional
+        self.ser_status = ColorCircle(self.fr_status, width=25, height=25,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelSerStat.grid(row=0, column=0)
         self.ser_status.grid(row=0, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # DMM connection status
         self.labelDmmStat = ttk.Label(self.fr_status, width=10, text='DMM', style="TLabel", anchor='w')
-        self.dmm_status = ColorCircle(self.fr_status, width=50, height=50,
+        self.dmm_status = ColorCircle(self.fr_status, width=25, height=25,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelDmmStat.grid(row=1, column=0)
         self.dmm_status.grid(row=1, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # PS connection status
         self.labelPsStat = ttk.Label(self.fr_status, width=10, text='PS', style="TLabel", anchor='w')
-        self.ps_status = ColorCircle(self.fr_status, width=50, height=50,
+        self.ps_status = ColorCircle(self.fr_status, width=25, height=25,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelPsStat.grid(row=2, column=0)
         self.ps_status.grid(row=2, column=1, pady=self.theme_config["pad"]["ypad_s"])
         # FG connection status
         self.labelFgStat = ttk.Label(self.fr_status, width=10, text='FG', style="TLabel", anchor='w')
-        self.fg_status = ColorCircle(self.fr_status, width=50, height=50,
+        self.fg_status = ColorCircle(self.fr_status, width=25, height=25,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelFgStat.grid(row=3, column=0)
         self.fg_status.grid(row=3, column=1, pady=self.theme_config["pad"]["ypad_s"])
@@ -183,8 +182,6 @@ class TabLog(guic.ThemedFrame):
         btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_stimulus(self):
-        """Initialize stimulus sweep configuration UI"""
-        # Title
         ttk.Label(self.fr_stimulus, text="Stimulus Sweep", style="TPinkLabel.TLabel").grid(
             row=0, column=0, columnspan=2, pady=5, padx=10
         )
@@ -255,18 +252,6 @@ class TabLog(guic.ThemedFrame):
         # Initially hide stimulus controls
         self.toggle_stimulus()
 
-    def init_fr_analysis(self):
-        # Simple placeholder for file analysis
-        # For graphing, use the GRAPH tab (Tab 8)
-        ttk.Label(self.fr_analysis, text="File Analysis", style="TPinkLabel.TLabel").grid(
-            row=0, column=0, pady=5, padx=10
-        )
-
-        info_label = tk.Label(self.fr_analysis,
-                              text="For graphing and analysis,\nplease use the GRAPH tab",
-                              bg=self.theme_config["light_4"])
-        info_label.grid(row=1, column=0, padx=10, pady=20)
-
     def gui_refresh(self, event):
         if event == "auto":
             if self.cc.get_ser_status():
@@ -290,7 +275,7 @@ class TabLog(guic.ThemedFrame):
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
-    # NOTE: some of these are linked to Checkbuttons
+    # NOTE: some of these are linked to Checkbuttons (instead of Buttons)
 
     def toggle_use_ser(self):
         if self.var_use_ser.get():
@@ -305,7 +290,7 @@ class TabLog(guic.ThemedFrame):
         if self.var_use_stimulus.get():
             # Show all stimulus configuration widgets
             for widget in self.fr_stimulus.winfo_children():
-                if widget != self.var_use_stimulus.master:  # Don't hide the checkbox itself
+                if widget != self.var_use_stimulus:  # Don't hide the checkbox itself
                     widget.grid()
         else:
             # Hide all stimulus configuration widgets except title and checkbox
@@ -356,10 +341,6 @@ class TabLog(guic.ThemedFrame):
                 if not self.cc.get_fg_status():
                     guih.alert_user("Can't start record!", "FG stimulus requires Function Generator connection!", "error")
                     return
-
-        if not self.record_status:
-            guih.alert_user("Can't start record!", "No instruments selected", "error")
-            return
 
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument
         logger.start_recording(self.csvh)
@@ -422,6 +403,7 @@ class TabLog(guic.ThemedFrame):
             1,
             self.serial_log_params.get("1.0", "end").strip()
         )
+        self.record_config.print()
 
         # create stimulus config if enabled
         if self.var_use_stimulus.get():
@@ -519,8 +501,11 @@ class TabLog(guic.ThemedFrame):
                 row = self._collect_data_row()
 
                 # Add stimulus value to the row
-                row["Stimulus_Value"] = stimulus_value
                 row["Stimulus_Step"] = step_num
+                if self.stimulus_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+                    row["Stimulus_PS_V"] = stimulus_value
+                elif self.stimulus_config.stimulus_type == logger.StimulusType.FG_FREQUENCY:
+                    row["Stimulus_FG_F"] = stimulus_value
 
                 # Update progress
                 self.recCnt += 1
@@ -539,23 +524,23 @@ class TabLog(guic.ThemedFrame):
                 self.record_status = False
 
         except Exception as e:
+            raise e
             self.prompt.print(f"Error during stimulus sweep: {e}", "error")
             self.record_status = False
 
     def _collect_data_row(self):
-        """Collect a single row of data from all enabled instruments"""
         row = {"Time": datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
 
         # Serial data if requested
-        if self.record_config.get("use_ser", False):
+        if self.record_config.use_ser is True:
             row["SerialData"] = self.cc.ser.read_line()
 
         # DMM data if requested
-        if self.record_config.get("use_dmm", False):
+        if self.record_config.use_dmm:
             row["DMM_Meas1"] = self.cc.dmm.read_value()
 
         # Power Supply data if requested
-        if self.record_config.get("use_ps", False):
+        if self.record_config.use_ps:
             row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
             row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
             row["PS_Imeas1"] = self.cc.ps.get_current(1)
@@ -565,7 +550,7 @@ class TabLog(guic.ThemedFrame):
                 row["PS_Imeas1"] = self.cc.ps.get_current(1)
 
         # Function Generator data if requested
-        if self.record_config.get("use_fg", False):
+        if self.record_config.use_fg:
             try:
                 row["FG_Freq"] = self.cc.fg.query(
                     self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
@@ -573,7 +558,7 @@ class TabLog(guic.ThemedFrame):
                 row["FG_Waveform"] = self.cc.fg.query(
                     self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
                 )
-            except Exception as e:
+            except Exception:
                 row["FG_Freq"] = "ERROR"
                 row["FG_Waveform"] = "ERROR"
 

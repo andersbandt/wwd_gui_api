@@ -53,8 +53,8 @@ class tabXDS110(guic.ThemedFrame):
         self.fr_target.grid(row=2, column=0, padx=30, pady=12)
 
         # add some other GUI variables
-        self.status_xds110 = ColorCircle(self.fr_xds110, width=50, height=50)
-        self.status_target = ColorCircle(self.fr_target, width=50, height=50)
+        self.status_xds110 = ColorCircle(self.fr_xds110, width=50, height=50, bg=self.theme_config["bg_dark"])
+        self.status_target = ColorCircle(self.fr_target, width=50, height=50, bg=self.theme_config["bg_dark"])
         self.toggle_drop = None  # fr_target
         self.lbl_target_v = None  # fr_target
         self.targetConfig_drop = None  # fr_firmware
@@ -115,8 +115,8 @@ class tabXDS110(guic.ThemedFrame):
         # set up all the usable objects
         self.entry_timesleep = Entry(fr_m, textvariable="seconds")
         self.entry_timeautoff = Entry(fr_m)
-        self.buildStatus = ColorCircle(fr_m, width=50, height=50)
-        self.flashStatus = ColorCircle(fr_m, width=60, height=60)
+        self.buildStatus = ColorCircle(fr_m, width=50, height=50, bg=self.theme_config["bg_dark"])
+        self.flashStatus = ColorCircle(fr_m, width=60, height=60, bg=self.theme_config["bg_dark"])
 
         # place buttons
         btn_build_firmware = Button(fr_m, text="Build firmware",

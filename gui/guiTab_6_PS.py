@@ -244,6 +244,7 @@ class TabPS(guic.ThemedFrame):
 
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
+        # TODO: I think I need a timeout on these
         if self.cc.get_ps_status():
             status_decode = self.cc.ps.check_status()
         else:
@@ -278,10 +279,12 @@ class TabPS(guic.ThemedFrame):
             self.ch2_mode.set_color("black")
 
     def gui_refresh(self, event):
+        print("gui_refresh for PS ...")
         if event == "auto":
             self.fr_port.refresh_ports()
         self.gui_refresh_info()
         self.gui_refresh_channel_state()
+        print("end of gui_refresh for PS!")
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################

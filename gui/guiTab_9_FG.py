@@ -14,10 +14,7 @@ import tkinter.messagebox as tkmb
 import time
 from datetime import datetime
 
-
 # import user defined modules
-from common import plotter
-from analysis.csv_helper import CSVHelper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
@@ -85,7 +82,6 @@ class TabFG(guic.ThemedFrame):
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()
-
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Function Generator Info', style="TPinkLabel.TLabel", width=20)
@@ -202,8 +198,8 @@ class TabFG(guic.ThemedFrame):
     def gui_refresh(self, event):
         if event == "auto":
             self.fr_port.refresh_ports()
-        self.gui_refresh_info()
-        self.gui_refresh_output_state()
+        # self.gui_refresh_info()
+        # self.gui_refresh_output_state()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################

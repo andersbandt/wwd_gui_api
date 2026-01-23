@@ -24,7 +24,8 @@ from gui import gui_class as guic
 
 # TODO: have saveable setup configs
 
-# TODO: add option to only select certain files from the Listbox in analysis
+# TODO: have an option to print out the available headers in the Listbox files
+
 
 
 def focus_next_widget(event):

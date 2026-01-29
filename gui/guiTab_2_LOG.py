@@ -37,6 +37,7 @@ class TabLog(guic.ThemedFrame):
         self.record_config = None
         self.stimulus_config = None
         self.stimulus_generator = None
+        self.is_dual_stimulus = False
 
         self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_setup = tk.Frame(self, bg=self.theme_config["light_4"])
@@ -186,7 +187,7 @@ class TabLog(guic.ThemedFrame):
         """Initialize stimulus sweep configuration UI"""
         # Title
         ttk.Label(self.fr_stimulus, text="Stimulus Sweep", style="TPinkLabel.TLabel").grid(
-            row=0, column=0, columnspan=2, pady=5, padx=10
+            row=0, column=0, columnspan=4, pady=5, padx=10
         )
 
         # Enable stimulus checkbox
@@ -200,57 +201,136 @@ class TabLog(guic.ThemedFrame):
             row=1, column=0, columnspan=2, padx=5, pady=5
         )
 
+        # Enable dual stimulus checkbox
+        self.var_use_dual_stimulus = tk.IntVar()
+        ttk.Checkbutton(self.fr_stimulus,
+                        text="Enable Dual Sweep (Nested Loop)",
+                        variable=self.var_use_dual_stimulus,
+                        onvalue=1,
+                        offvalue=0,
+                        command=self.toggle_dual_stimulus).grid(
+            row=1, column=2, columnspan=2, padx=5, pady=5
+        )
+
+        # === FIRST STIMULUS (or Outer Loop) ===
+        tk.Label(self.fr_stimulus, text="--- Parameter 1 (Outer Loop) ---",
+                 font=('TkDefaultFont', 9, 'bold')).grid(row=2, column=0, columnspan=2, pady=5)
+
         # Stimulus type dropdown
-        tk.Label(self.fr_stimulus, text="Stimulus Type:").grid(row=2, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="Stimulus Type:").grid(row=3, column=0, sticky='w', padx=5, pady=2)
         self.stimulus_type_drop = guih.generate_drop_down(
             self.fr_stimulus,
             ["PS Voltage", "FG Frequency", "FG Duty Cycle"]
         )
-        self.stimulus_type_drop[0].grid(row=2, column=1, padx=5, pady=2)
+        self.stimulus_type_drop[0].grid(row=3, column=1, padx=5, pady=2)
 
         # Sweep mode dropdown
-        tk.Label(self.fr_stimulus, text="Sweep Mode:").grid(row=3, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="Sweep Mode:").grid(row=4, column=0, sticky='w', padx=5, pady=2)
         self.sweep_mode_drop = guih.generate_drop_down(
             self.fr_stimulus,
             ["Linear", "Logarithmic"]
         )
-        self.sweep_mode_drop[0].grid(row=3, column=1, padx=5, pady=2)
+        self.sweep_mode_drop[0].grid(row=4, column=1, padx=5, pady=2)
 
         # Start value
-        tk.Label(self.fr_stimulus, text="Start Value:").grid(row=4, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="Start Value:").grid(row=5, column=0, sticky='w', padx=5, pady=2)
         self.stim_start_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_start_entry.grid(row=4, column=1, padx=5, pady=2)
+        self.stim_start_entry.grid(row=5, column=1, padx=5, pady=2)
         self.stim_start_entry.insert(0, "1.0")
 
         # Stop value
-        tk.Label(self.fr_stimulus, text="Stop Value:").grid(row=5, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="Stop Value:").grid(row=6, column=0, sticky='w', padx=5, pady=2)
         self.stim_stop_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_stop_entry.grid(row=5, column=1, padx=5, pady=2)
+        self.stim_stop_entry.grid(row=6, column=1, padx=5, pady=2)
         self.stim_stop_entry.insert(0, "10.0")
 
         # Step value
-        tk.Label(self.fr_stimulus, text="Step Value:").grid(row=6, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="Step Value:").grid(row=7, column=0, sticky='w', padx=5, pady=2)
         self.stim_step_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_step_entry.grid(row=6, column=1, padx=5, pady=2)
+        self.stim_step_entry.grid(row=7, column=1, padx=5, pady=2)
         self.stim_step_entry.insert(0, "1.0")
 
         # Settling time
-        tk.Label(self.fr_stimulus, text="Settling Time (s):").grid(row=7, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="Settling Time (s):").grid(row=8, column=0, sticky='w', padx=5, pady=2)
         self.stim_settling_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_settling_entry.grid(row=7, column=1, padx=5, pady=2)
+        self.stim_settling_entry.grid(row=8, column=1, padx=5, pady=2)
         self.stim_settling_entry.insert(0, "0.5")
 
         # PS Channel (only relevant for PS voltage)
-        tk.Label(self.fr_stimulus, text="PS Channel:").grid(row=8, column=0, sticky='w', padx=5, pady=2)
+        tk.Label(self.fr_stimulus, text="PS Channel:").grid(row=9, column=0, sticky='w', padx=5, pady=2)
         self.stim_ps_channel_drop = guih.generate_drop_down(
             self.fr_stimulus,
             [1, 2]
         )
-        self.stim_ps_channel_drop[0].grid(row=8, column=1, padx=5, pady=2)
+        self.stim_ps_channel_drop[0].grid(row=9, column=1, padx=5, pady=2)
+
+        # === SECOND STIMULUS (Inner Loop) - Only shown when dual sweep enabled ===
+        self.lbl_stim2_header = tk.Label(self.fr_stimulus, text="--- Parameter 2 (Inner Loop) ---",
+                                          font=('TkDefaultFont', 9, 'bold'))
+        self.lbl_stim2_header.grid(row=2, column=2, columnspan=2, pady=5)
+
+        # Stimulus 2 type dropdown
+        self.lbl_stim2_type = tk.Label(self.fr_stimulus, text="Stimulus Type:")
+        self.lbl_stim2_type.grid(row=3, column=2, sticky='w', padx=5, pady=2)
+        self.stimulus2_type_drop = guih.generate_drop_down(
+            self.fr_stimulus,
+            ["PS Voltage", "FG Frequency", "FG Duty Cycle"]
+        )
+        self.stimulus2_type_drop[0].grid(row=3, column=3, padx=5, pady=2)
+        self.stimulus2_type_drop[1].set("FG Duty Cycle")  # Default to different param
+
+        # Sweep mode 2 dropdown
+        self.lbl_stim2_mode = tk.Label(self.fr_stimulus, text="Sweep Mode:")
+        self.lbl_stim2_mode.grid(row=4, column=2, sticky='w', padx=5, pady=2)
+        self.sweep2_mode_drop = guih.generate_drop_down(
+            self.fr_stimulus,
+            ["Linear", "Logarithmic"]
+        )
+        self.sweep2_mode_drop[0].grid(row=4, column=3, padx=5, pady=2)
+
+        # Start value 2
+        self.lbl_stim2_start = tk.Label(self.fr_stimulus, text="Start Value:")
+        self.lbl_stim2_start.grid(row=5, column=2, sticky='w', padx=5, pady=2)
+        self.stim2_start_entry = tk.Entry(self.fr_stimulus, width=15)
+        self.stim2_start_entry.grid(row=5, column=3, padx=5, pady=2)
+        self.stim2_start_entry.insert(0, "10.0")
+
+        # Stop value 2
+        self.lbl_stim2_stop = tk.Label(self.fr_stimulus, text="Stop Value:")
+        self.lbl_stim2_stop.grid(row=6, column=2, sticky='w', padx=5, pady=2)
+        self.stim2_stop_entry = tk.Entry(self.fr_stimulus, width=15)
+        self.stim2_stop_entry.grid(row=6, column=3, padx=5, pady=2)
+        self.stim2_stop_entry.insert(0, "90.0")
+
+        # Step value 2
+        self.lbl_stim2_step = tk.Label(self.fr_stimulus, text="Step Value:")
+        self.lbl_stim2_step.grid(row=7, column=2, sticky='w', padx=5, pady=2)
+        self.stim2_step_entry = tk.Entry(self.fr_stimulus, width=15)
+        self.stim2_step_entry.grid(row=7, column=3, padx=5, pady=2)
+        self.stim2_step_entry.insert(0, "10.0")
+
+        # PS Channel 2 (only relevant for PS voltage)
+        self.lbl_stim2_ps_channel = tk.Label(self.fr_stimulus, text="PS Channel:")
+        self.lbl_stim2_ps_channel.grid(row=9, column=2, sticky='w', padx=5, pady=2)
+        self.stim2_ps_channel_drop = guih.generate_drop_down(
+            self.fr_stimulus,
+            [1, 2]
+        )
+        self.stim2_ps_channel_drop[0].grid(row=9, column=3, padx=5, pady=2)
 
         # Status label for showing sweep progress
-        self.stim_progress_label = tk.Label(self.fr_stimulus, text="", relief='sunken', width=20)
-        self.stim_progress_label.grid(row=9, column=0, columnspan=2, padx=5, pady=5)
+        self.stim_progress_label = tk.Label(self.fr_stimulus, text="", relief='sunken', width=40)
+        self.stim_progress_label.grid(row=10, column=0, columnspan=4, padx=5, pady=5)
+
+        # Store second stimulus widgets for easy show/hide
+        self.stim2_widgets = [
+            self.lbl_stim2_header, self.lbl_stim2_type, self.stimulus2_type_drop[0],
+            self.lbl_stim2_mode, self.sweep2_mode_drop[0],
+            self.lbl_stim2_start, self.stim2_start_entry,
+            self.lbl_stim2_stop, self.stim2_stop_entry,
+            self.lbl_stim2_step, self.stim2_step_entry,
+            self.lbl_stim2_ps_channel, self.stim2_ps_channel_drop[0]
+        ]
 
         # Initially hide stimulus controls
         self.toggle_stimulus()
@@ -307,12 +387,25 @@ class TabLog(guic.ThemedFrame):
             for widget in self.fr_stimulus.winfo_children():
                 if widget != self.var_use_stimulus.master:  # Don't hide the checkbox itself
                     widget.grid()
+            # Update dual stimulus visibility
+            self.toggle_dual_stimulus()
         else:
-            # Hide all stimulus configuration widgets except title and checkbox
+            # Hide all stimulus configuration widgets except title and checkboxes (row 0 and 1)
             for widget in self.fr_stimulus.winfo_children():
                 widget_info = widget.grid_info()
-                if widget_info.get('row', 0) > 1:  # Keep row 0 (title) and row 1 (checkbox)
+                if widget_info.get('row', 0) > 1:
                     widget.grid_remove()
+
+    def toggle_dual_stimulus(self):
+        """Show/hide second stimulus parameter controls"""
+        if self.var_use_dual_stimulus.get() and self.var_use_stimulus.get():
+            # Show second stimulus widgets
+            for widget in self.stim2_widgets:
+                widget.grid()
+        else:
+            # Hide second stimulus widgets
+            for widget in self.stim2_widgets:
+                widget.grid_remove()
 
     def start_record(self):
         # Organize parameters first
@@ -346,16 +439,29 @@ class TabLog(guic.ThemedFrame):
 
         # Check stimulus configuration if enabled
         if self.var_use_stimulus.get():
-            stim_type = self.stimulus_config.stimulus_type
-
-            if stim_type == logger.StimulusType.PS_VOLTAGE:
-                if not self.cc.get_ps_status():
-                    guih.alert_user("Can't start record!", "PS stimulus requires Power Supply connection!", "error")
-                    return
-            elif stim_type in [logger.StimulusType.FG_FREQUENCY, logger.StimulusType.FG_DUTY_CYCLE]:
-                if not self.cc.get_fg_status():
-                    guih.alert_user("Can't start record!", "FG stimulus requires Function Generator connection!", "error")
-                    return
+            if isinstance(self.stimulus_config, logger.DualStimulusConfig):
+                # Check both outer and inner loop requirements
+                for loop_config in [self.stimulus_config.outer_loop, self.stimulus_config.inner_loop]:
+                    stim_type = loop_config.stimulus_type
+                    if stim_type == logger.StimulusType.PS_VOLTAGE:
+                        if not self.cc.get_ps_status():
+                            guih.alert_user("Can't start record!", "PS stimulus requires Power Supply connection!", "error")
+                            return
+                    elif stim_type in [logger.StimulusType.FG_FREQUENCY, logger.StimulusType.FG_DUTY_CYCLE]:
+                        if not self.cc.get_fg_status():
+                            guih.alert_user("Can't start record!", "FG stimulus requires Function Generator connection!", "error")
+                            return
+            else:
+                # Single stimulus check
+                stim_type = self.stimulus_config.stimulus_type
+                if stim_type == logger.StimulusType.PS_VOLTAGE:
+                    if not self.cc.get_ps_status():
+                        guih.alert_user("Can't start record!", "PS stimulus requires Power Supply connection!", "error")
+                        return
+                elif stim_type in [logger.StimulusType.FG_FREQUENCY, logger.StimulusType.FG_DUTY_CYCLE]:
+                    if not self.cc.get_fg_status():
+                        guih.alert_user("Can't start record!", "FG stimulus requires Function Generator connection!", "error")
+                        return
 
         if not self.record_status:
             guih.alert_user("Can't start record!", "No instruments selected", "error")
@@ -425,9 +531,6 @@ class TabLog(guic.ThemedFrame):
 
         # create stimulus config if enabled
         if self.var_use_stimulus.get():
-            stimulus_type_str = self.stimulus_type_drop[1].get()
-            sweep_mode_str = self.sweep_mode_drop[1].get()
-
             # Map strings to enums
             stimulus_type_map = {
                 "PS Voltage": logger.StimulusType.PS_VOLTAGE,
@@ -440,26 +543,84 @@ class TabLog(guic.ThemedFrame):
             }
 
             try:
-                self.stimulus_config = logger.StimulusConfig(
-                    enabled=True,
-                    stimulus_type=stimulus_type_map[stimulus_type_str],
-                    sweep_mode=sweep_mode_map[sweep_mode_str],
-                    start_value=float(self.stim_start_entry.get()),
-                    stop_value=float(self.stim_stop_entry.get()),
-                    step_value=float(self.stim_step_entry.get()),
-                    settling_time=float(self.stim_settling_entry.get()),
-                    ps_channel=int(self.stim_ps_channel_drop[1].get())
-                )
+                if self.var_use_dual_stimulus.get():
+                    # === DUAL STIMULUS MODE ===
+                    # Create outer loop config
+                    stimulus1_type_str = self.stimulus_type_drop[1].get()
+                    sweep1_mode_str = self.sweep_mode_drop[1].get()
 
-                # Validate the config
-                valid, error_msg = self.stimulus_config.validate()
-                if not valid:
-                    guih.alert_user("Invalid Stimulus Config", error_msg, "error")
-                    raise ValueError(error_msg)
+                    outer_config = logger.StimulusConfig(
+                        enabled=True,
+                        stimulus_type=stimulus_type_map[stimulus1_type_str],
+                        sweep_mode=sweep_mode_map[sweep1_mode_str],
+                        start_value=float(self.stim_start_entry.get()),
+                        stop_value=float(self.stim_stop_entry.get()),
+                        step_value=float(self.stim_step_entry.get()),
+                        settling_time=float(self.stim_settling_entry.get()),
+                        ps_channel=int(self.stim_ps_channel_drop[1].get())
+                    )
 
-                # Create the stimulus generator
-                self.stimulus_generator = logger.StimulusGenerator(self.stimulus_config)
-                self.prompt.print(f"Stimulus sweep configured: {len(self.stimulus_generator)} steps")
+                    # Create inner loop config
+                    stimulus2_type_str = self.stimulus2_type_drop[1].get()
+                    sweep2_mode_str = self.sweep2_mode_drop[1].get()
+
+                    inner_config = logger.StimulusConfig(
+                        enabled=True,
+                        stimulus_type=stimulus_type_map[stimulus2_type_str],
+                        sweep_mode=sweep_mode_map[sweep2_mode_str],
+                        start_value=float(self.stim2_start_entry.get()),
+                        stop_value=float(self.stim2_stop_entry.get()),
+                        step_value=float(self.stim2_step_entry.get()),
+                        settling_time=0.0,  # Use outer loop settling time
+                        ps_channel=int(self.stim2_ps_channel_drop[1].get())
+                    )
+
+                    # Create dual stimulus config
+                    self.stimulus_config = logger.DualStimulusConfig(
+                        enabled=True,
+                        outer_loop=outer_config,
+                        inner_loop=inner_config
+                    )
+
+                    # Validate the config
+                    valid, error_msg = self.stimulus_config.validate()
+                    if not valid:
+                        guih.alert_user("Invalid Dual Stimulus Config", error_msg, "error")
+                        raise ValueError(error_msg)
+
+                    # Create the stimulus generator
+                    self.stimulus_generator = logger.DualStimulusGenerator(self.stimulus_config)
+                    self.is_dual_stimulus = True
+                    self.prompt.print(f"Dual stimulus sweep configured: {len(self.stimulus_generator)} total steps")
+                    self.prompt.print(f"  Outer loop: {len(self.stimulus_generator.outer_gen)} steps")
+                    self.prompt.print(f"  Inner loop: {len(self.stimulus_generator.inner_gen)} steps")
+
+                else:
+                    # === SINGLE STIMULUS MODE ===
+                    stimulus_type_str = self.stimulus_type_drop[1].get()
+                    sweep_mode_str = self.sweep_mode_drop[1].get()
+
+                    self.stimulus_config = logger.StimulusConfig(
+                        enabled=True,
+                        stimulus_type=stimulus_type_map[stimulus_type_str],
+                        sweep_mode=sweep_mode_map[sweep_mode_str],
+                        start_value=float(self.stim_start_entry.get()),
+                        stop_value=float(self.stim_stop_entry.get()),
+                        step_value=float(self.stim_step_entry.get()),
+                        settling_time=float(self.stim_settling_entry.get()),
+                        ps_channel=int(self.stim_ps_channel_drop[1].get())
+                    )
+
+                    # Validate the config
+                    valid, error_msg = self.stimulus_config.validate()
+                    if not valid:
+                        guih.alert_user("Invalid Stimulus Config", error_msg, "error")
+                        raise ValueError(error_msg)
+
+                    # Create the stimulus generator
+                    self.stimulus_generator = logger.StimulusGenerator(self.stimulus_config)
+                    self.is_dual_stimulus = False
+                    self.prompt.print(f"Stimulus sweep configured: {len(self.stimulus_generator)} steps")
 
             except ValueError as e:
                 guih.alert_user("Invalid Stimulus Values", str(e), "error")
@@ -467,6 +628,7 @@ class TabLog(guic.ThemedFrame):
         else:
             self.stimulus_config = None
             self.stimulus_generator = None
+            self.is_dual_stimulus = False
 
         # setup recording
         self.recName, self.csvh = logger.setup_recording(
@@ -505,33 +667,12 @@ class TabLog(guic.ThemedFrame):
         self.prompt.print(f"Starting stimulus sweep with {len(self.stimulus_generator)} steps")
 
         try:
-            for step_num, stimulus_value in enumerate(self.stimulus_generator, 1):
-                if not self.record_status:
-                    break
-
-                # Apply the stimulus
-                self._apply_stimulus(stimulus_value)
-
-                # Wait for settling
-                time.sleep(self.stimulus_config.settling_time)
-
-                # Collect data
-                row = self._collect_data_row()
-
-                # Add stimulus value to the row
-                row["Stimulus_Value"] = stimulus_value
-                row["Stimulus_Step"] = step_num
-
-                # Update progress
-                self.recCnt += 1
-                progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
-                self.labelRNums.config(text=progress_text)
-                self.stim_progress_label.config(text=progress_text)
-
-                # Append to CSV
-                self.csvh.add_row_from_dict(row)
-
-                self.prompt.print(f"Step {step_num}: Stimulus={stimulus_value:.3f}")
+            if self.is_dual_stimulus:
+                # === DUAL STIMULUS MODE ===
+                self._thread_record_dual_stimulus()
+            else:
+                # === SINGLE STIMULUS MODE ===
+                self._thread_record_single_stimulus()
 
             # Sweep complete
             if self.record_status:
@@ -539,8 +680,70 @@ class TabLog(guic.ThemedFrame):
                 self.record_status = False
 
         except Exception as e:
-            self.prompt.print(f"Error during stimulus sweep: {e}", "error")
+            self.prompt.print(f"Error during stimulus sweep: {e}")
             self.record_status = False
+
+    def _thread_record_single_stimulus(self):
+        """Single parameter stimulus sweep"""
+        for step_num, stimulus_value in enumerate(self.stimulus_generator, 1):
+            if not self.record_status:
+                break
+
+            # Apply the stimulus
+            self._apply_stimulus(stimulus_value, self.stimulus_config)
+
+            # Wait for settling
+            time.sleep(self.stimulus_config.settling_time)
+
+            # Collect data
+            row = self._collect_data_row()
+
+            # Add stimulus value to the row
+            row["Stimulus_Value"] = stimulus_value
+            row["Stimulus_Step"] = step_num
+
+            # Update progress
+            self.recCnt += 1
+            progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
+            self.labelRNums.config(text=progress_text)
+            self.stim_progress_label.config(text=progress_text)
+
+            # Append to CSV
+            self.csvh.add_row_from_dict(row)
+
+            self.prompt.print(f"Step {step_num}: Stimulus={stimulus_value:.3f}")
+
+    def _thread_record_dual_stimulus(self):
+        """Dual parameter stimulus sweep (nested loops)"""
+        for step_num, (outer_value, inner_value) in enumerate(self.stimulus_generator, 1):
+            if not self.record_status:
+                break
+
+            # Apply both stimuli
+            self._apply_stimulus(outer_value, self.stimulus_config.outer_loop)
+            self._apply_stimulus(inner_value, self.stimulus_config.inner_loop)
+
+            # Wait for settling (use outer loop settling time)
+            time.sleep(self.stimulus_config.outer_loop.settling_time)
+
+            # Collect data
+            row = self._collect_data_row()
+
+            # Add stimulus values to the row
+            row["Stimulus_Outer_Value"] = outer_value
+            row["Stimulus_Inner_Value"] = inner_value
+            row["Stimulus_Step"] = step_num
+
+            # Update progress
+            self.recCnt += 1
+            progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
+            self.labelRNums.config(text=progress_text)
+            self.stim_progress_label.config(text=progress_text)
+
+            # Append to CSV
+            self.csvh.add_row_from_dict(row)
+
+            self.prompt.print(f"Step {step_num}: Outer={outer_value:.3f}, Inner={inner_value:.3f}")
 
     def _collect_data_row(self):
         """Collect a single row of data from all enabled instruments"""
@@ -579,12 +782,17 @@ class TabLog(guic.ThemedFrame):
 
         return row
 
-    def _apply_stimulus(self, value):
-        """Apply the stimulus value to the appropriate instrument"""
-        stim_type = self.stimulus_config.stimulus_type
+    def _apply_stimulus(self, value, config):
+        """Apply the stimulus value to the appropriate instrument
+
+        Args:
+            value: The stimulus value to apply
+            config: StimulusConfig containing the stimulus type and parameters
+        """
+        stim_type = config.stimulus_type
 
         if stim_type == logger.StimulusType.PS_VOLTAGE:
-            channel = self.stimulus_config.ps_channel
+            channel = config.ps_channel
             self.cc.ps.set_voltage(value, channel)
 
         elif stim_type == logger.StimulusType.FG_FREQUENCY:

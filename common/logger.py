@@ -204,6 +204,67 @@ class StimulusGenerator:
         return self.current_index, len(self.values)
 
 
+@dataclass
+class DualStimulusConfig:
+    """Configuration for dual-parameter stimulus sweeps (nested loops)"""
+    enabled: bool = False
+    outer_loop: StimulusConfig = None  # Outer loop parameter (e.g., Frequency)
+    inner_loop: StimulusConfig = None  # Inner loop parameter (e.g., Duty cycle)
+
+    def validate(self):
+        """Validate the dual stimulus configuration"""
+        if not self.enabled:
+            return True, ""
+
+        if self.outer_loop is None or self.inner_loop is None:
+            return False, "Both outer and inner loop configurations are required"
+
+        # Validate outer loop
+        valid, error_msg = self.outer_loop.validate()
+        if not valid:
+            return False, f"Outer loop error: {error_msg}"
+
+        # Validate inner loop
+        valid, error_msg = self.inner_loop.validate()
+        if not valid:
+            return False, f"Inner loop error: {error_msg}"
+
+        # Check that stimulus types are different
+        if self.outer_loop.stimulus_type == self.inner_loop.stimulus_type:
+            return False, "Outer and inner loop must use different stimulus types"
+
+        return True, ""
+
+
+class DualStimulusGenerator:
+    """Generates stimulus values for a dual-parameter sweep (nested loops)"""
+
+    def __init__(self, config: DualStimulusConfig):
+        self.config = config
+        self.outer_gen = StimulusGenerator(config.outer_loop)
+        self.inner_gen = StimulusGenerator(config.inner_loop)
+        self.total_steps = len(self.outer_gen) * len(self.inner_gen)
+        self.current_step = 0
+
+    def __iter__(self):
+        """Make the generator iterable, yielding (outer_value, inner_value) tuples"""
+        self.current_step = 0
+        for outer_val in self.outer_gen:
+            # Reset inner generator for each outer value
+            self.inner_gen = StimulusGenerator(self.config.inner_loop)
+            for inner_val in self.inner_gen:
+                self.current_step += 1
+                yield (outer_val, inner_val)
+
+    def __len__(self):
+        """Return total number of steps (outer * inner)"""
+        return self.total_steps
+
+    def get_progress(self):
+        """Get current progress (current step, total steps)"""
+        return self.current_step, self.total_steps
+
+
 def parse_serial_params(raw: str):
     """
     Parse comma-separated serial params. Raises ValueError if format is invalid.
@@ -225,7 +286,14 @@ def parse_serial_params(raw: str):
     return parts
 
 
-def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig = None):
+def build_headers(record_config: RecordConfig, stimulus_config=None):
+    """
+    Build CSV headers based on recording and stimulus configuration.
+
+    Args:
+        record_config: RecordConfig for instrument selection
+        stimulus_config: Either StimulusConfig or DualStimulusConfig
+    """
     # SETUP CSV HEADER PARAMETERS
     headers = ["Time"]
 
@@ -260,8 +328,13 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
         headers += fg_params
 
     # Stimulus columns (if stimulus mode enabled)
-    if stimulus_config and stimulus_config.enabled:
-        headers += ["Stimulus_Value", "Stimulus_Step"]
+    if stimulus_config:
+        if isinstance(stimulus_config, DualStimulusConfig) and stimulus_config.enabled:
+            # Dual stimulus: add columns for both outer and inner loops
+            headers += ["Stimulus_Outer_Value", "Stimulus_Inner_Value", "Stimulus_Step"]
+        elif isinstance(stimulus_config, StimulusConfig) and stimulus_config.enabled:
+            # Single stimulus: original behavior
+            headers += ["Stimulus_Value", "Stimulus_Step"]
 
     return headers
 
@@ -270,13 +343,21 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
 # Orchestrator (single call)
 # ---------------------------
 
-def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig, stimulus_config: StimulusConfig = None):
+def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig, stimulus_config=None):
     """
     High-level setup that:
       1) Creates the filename
       2) Builds the headers (may alert/confirm via callbacks)
       3) Initializes the CSV file
-    Returns: (filename, headers, csv_helper, updated_config)
+
+    Args:
+        data_dir: Directory for output files
+        prefix: Filename prefix
+        ext_text: Additional text for filename
+        config: RecordConfig for instrument selection
+        stimulus_config: Either StimulusConfig or DualStimulusConfig (optional)
+
+    Returns: (filename, csv_helper)
     """
     rec_name = build_log_name(prefix, ext_text)
     headers = build_headers(config, stimulus_config)

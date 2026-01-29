@@ -35,7 +35,6 @@ class TabFG(guic.ThemedFrame):
         self.fr_port = None
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up function generator variables
         self.id = None
@@ -60,10 +59,10 @@ class TabFG(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_status.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        # TODO: need to add dynamic padding here (based on theme_config)
+        self.fr_info.grid(row=0, column=0)
+        self.fr_control.grid(row=1, column=0)
+        self.prompt.grid(row=1, column=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -81,7 +80,6 @@ class TabFG(guic.ThemedFrame):
         print("Initializing tab 9 (FG) content")
         self.init_fr_info()
         self.init_fr_control()
-        self.init_fr_status()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Function Generator Info', style="TPinkLabel.TLabel", width=20)
@@ -172,34 +170,16 @@ class TabFG(guic.ThemedFrame):
         self.output_toggle_btn = tk.Button(fr_m, text="Toggle Output", command=self.toggle_output)
         self.output_toggle_btn.grid(row=3, column=1, padx=10, pady=10)
 
-    def init_fr_status(self):
-        # Output status indicator
-        self.labelOutputStatus = ttk.Label(self.fr_status, width=12, text='Output Status', style="TLabel", anchor='w')
-        self.output_status = ColorCircle(self.fr_status, width=50, height=50,
-                                        bg=self.theme_config["bg_dark"])
-        self.labelOutputStatus.grid(row=0, column=0, pady=15, padx=15)
-        self.output_status.grid(row=1, column=0, pady=15, padx=15)
-
     def gui_refresh_info(self):
         if self.fr_port.status:
             self.valueWaveform.config(text='{:8s}'.format(str(self.waveform)))
             self.valueFrequency.config(text='{:8s}'.format(str(self.frequency)))
             self.valueDutyCycle.config(text='{:8s}'.format(str(self.duty_cycle)))
 
-    def gui_refresh_output_state(self):
-        if self.cc.get_fg_status():
-            if self.output_on:
-                self.output_toggle_btn.config(bg=self.theme_config["success"])
-                self.output_status.set_color("green")
-            else:
-                self.output_toggle_btn.config(bg=self.theme_config["error"])
-                self.output_status.set_color("red")
-
     def gui_refresh(self, event):
         if event == "auto":
             self.fr_port.refresh_ports()
         # self.gui_refresh_info()
-        # self.gui_refresh_output_state()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -316,10 +296,9 @@ class TabFG(guic.ThemedFrame):
             return False
 
         if self.id:  # CONNECTION SUCCESS
-            # re-initialize frames if needed
+            # NOTE: re-initialize the frames in case anything like channel count, etc. needs different GUI elements
             self.init_fr_info()
             self.init_fr_control()
-            self.init_fr_status()
 
             # start doing stuff
             self.prompt.print(f"Connected to FG with id: {self.id}")
@@ -334,8 +313,6 @@ class TabFG(guic.ThemedFrame):
             except Exception:
                 pass  # Some FGs may not support this command
 
-            # gui_refresh
-            self.gui_refresh_output_state()
             return True
         else:  # BAD ID received
             self.cc.set_fg(None)

@@ -51,9 +51,9 @@ class TabATE(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.fr_info.grid(row=0, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_control.grid(row=1, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"])
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -66,7 +66,7 @@ class TabATE(guic.ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+        self.fr_port.grid(row=0, column=1, rowspan=2, padx=15, pady=self.theme_config["pad"]["ypad_s"])
 
     def initTabContent(self):
         print("Initializing tab 7 (ATE) content")
@@ -139,10 +139,11 @@ class TabATE(guic.ThemedFrame):
 
     def ate_command(self, command_str):
         if self.ate is not None:
-            self.ate.send_cmd(command_str)
+            self.ate.write(command_str)
 
     def ate_query(self, command_str):
         if self.ate is not None:
+            self.prompt.print("Sending command: " + command_str)
             res = self.ate.query(command_str)
             self.prompt.print(f"Got response: {res}")
 

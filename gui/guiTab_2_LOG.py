@@ -9,14 +9,13 @@ from datetime import datetime
 
 # import user defined modules
 from common import logger
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
-
-# TODO: the labelnums printout isn't sized correctly for stimulus mode (needs to be wider)
 
 
 class TabLog(guic.ThemedFrame):
@@ -172,7 +171,7 @@ class TabLog(guic.ThemedFrame):
                                 bg=self.theme_config["error"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_stop_entry.grid(row=5, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-        self.labelRNums = ttk.Label(self.fr_setup, text='', width=8, relief='sunken')
+        self.labelRNums = ttk.Label(self.fr_setup, text='', width=15, relief='sunken')
         self.labelRNums.grid(row=5, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
 
         # set up button START live GRAPH
@@ -300,6 +299,7 @@ class TabLog(guic.ThemedFrame):
                     widget.grid_remove()
 
     def start_record(self):
+        # TODO: this thing doesn't properly detect case where user hasn't selected any equipment
         # Organize parameters first
         self.organize_record_params()
         self.record_status = False
@@ -422,6 +422,9 @@ class TabLog(guic.ThemedFrame):
             }
 
             try:
+                # TODO: I want double stimulus configs
+                #   EXAMPLE: frequency AND duty cycle
+                #   EXAMPLE: frequency and VIN
                 self.stimulus_config = logger.StimulusConfig(
                     enabled=True,
                     stimulus_type=stimulus_type_map[stimulus_type_str],
@@ -460,7 +463,6 @@ class TabLog(guic.ThemedFrame):
         )
 
     def thread_record(self):
-        # Check if stimulus-based recording
         if self.stimulus_config and self.stimulus_config.enabled:
             self.thread_record_stimulus()
         else:
@@ -540,14 +542,30 @@ class TabLog(guic.ThemedFrame):
             row["DMM_Meas1"] = self.cc.dmm.read_value()
 
         # Power Supply data if requested
+
         if self.record_config.use_ps:
-            row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
-            row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
-            row["PS_Imeas1"] = self.cc.ps.get_current(1)
-            if self.record_config["ps_channels"] == 2:
-                row["PS_Vset2"] = self.cc.ps.get_set_voltage(2)
-                row["PS_Vmeas2"] = self.cc.ps.get_set_voltage(2)
+            try:
+                time.sleep(5)
+                print("getting Vset1")
+                row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
+                time.sleep(5)
+                print("getting Vmeas1")
+                # TODO: some issue with E3640A where if in stimulus mode it turns off the output very briefly for measurement here
+                #   I think the issue is at this line where output goes off
+                #   is the format getting weird? Idk
+                row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
+                time.sleep(5)
+                print("getting Imeas1")
                 row["PS_Imeas1"] = self.cc.ps.get_current(1)
+                time.sleep(5)
+                if self.record_config.ps_channels == 2:
+                    row["PS_Vset2"] = self.cc.ps.get_set_voltage(2)
+                    row["PS_Vmeas2"] = self.cc.ps.get_set_voltage(2)
+                    row["PS_Imeas1"] = self.cc.ps.get_current(1)
+            except COMMUNICATION_ERRORS as e:
+                self.record_status = False
+                guih.alert_user("Communication Error", str(e), "error")
+
 
         # Function Generator data if requested
         if self.record_config.use_fg:
@@ -570,7 +588,7 @@ class TabLog(guic.ThemedFrame):
 
         if stim_type == logger.StimulusType.PS_VOLTAGE:
             channel = self.stimulus_config.ps_channel
-            self.cc.ps.set_voltage(value, channel)
+            self.cc.ps.set_voltage(value, channel=channel)
 
         elif stim_type == logger.StimulusType.FG_FREQUENCY:
             self.cc.fg.set_frequency(value)

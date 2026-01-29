@@ -9,6 +9,9 @@ class ClassController:
         self.relay = None
         self.fg = None
 
+        # TODO: somehow set some recording status and DISABLE gui_refresh on all tabs. Otherwise logging will crash when I click into another tab
+        self.recording = False
+
         self.ports_used = {}
 
     def set_ser(self, ser):
@@ -25,7 +28,6 @@ class ClassController:
 
     def set_fg(self, fg):
         self.fg = fg
-
 
     def get_ser_status(self):
         if self.ser is None:
@@ -56,7 +58,6 @@ class ClassController:
             return False
         else:
             return self.fg.status
-
 
     def set_used_port(self, port, usage):
         """

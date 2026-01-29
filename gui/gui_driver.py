@@ -55,7 +55,6 @@ def parse_autoconnect_config():
     return autoconn_vars
 
 
-
 class MainApplication(ThemedApp):
     def __init__(self, window, height, width, theme_file, autoconnect, compact):
         super().__init__(window, theme_file, compact=compact)
@@ -181,9 +180,15 @@ def main(autoconnect):
     # perform shutdown activities
     print("TKINTER is shutting down!")
     if app.controller.ps is not None:
+        print("Disconnect from power supply (and turning outputs off)")
         app.controller.ps.output_off(1)
         app.controller.ps.output_off(2)
         app.controller.ps.disconnect()
+
+    if app.controller.dmm is not None:
+        print("Disconnect from DMM")
+        app.controller.dmm.disconnect()
+
 
     if app.controller.relay is not None:
         app.controller.relay.open_all()

@@ -5,6 +5,9 @@
 @brief    contains Class objects for the Tkinter GUI
 """
 
+# TODO (unrelated here). Combine master.ini and default.ini into a single file maybe?
+
+
 # import modules
 import tkinter as tk
 import xml.etree.ElementTree
@@ -222,9 +225,7 @@ class Prompt(ThemedFrame):
 class ColorCircle(tk.Canvas):
     def __init__(self, master, width, height, bg, *args, **kwargs):
         super().__init__(master, width=width, height=height, bg=bg, *args, **kwargs)
-        # TODO: have this sizing be dynamic with compact screen option
-        # self.status_oval = self.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
-        self.status_oval = self.create_oval(25 * .25, 25 * .25, 25 * .75, 25 * 0.75)  # x0, y0, x1, y1
+        self.status_oval = self.create_oval(width * .25, width * .25, width * .75, width * 0.75)  # x0, y0, x1, y1
 
     def set_color(self, color):
         self.itemconfig(self.status_oval, fill=color)

@@ -24,12 +24,13 @@ log_folder = "data" # master program folder for all output data. tag:hardcode
 #### file stuff  ################
 #################################
 
-# TODO: play around with file name creation
+
 def build_log_name(prefix, file_str_ext):
     # FILENAME SETUP
     recName = prefix + "_" + strftime('%Y%m%d%H%M%S', localtime())
-    if file_str_ext is not None or '':
-        recName += "_" + file_str_ext
+    if file_str_ext is not None:
+        if file_str_ext != '':
+            recName += "_" + file_str_ext
     recName += ".csv"
     return recName
 
@@ -123,7 +124,11 @@ def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_p
 #### STIMULUS LOGGING  ##########
 #################################
 
-# TODO: really this should be grouped into my RecordConfig. Everything should be in RecordConfig
+
+# TODO: ask Claude code to combine stimulus config and record config
+#   actually ... is there a case where I would JUST want to run a stimulus?
+#   I could just embed everything in recordconfig anyway and set something like record=NO?
+#   evaluate with AI spitballing ...
 class StimulusType(Enum):
     """Types of stimulus that can be swept"""
     NONE = "None"
@@ -277,11 +282,8 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
     if record_config.use_ps:
         ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
 
-        # TODO: have to get creative about detecting status
-        # if self.cc.get_ps_status():
-        if 1:
-            if record_config.ps_channels > 1:
-                ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
+        if record_config.ps_channels > 1:
+            ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
 
         headers += ps_params
 
@@ -291,7 +293,7 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
         headers += fg_params
 
     # Stimulus columns (if stimulus mode enabled)
-    # TODO: clean the setting of this up? Because I reference the same header in guiTab2_LOG? maybe recordconfig class should cotain these?
+    # TODO: audit that when I combine record_config and stimulus_config this gets fixed
     if stimulus_config and stimulus_config.enabled:
         headers += ["Stimulus_Step"]
         if stimulus_config.stimulus_type == StimulusType.PS_VOLTAGE:

@@ -1,8 +1,16 @@
 {
+    "light_1": "#FF79C6",
+    "light_2": "#FF5555",
+    "light_3": "#F1FA8C",
+    "light_4": "#8BE9FD",
+    "light_5": "#FFB86C",
+    "dark_1": "#882222",
+    "dark_2": "#282A36",
+    "dark_3": "#6272a4",
     "bg_dark": "#2B2B2B",
     "bg_light": "#6272A4",
     "fg_light": "#F8F8F2",
-    "fg_dark": "#6272A4",
+    "fg_dark": "#39425E",
     "error": "#FF5555",
     "success": "#50FA7B",
     "warning": "#F1FA8C",
@@ -57,12 +65,5 @@
       "xpad": 5,
       "w_prompt": 110,
       "h_prompt": 14
-    },
-    "light_1": "#FF79C6",
-    "light_2": "#282A36",
-    "light_3": "#F1FA8C",
-    "light_4": "#8BE9FD",
-    "dark_1": "#FF5555",
-    "dark_2": "#50FA7B",
-    "dark_3": "#FFB86C"
+    }
 }

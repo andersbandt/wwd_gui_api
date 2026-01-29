@@ -24,8 +24,6 @@ from gui import gui_class as guic
 
 # TODO: have saveable setup configs
 
-# TODO: have an option to print out the available headers in the Listbox files
-
 
 
 def focus_next_widget(event):
@@ -64,6 +62,9 @@ class TabGraph(guic.ThemedFrame):
         self.fr_analysis.grid(row=1, column=1, pady=15, padx=15)
         self.prompt.grid(row=2, column=0, columnspan=4, padx=30, pady=12)
 
+        # refresh initial file last
+        self.refresh_files()
+
     def initTabContent(self):
         print("Initializing tab 8 (Graph) content")
 
@@ -76,14 +77,7 @@ class TabGraph(guic.ThemedFrame):
         self.init_fr_analysis()
 
     def init_fr_setup(self):
-        # add directory search
-        self.lbl_data_directory = tk.Label(self.fr_setup, text=self.data_dir, bg=self.theme_config["bg_light"])
-        self.lbl_data_directory.grid(row=1, column=0)
-        btn_set_directory = tk.Button(self.fr_setup, text="Set directory",
-                                 command=lambda: self.set_directory(),
-                                 bg=self.theme_config["light_1"], fg="black", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_set_directory.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-
+        # TODO: make it more intuitive on what is labeling and what is data specific
         # graph labeling
         tk.Label(self.fr_setup, text="Title").grid(row=2, column=1, padx=5, pady=2)
         tk.Label(self.fr_setup, text="X-axis").grid(row=3, column=1, padx=5, pady=2)
@@ -138,23 +132,35 @@ class TabGraph(guic.ThemedFrame):
         self.file_labeler = tk.Text(self.fr_setup, height=1, width=20)
         self.file_labeler.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-        # set up button SHOW_FILES
-        btn_start_entry = tk.Button(self.fr_setup, text="Refresh Files",
-                                 command=lambda: self.refresh_files(),
-                                 bg=self.theme_config["success"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_start_entry.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        # add check box and text field to label graphs by column name
+        self.var_use_data_labeler = tk.IntVar()
+        ttk.Checkbutton(self.fr_setup,
+                        text="Use Data (header) Labeler",
+                        variable=self.var_use_data_labeler,
+                        onvalue=1,
+                        offvalue=0).grid(row=11, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.data_labeler = tk.Text(self.fr_setup, height=1, width=20)
+        self.data_labeler.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
 
-        # set up button START GRAPH
-        btn_start_entry = tk.Button(self.fr_setup, text="Load fields (not working)",
-                                 command=None,
-                                 bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_start_entry.grid(row=11, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
+
+    # TODO: change this name to files maybe? or something not analysis?
     def init_fr_analysis(self):
+        fr_m = self.fr_analysis
+
+        # add directory search
+        self.lbl_data_directory = tk.Label(fr_m, text=self.data_dir, fg=self.theme_config["fg_light"], bg=self.theme_config["bg_light"])
+        self.lbl_data_directory.grid(row=0, column=0)
+        btn_set_directory = tk.Button(fr_m, text="Set directory",
+                                 command=lambda: self.set_directory(),
+                                 bg=self.theme_config["light_1"], fg=self.theme_config["fg_dark"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_set_directory.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
+
         # Create Listbox with multi-select support and scrollbar
         listbox_frame = tk.Frame(self.fr_analysis)
-        listbox_frame.grid(row=0, column=0, padx=self.theme_config["pad"]["xpad_m"], pady=self.theme_config["pad"]["ypad_m"])
+        listbox_frame.grid(row=1, column=0, rowspan=4, padx=self.theme_config["pad"]["xpad_m"], pady=self.theme_config["pad"]["ypad_m"])
 
         scrollbar = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
         self.file_listbox = tk.Listbox(
@@ -172,23 +178,36 @@ class TabGraph(guic.ThemedFrame):
         self.file_listbox.bind('<<ListboxSelect>>', self.on_file_select)
 
         # Selection info label
-        self.file_selection_label = tk.Label(self.fr_analysis, text="0 files selected", relief='sunken')
-        self.file_selection_label.grid(row=1, column=0, padx=10, pady=5, sticky='ew')
+        self.file_selection_label = tk.Label(fr_m, text="0 files selected", relief='sunken')
+        self.file_selection_label.grid(row=6, column=0, padx=10, pady=5, sticky='ew')
+
+        # set up button to REFRESH FILES
+        btn_refresh_files = tk.Button(fr_m, text="Refresh Files",
+                                 command=lambda: self.refresh_files(),
+                                 bg=self.theme_config["light_2"], fg=self.theme_config["fg_dark"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_refresh_files.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
+
+        # set up button PRINT FIELDS
+        btn_disp_fields = tk.Button(fr_m, text="Print fields",
+                                 command=self.disp_fields,
+                                 bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+        btn_disp_fields.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # analyze button
-        open_button = tk.Button(self.fr_analysis,
+        open_button = tk.Button(fr_m,
                                 text="Analyze Selected Files",
                                 command=self.analyze_files,
-                                bg=self.theme_config["dark_2"], fg="white",
+                                bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"],
                                 height=self.theme_config["size"]["h_button"],
                                 width=self.theme_config["size"]["w_button"])
         open_button.grid(row=3, column=1, padx=10, pady=10)
 
         # plot button
-        graph_button = tk.Button(self.fr_analysis,
+        graph_button = tk.Button(fr_m,
                                  text="Graph Selected Files",
                                  command=self.graph_files,
-                                 bg=self.theme_config["dark_3"], fg="white",
+                                 bg=self.theme_config["success"], fg=self.theme_config["fg_dark"],
                                  height=self.theme_config["size"]["h_button"],
                                  width=self.theme_config["size"]["w_button"])
         graph_button.grid(row=4, column=1, padx=10, pady=10)
@@ -202,6 +221,8 @@ class TabGraph(guic.ThemedFrame):
 
     def set_directory(self):
         self.data_dir = filedialog.askdirectory()
+        if self.data_dir is None or self.data_dir == "":
+            return
         self.lbl_data_directory.config(text=self.data_dir)
 
     def on_file_select(self, event):
@@ -227,6 +248,7 @@ class TabGraph(guic.ThemedFrame):
             if idx < len(self.files):
                 selected_files.append(self.files[idx])
 
+        # TODO: should this return actually be a dict?
         return selected_files
 
     def refresh_files(self):
@@ -269,6 +291,11 @@ class TabGraph(guic.ThemedFrame):
 
         self.prompt.print(f"Loaded {len(self.files)} files")
 
+    def disp_fields(self):
+        selected_files = self.get_selected_files()
+        for filename, _, _, df in selected_files:
+            self.prompt.print(f"Filename: {filename} --> {list(df.columns)}")
+
     def graph_files(self):
         # Get selected files
         selected_files = self.get_selected_files()
@@ -306,26 +333,24 @@ class TabGraph(guic.ThemedFrame):
                 guih.alert_user("Scale factor not integer", str(e), "error")
                 return False
 
-            # set up labeling
+            # label graphs by FILENAME
             if self.var_use_file_labeler.get():
                 try:
                     file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
                     label = file_parts[file_label_idx]
                 except (ValueError, IndexError):
                     label = filename
+                ax.plot(x_data * x_scale, y_data * y_scale, label=label, marker='o', markersize=3)
+            # label graphs by DATA
+            elif self.var_use_data_labeler.get():
+                label_var = self.data_labeler.get("1.0", "end").strip("\n")
+                for label_val in sorted(df[label_var].dropna().unique()):
+                    df_tmp = df[df[label_var] == label_val]
+                    label = f"{label_var}={label_val}"
+                    ax.plot(df_tmp[x_key] * x_scale, df_tmp[y_key] * y_scale, label=label, marker='o', markersize=3)
+            # no label
             else:
-                label = filename
-
-            # plot on axis
-            ax.plot(
-                 x_data * x_scale,
-                 y_data * y_scale,
-                label=label,
-                marker='o',
-                markersize=3
-            )
-
-            self.prompt.print(f"Plotted {filename}")
+                ax.plot(x_data * x_scale, y_data * y_scale, marker='o', markersize=3)
 
         # show plot
         ax.legend()

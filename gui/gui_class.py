@@ -124,19 +124,19 @@ class ThemedApp:
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
-        self.style.configure('TGreenButton.TButton',
-                             background=self.theme_config["dark_2"],
-                             foreground=self.theme_config["button"]["foreground"],
-                             font=(self.theme_config["font"]["family"],
-                                   self.theme_config["font"]["size"],
-                                   self.theme_config["font"]["style"]))
-
-        self.style.configure('TYellowButton.TButton',
-                             background="#F1FA8C",
-                             foreground=self.theme_config["fg_dark"],
-                             font=(self.theme_config["font"]["family"],
-                                   self.theme_config["font"]["size"],
-                                   self.theme_config["font"]["style"]))
+        # self.style.configure('TGreenButton.TButton',
+        #                      background=self.theme_config["success"],
+        #                      foreground=self.theme_config["button"]["foreground"],
+        #                      font=(self.theme_config["font"]["family"],
+        #                            self.theme_config["font"]["size"],
+        #                            self.theme_config["font"]["style"]))
+        #
+        # self.style.configure('TYellowButton.TButton',
+        #                      background="#F1FA8C",
+        #                      foreground=self.theme_config["fg_dark"],
+        #                      font=(self.theme_config["font"]["family"],
+        #                            self.theme_config["font"]["size"],
+        #                            self.theme_config["font"]["style"]))
 
         self.style.configure("TButtonOn.TButton", background=self.theme_config["success"])
         self.style.configure("TButtonOff.TButton", background=self.theme_config["error"])
@@ -195,7 +195,7 @@ class Prompt(ThemedFrame):
                                                 font = (self.theme_config["font"]["family"], self.theme_config["font"]["size"]),
                                                 height=height,
                                                 width=width,
-                                                bg=self.theme_config["light_2"],
+                                                bg=self.theme_config["dark_2"],
                                                 fg=self.theme_config["fg_light"],
                                                 borderwidth=10)
         self.prompt.tag_configure("error", foreground="red")
@@ -312,7 +312,7 @@ class SerialConnFrame(ConnFrame):
         # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",
                                    command=self.refresh_ports,
-                                   bg=self.theme_config["dark_1"], fg=self.theme_config["fg_light"])
+                                   bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"])
         refresh_button.grid(row=1, column=2, pady=1)
 
         # initialize port list dropdown
@@ -326,12 +326,12 @@ class SerialConnFrame(ConnFrame):
         # add Buttons for Connect / Disconnect
         btn_connect_serial = tk.Button(self, text="Connect to COM",
                                        command=self.connect,
-                                       bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=1,
+                                       bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1,
                                        width=15)
         btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
         btn_disconnect_serial = tk.Button(self, text="Disconnect COM",
                                           command=self.disconnect,
-                                          bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1,
+                                          bg=self.theme_config["dark_2"], fg=self.theme_config["fg_light"], height=1,
                                           width=15)
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 

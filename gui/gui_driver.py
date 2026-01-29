@@ -30,9 +30,12 @@ from gui import guiTab_8_GRAPH
 from gui import guiTab_9_FG
 
 
+# TODO: add button to open `master.ini` like I have for the relay config file
+
+
 def parse_autoconnect_config():
     # initialize the config parser
-    config_file_path = "config/master.ini"
+    config_file_path = "config/master.ini" # tag:HARDCODE
     if os.path.exists(config_file_path):
         config = configparser.ConfigParser()
         config.read(config_file_path)
@@ -46,7 +49,7 @@ def parse_autoconnect_config():
 
     # read in parameters from the config file
     autoconn_vars = []
-    for i in range(1, 9):
+    for i in range(1, 10): #tag:HARDCODE
         tmp = config["AUTOCONNECT"][f"tab_{i}"]
         if tmp.strip().upper() == "YES":
             autoconn_vars.append(True)
@@ -80,7 +83,8 @@ class MainApplication(ThemedApp):
         if self.autoconnect:
             autoconnect = parse_autoconnect_config()
         else:
-            autoconnect = [False for i in range(9)]
+            # TODO: cleanup this below
+            autoconnect = [False for i in range(10)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
 
         # create Tab objects
         self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,self.theme_config, autoconnect[0])
@@ -179,6 +183,8 @@ def main(autoconnect):
 
     # perform shutdown activities
     print("TKINTER is shutting down!")
+
+    # disconnect all active connections in `class_controller.py`
     if app.controller.ps is not None:
         print("Disconnect from power supply (and turning outputs off)")
         app.controller.ps.output_off(1)
@@ -189,6 +195,9 @@ def main(autoconnect):
         print("Disconnect from DMM")
         app.controller.dmm.disconnect()
 
+    if app.controller.fg is not None:
+        print("Disconnect from FG")
+        app.controller.fg.disconnect()
 
     if app.controller.relay is not None:
         app.controller.relay.open_all()

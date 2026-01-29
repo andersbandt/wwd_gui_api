@@ -63,7 +63,7 @@ class tabXDS110(guic.ThemedFrame):
         self.initTabContent()
 
         # load target settings
-        self.parse_target_config("default.ini")
+        self.parse_target_config("master.ini") #tag:HARDCODE
 
     def initTabContent(self):
         print("Initializing tab 4 (XDS110) content")

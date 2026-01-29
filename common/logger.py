@@ -124,11 +124,6 @@ def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_p
 #### STIMULUS LOGGING  ##########
 #################################
 
-
-# TODO: ask Claude code to combine stimulus config and record config
-#   actually ... is there a case where I would JUST want to run a stimulus?
-#   I could just embed everything in recordconfig anyway and set something like record=NO?
-#   evaluate with AI spitballing ...
 class StimulusType(Enum):
     """Types of stimulus that can be swept"""
     NONE = "None"
@@ -240,6 +235,67 @@ class StimulusGenerator:
         return self.current_index, len(self.values)
 
 
+@dataclass
+class DualStimulusConfig:
+    """Configuration for dual-parameter stimulus sweeps (nested loops)"""
+    enabled: bool = False
+    outer_loop: StimulusConfig = None  # Outer loop parameter
+    inner_loop: StimulusConfig = None  # Inner loop parameter
+
+    def validate(self):
+        """Validate the dual stimulus configuration"""
+        if not self.enabled:
+            return True, ""
+
+        if self.outer_loop is None or self.inner_loop is None:
+            return False, "Both outer and inner loop configurations are required"
+
+        # Validate outer loop
+        valid, error_msg = self.outer_loop.validate()
+        if not valid:
+            return False, f"Outer loop error: {error_msg}"
+
+        # Validate inner loop
+        valid, error_msg = self.inner_loop.validate()
+        if not valid:
+            return False, f"Inner loop error: {error_msg}"
+
+        # Check that stimulus types are different
+        if self.outer_loop.stimulus_type == self.inner_loop.stimulus_type:
+            return False, "Outer and inner loop must use different stimulus types"
+
+        return True, ""
+
+
+class DualStimulusGenerator:
+    """Generates stimulus values for a dual-parameter sweep (nested loops)"""
+
+    def __init__(self, config: DualStimulusConfig):
+        self.config = config
+        self.outer_gen = StimulusGenerator(config.outer_loop)
+        self.inner_gen = StimulusGenerator(config.inner_loop)
+        self.total_steps = len(self.outer_gen) * len(self.inner_gen)
+        self.current_step = 0
+
+    def __iter__(self):
+        """Make the generator iterable, yielding (outer_value, inner_value) tuples"""
+        self.current_step = 0
+        for outer_val in self.outer_gen:
+            # Reset inner generator for each outer value
+            self.inner_gen = StimulusGenerator(self.config.inner_loop)
+            for inner_val in self.inner_gen:
+                self.current_step += 1
+                yield (outer_val, inner_val)
+
+    def __len__(self):
+        """Return total number of steps (outer * inner)"""
+        return self.total_steps
+
+    def get_progress(self):
+        """Get current progress (current step, total steps)"""
+        return self.current_step, self.total_steps
+
+
 def parse_serial_params(raw: str):
     """
     Parse comma-separated serial params. Raises ValueError if format is invalid.
@@ -293,14 +349,13 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
         headers += fg_params
 
     # Stimulus columns (if stimulus mode enabled)
-    # TODO: audit that when I combine record_config and stimulus_config this gets fixed
-    if stimulus_config and stimulus_config.enabled:
-        headers += ["Stimulus_Step"]
-        if stimulus_config.stimulus_type == StimulusType.PS_VOLTAGE:
-            headers += ["Stimulus_PS_V"]
-        elif stimulus_config.stimulus_type == StimulusType.FG_FREQUENCY:
-            headers += ["Stimulus_FG_F"]
-
+    if stimulus_config:
+        if isinstance(stimulus_config, DualStimulusConfig) and stimulus_config.enabled:
+            # Dual stimulus: add columns for both outer and inner loops
+            headers += ["Stimulus_Outer_Value", "Stimulus_Inner_Value", "Stimulus_Step"]
+        elif isinstance(stimulus_config, StimulusConfig) and stimulus_config.enabled:
+            # Single stimulus: original behavior
+            headers += ["Stimulus_Value", "Stimulus_Step"]
 
     return headers
 

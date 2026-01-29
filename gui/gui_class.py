@@ -5,7 +5,6 @@
 @brief    contains Class objects for the Tkinter GUI
 """
 
-# TODO (unrelated here). Combine master.ini and default.ini into a single file maybe?
 
 
 # import modules

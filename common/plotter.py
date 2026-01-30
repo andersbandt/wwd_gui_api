@@ -1,52 +1,14 @@
 
 # import plotter modules
-import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import style
-from drawnow import *
+from drawnow import drawnow
+import numpy as np
+import matplotlib.pyplot as plt
 
 # import needed modules
-import time
 import secrets
 import hashlib
-
-
-
-
-
-
-
-def time_plot(x_series, y_axis, xlabel, ylabel, color=None):
-    plt.figure()
-    plt.plot(x_series, y_axis, color=color)
-    plt.grid(True)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-
-    save_fig()
-
-
-def graph_afe(x_series, afe_d, vertical_lines=None, title=None):
-    # f = plt.figure()
-    plt.figure(figsize=(12, 6))
-
-    plt.plot(x_series, afe_d)
-    # plt.scatter(x_series, afe_d) # this thing honestly sucks for AFE data
-
-    # Add vertical lines
-    if vertical_lines is not None:
-        for index in vertical_lines:
-            plt.axvline(x=index, color='red', linestyle='--', linewidth=2)
-
-    if title is not None:
-        plt.title(title)
-    else:
-        plt.title('AFE ADC data')
-    # plt.xlabel('Sample Number')
-
-    plt.legend(['afe_ADC'])
-
-    plt.tight_layout()
 
 
 def save_fig():
@@ -56,13 +18,67 @@ def save_fig():
     plt.savefig(f'tmp/{hash_p}.png')
 
 
-# Create a function that makes our desired plot
-def makeFig(self):
-    plt.title('Sensor data')  # Set the title
-    plt.grid(True)  # Set The grid
-    plt.ylabel('Axis Acceleration')  # Label the y axis
-    plt.plot(self.afe_adc, 'ro-', label='AFE data')  # Set the line plot
+#################################
+#### generic plotting ###########
+#################################
 
+# NOTE: not tested
+def plot_3d(x_axis, y_axis, z_axis):
+    # Meshgrid for plotting
+    x, y = np.meshgrid(x_axis, y_axis)
+
+    # 3D plot
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(x, y, z_axis, cmap='viridis')
+
+    ax.set_title('Frequency vs Duty Cycle vs Output Voltage')
+    ax.set_xlabel('Duty Cycle (%)')
+    ax.set_ylabel('Frequency (Hz)')
+    ax.set_zlabel('Output Voltage (V)')
+    fig.colorbar(surf, shrink=0.5, aspect=10, label='Voltage (V)')
+
+
+def plot(x_data, y_data,
+         xlabel=None,
+         ylabel=None,
+         title=None,
+         legend=None,
+         color=None,
+         vertical_lines=None,
+         figsize=None):
+    if figsize is None:
+        plt.figure()
+    else:
+        plt.figure(figsize=figsize) # NOTE: example would be figsize=(12, 6)
+
+    plt.plot(x_data, y_data, color=color)
+
+
+    # Add vertical lines
+    if vertical_lines is not None:
+        for index in vertical_lines:
+            plt.axvline(x=index, color='red', linestyle='--', linewidth=2)
+
+
+    # annotate plot
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title)
+    if legend is not None:
+        plt.legend(legend)
+
+
+    plt.show()
+
+
+
+#################################
+#### liveplotting ###########
+#################################
 
 def live_plot(self, data):
     plt.ion()
@@ -84,6 +100,7 @@ def live_plot(self, data):
         plt.pause(.00000001)
 
 
+# TODO: this thing should be generic no? Not current dependent?
 class LivePlot:
     def __init__(self):
         style.use('fivethirtyeight')
@@ -96,7 +113,6 @@ class LivePlot:
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Current (A)")
         self.ax.legend(loc="upper left")
-
 
     def show_animation(self, animate, interval=500):
         self.ani = animation.FuncAnimation(self.fig, animate, interval=interval)

@@ -6,44 +6,27 @@
 """
 
 # import needed modules
-import logging
 from analysis import csv_helper as csvh
-import os
 from time import strftime, localtime
-from datetime import datetime
 from dataclasses import dataclass
 
 from analysis.csv_helper import CSVHelper
 from enum import Enum
 import numpy as np
 
-log_folder = "data" # master program folder for all output data. tag:hardcode
-
 
 #################################
 #### file stuff  ################
 #################################
 
-
-def build_log_name(prefix, file_str_ext):
+def build_log_name(prefix, file_name_ext, extension, date_strf='%Y%m%d%H%M%S'):
     # FILENAME SETUP
-    recName = prefix + "_" + strftime('%Y%m%d%H%M%S', localtime())
-    if file_str_ext is not None:
-        if file_str_ext != '':
-            recName += "_" + file_str_ext
-    recName += ".csv"
+    recName = prefix + "_" + strftime(date_strf, localtime())
+    if file_name_ext is not None:
+        if file_name_ext != '':
+            recName += "_" + file_name_ext
+    recName += "." + extension # NOTE: this is the file type (.txt, .csv, .log, etc)
     return recName
-
-
-# TODO: evaluate this function compared to the more recent one above
-# def get_filename(basefilepath, folder, name_ext, extension):
-#     current_datetime = datetime.now()
-#     date_strf = "%Y%m%d"
-#     formatted_datetime = current_datetime.strftime(date_strf)
-#     if name_ext is None:
-#         name_ext = ""
-#     filename = f"{basefilepath}/{log_folder}/{folder}/_{formatted_datetime}_{name_ext}.{extension}"
-#     return filename
 
 
 #################################
@@ -51,11 +34,13 @@ def build_log_name(prefix, file_str_ext):
 #################################
 
 def init_text(basefilepath, data_folder, start_msg):
-    filename = get_filename(basefilepath, # basefilepath
-                            data_folder, # (output folder)
-                            None, # name_ext
-                            "log") # .extension
-    open_text(filename, start_msg)
+    filename = build_log_name(
+        "",
+        "",
+        "log",
+        date_strf='%Y%m%d')
+    filepath= f"{basefilepath}/{data_folder}/{filename}"
+    open_text(filepath, start_msg)
     print("Text file output started!!!")
     print("\toutput started at file: ", filename)
     return filename
@@ -372,7 +357,7 @@ def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordCon
       3) Initializes the CSV file
     Returns: (filename, headers, csv_helper, updated_config)
     """
-    rec_name = build_log_name(prefix, ext_text)
+    rec_name = build_log_name(prefix, ext_text, "csv")
     headers = build_headers(config, stimulus_config)
     csvobj = csvh.init_csvh(data_dir, rec_name, headers)
     return rec_name, csvobj

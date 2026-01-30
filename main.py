@@ -5,22 +5,12 @@
 @brief    used for control of my WWD device through a GUI
 """
 
-# TODO: audit (and remove) all usages of ttk.Button
-
 # needed modules
 import argparse
-import logging
+
 
 # import user created modules
 from gui import gui_driver
-
-
-# NOTE: mainly added this because XDM1041 EEequipment code includes it?
-print("Setting up basic logging config in main()")
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-# )
 
 
 def main():
@@ -28,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description="A description of your script.")
 
     # Add command-line arguments
+    # TODO: wait should default state be no auto-connect? I think so
     parser.add_argument('-a', '--auto-connect', action='store_true', help='Enable auto-connect mode')
     parser.add_argument('-o', '--disable-auto', action='store_true', help='Enable other behavior')
 

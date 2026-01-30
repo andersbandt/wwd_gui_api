@@ -30,7 +30,11 @@ from gui import guiTab_8_GRAPH
 from gui import guiTab_9_FG
 
 
+# TODO: reorder the tab order. Ending to be --> (PS, FG, ATE, LOG, GRAPH)
+
 # TODO: add button to open `master.ini` like I have for the relay config file
+
+# TODO: just make some other darcula.json and have a theme settings (make a settings tab?). I think this would make any users happy!
 
 
 def parse_autoconnect_config():

@@ -52,20 +52,6 @@ for f in freq_arr:
 
 vdds = np.array(vdds)
 
-# Meshgrid for plotting
-FREQ, DUTY = np.meshgrid(duty_arr, freq_arr)
-
-# 3D plot
-fig = plt.figure(figsize=(10, 7))
-ax = fig.add_subplot(111, projection='3d')
-surf = ax.plot_surface(FREQ, DUTY, vdds, cmap='viridis')
-
-ax.set_title('Frequency vs Duty Cycle vs Output Voltage')
-ax.set_xlabel('Duty Cycle (%)')
-ax.set_ylabel('Frequency (Hz)')
-ax.set_zlabel('Output Voltage (V)')
-fig.colorbar(surf, shrink=0.5, aspect=10, label='Voltage (V)')
-
 
 plt.show()
 

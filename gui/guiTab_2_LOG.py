@@ -59,14 +59,19 @@ class TabLog(guic.ThemedFrame):
         self.fr_stimulus.grid(row=2, column=0, pady=15, padx=15)
         self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=12)
 
+        # TODO: implement dynamic padding here (below values are for compact)
+        # self.fr_status.grid(row=1, column=0, pady=3, padx=3)
+        # self.fr_setup.grid(row=1, column=1, pady=3, padx=3)
+        # self.fr_stimulus.grid(row=2, column=0, pady=1)
+        # self.prompt.grid(row=2, column=1, pady=1)
+
     def initTabContent(self):
         print("Initializing tab 2 (Logger) content")
 
         # print welcome text_data
-        # TODO: need to work on compact sizing more before enabling this
-        # l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
-        #                font=(self.theme_config["font"]["family"], 16))
-        # l1.grid(column=0, row=0, columnspan=4)
+        l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
+                       font=(self.theme_config["font"]["family"], 16))
+        l1.grid(column=0, row=0, columnspan=4)
 
         self.init_fr_status()
         self.init_fr_setup()
@@ -75,7 +80,6 @@ class TabLog(guic.ThemedFrame):
     def init_fr_status(self):
         # Serial connection status
         self.labelSerStat = ttk.Label(self.fr_status, width=10, text='Serial', style="TLabel", anchor='w')
-        # TODO: make these width and heights conditional
         self.ser_status = ColorCircle(self.fr_status, width=25, height=25,
                                     bg=self.theme_config["bg_dark"])  # create a Canvas widget
         self.labelSerStat.grid(row=0, column=0)

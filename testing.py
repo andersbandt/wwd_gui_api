@@ -5,7 +5,7 @@ from time import localtime, strftime
 import pyvisa
 
 # import user created modules
-from analysis.csv_helper import CSVHelper
+from common.csv_helper import CSVHelper
 from EEequipment.E3640A.E3640A import E3640A
 from EEequipment.fluke8842A.fluke8842A import Fluke8842A
 from EEequipment.hp3478A.hp3478A import HP3478A

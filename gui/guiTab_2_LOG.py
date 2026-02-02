@@ -54,6 +54,7 @@ class TabLog(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
+        # TODO: honestly try out pack here, I think it would help the layout? Because fr_setup can slide left a TON
         self.fr_status.grid(row=1, column=0, pady=15, padx=15)
         self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
         self.fr_stimulus.grid(row=2, column=0, pady=15, padx=15)
@@ -468,6 +469,7 @@ class TabLog(guic.ThemedFrame):
     def stop_record(self):
         self.record_status = False
         self.prompt.print("Stopping data record!")
+        # threading.Thread(target=self.thread_record). # TODO: do I have to stop the thread here?
 
     ##############################################################################
     ####      RECORDING FUNCTIONS        #########################################
@@ -503,7 +505,6 @@ class TabLog(guic.ThemedFrame):
                 raise ValueError("Time string should end with 's', 'm', or 'h'.")
 
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
-
 
     # TODO: my god this function is long now
     def organize_record_params(self):
@@ -675,6 +676,7 @@ class TabLog(guic.ThemedFrame):
             if self.record_status:
                 self.prompt.print("Stimulus sweep completed!")
                 self.record_status = False
+                return
 
         except Exception as e:
             self.prompt.print(f"Error during stimulus sweep: {e}")

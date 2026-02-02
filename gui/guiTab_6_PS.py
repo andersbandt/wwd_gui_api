@@ -17,7 +17,7 @@ from datetime import datetime
 
 # import user defined modules
 from common import plotter
-from analysis.csv_helper import CSVHelper
+from common.csv_helper import CSVHelper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
@@ -383,7 +383,7 @@ class TabPS(guic.ThemedFrame):
             self.csvh.initialize_file(["Sample", "Time", "Current"])
 
         self.prompt.print("Starting live current plot ...")
-        currentLivePlot = plotter.LivePlot()
+        currentLivePlot = plotter.LivePlot("Live current plot", "Time (s)", "Current (A)")
 
         def animate(i):
             for j in range(0, 10):

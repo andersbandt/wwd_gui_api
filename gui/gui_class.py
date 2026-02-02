@@ -179,6 +179,7 @@ class ThemedFrame(tk.Frame):
         self.configure(bg=bg)
 
 
+# TODO: CLAUDE would be cool to add timestamps to printout here (probably as an option not the default)
 class Prompt(ThemedFrame):
     def __init__(self, master, theme_config, title, height, width):
         super().__init__(master, theme_config, height=height, width=width)
@@ -272,6 +273,7 @@ class ConnFrame(ThemedFrame):
             self.status_oval.set_color(self.theme_config["error"])
 
     def gui_refresh(self):
+        # TODO: CLAUDE (ask how I can detect connection status here)
         self.set_status(self.status)
 
     def set_color(self, color):

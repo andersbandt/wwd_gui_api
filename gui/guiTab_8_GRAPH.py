@@ -2,12 +2,9 @@
 
 # import needed packages
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import pandas as pd
 import os
 from pathlib import Path
-import re
 
 # import needed GUI packages
 import tkinter as tk
@@ -15,7 +12,6 @@ from tkinter import ttk
 from tkinter import filedialog
 
 # import user defined modules
-from analysis.csv_helper import CSVHelper
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -83,15 +79,16 @@ class TabGraph(guic.ThemedFrame):
     def init_fr_setup(self):
         # TODO: make it more intuitive on what is labeling and what is data specific
         # graph labeling
-        tk.Label(self.fr_setup, text="Title").grid(row=2, column=1, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="X-axis").grid(row=3, column=1, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Y-axis").grid(row=4, column=1, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="X-scale").grid(row=5, column=1, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Y-scale").grid(row=6, column=1, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="X-variable").grid(row=7, column=1, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Y-variable").grid(row=8, column=1, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="Title").grid(row=2, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="X-axis").grid(row=3, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="Y-axis").grid(row=4, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="X-scale").grid(row=5, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="Y-scale").grid(row=6, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="X-variable").grid(row=7, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="Y-variable").grid(row=8, column=0, padx=5, pady=2)
 
-        self.title = tk.Text(self.fr_setup, height=1, width=20)
+        # TODO: the title text box might have to be bigger (can I make it dynamic?)
+        self.title = tk.Text(self.fr_setup, height=2, width=20)
         self.x_label = tk.Text(self.fr_setup, height=1, width=20)
         self.y_label = tk.Text(self.fr_setup, height=1, width=20)
         self.x_scale = tk.Spinbox(self.fr_setup, from_=1, to=10e9)
@@ -108,13 +105,13 @@ class TabGraph(guic.ThemedFrame):
         self.y_var.bind("<Tab>", focus_next_widget)
 
         # Widgets
-        self.title.grid(row=2, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.x_label.grid(row=3, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.y_label.grid(row=4, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.x_scale.grid(row=5, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.y_scale.grid(row=6, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.x_var.grid(row=7, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.y_var.grid(row=8, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.title.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.x_label.grid(row=3, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.y_label.grid(row=4, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.x_scale.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.y_scale.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.x_var.grid(row=7, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.y_var.grid(row=8, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add check box and text field to filter files by string
         self.var_use_file_regex = tk.IntVar()
@@ -146,10 +143,7 @@ class TabGraph(guic.ThemedFrame):
         self.data_labeler = tk.Text(self.fr_setup, height=1, width=20)
         self.data_labeler.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-
-
-
-    # TODO: change this name to files maybe? or something not analysis?
+    # TODO: CLAUDE - change this name to files maybe? or something not analysis?
     def init_fr_analysis(self):
         fr_m = self.fr_analysis
 
@@ -331,8 +325,9 @@ class TabGraph(guic.ThemedFrame):
                 self.prompt.print(f"Error: Column '{e}' not found in {filename}", "error")
                 continue
             try:
-                x_scale = int(self.x_scale.get())
-                y_scale = int(self.y_scale.get())
+                # TODO: would be cool to be able to handle like 10e-3 here ...
+                x_scale = float(self.x_scale.get())
+                y_scale = float(self.y_scale.get())
             except ValueError as e:
                 guih.alert_user("Scale factor not integer", str(e), "error")
                 return False

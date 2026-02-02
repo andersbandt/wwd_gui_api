@@ -10,13 +10,11 @@ import tkinter as tk
 from tkinter import *
 from tkinter import ttk
 import threading
-# import asyncio
 import serial
-import time
 from datetime import datetime
 
 # import user defined modules
-from common.SerialReader import SerialReader
+from common.serial_helper import SerialProcessor
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -29,7 +27,7 @@ class TabUSB(guic.ThemedFrame):
         self.grid(row=0, column=0)
         self.basefilepath = basefilepath
 
-        # serial Object
+        # serial Object (SerialProcessor)
         self.ser_obj = None
 
         # print welcome text_data
@@ -45,7 +43,7 @@ class TabUSB(guic.ThemedFrame):
         self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close())
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
@@ -103,15 +101,12 @@ class TabUSB(guic.ThemedFrame):
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
+        self.fr_port.gui_refresh()
 
         if self.ser_obj is not None:
             if self.ser_obj.serStatus is False:
-                # TODO: here is where I can add back that printout to the log that like "USB DISCONNECTED"
-                self.ser_obj.stop_process()
-                self.fr_port.set_status(False)
-                self.t1.stop()
-        else:
-            self.fr_port.set_status(True)
+                self.port_close() # TODO: if I ever add port detection in my fr_port need to delete this statement (handled in gui_refresh())
+
 
     ##############################################################################
     ####      BUTTON ACTION FUNCTIONS        #####################################
@@ -161,33 +156,19 @@ class TabUSB(guic.ThemedFrame):
     #### THREADS SHIT    ############
     #################################
 
-    # NOTE: autoconnect attempt. Problem right now is probably the performance hit with threading
-    # def manage_connection(self):
-    #     status = True
-    #     while status:
-    #         if self.ser_obj.serStatus is False:
-    #             print("Attempt to reopen serial ...")
-    #             self.ser_obj.reopen()
-    #             time.sleep(3)
-
     def thread_print_display(self):
-        # TODO ATE: get "RunTimeError: main thread is not in main loop error"
-        #       also not needed if my detection of closed serial connection isn't auto working
-        # self.t1 = guic.StoppableThread(
-        #     target=lambda: self.gui_refresh,
-        #     args={"auto"})
-        # self.t1.start()
-
-        self.t2 = guic.StoppableThread(
+        self.t1 = guic.StoppableThread(
             target=self.ser_obj.get_data,
             kwargs={'printmode': False})
-        self.t2.start()
+        self.t1.start()
 
-        self.t3 = guic.StoppableThread(
+        # TODO: CLAUDE should add some user input to allow for timestamp mode to be selected here
+        #   in same user interface add mode for printing out back?
+        self.t2 = guic.StoppableThread(
             target=self.ser_obj.process_data,
-            args=(self.basefilepath, None, "raw", "text_data")
+            args=(self.basefilepath, "data\\text_data", "raw") # tag:HARDCODE
         )
-        self.t3.start()
+        self.t2.start()
 
         return True
 
@@ -199,9 +180,12 @@ class TabUSB(guic.ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
+        # TODO: CLAUDE (prompt user for baud rate here). Best solution I can come up with
+        #   actually let's put it in a setting in the `master.ini` file !!!
+
         self.prompt.print(f"Init with port: {port}")
         try:
-            self.ser_obj = SerialReader(port, 115200)
+            self.ser_obj = SerialProcessor(port, 9600)
         except serial.serialutil.SerialException as e:
             self.prompt.print(f"ERROR: {e}")
             self.prompt.print(f"Can't init with port\n")
@@ -209,16 +193,19 @@ class TabUSB(guic.ThemedFrame):
             return False
 
         threading.Thread(target=self.thread_print_display).start()
-        # threading.Timer(1.0, self.thread_print_display).start() # NOTE: I possiblyy had this 1 second delayyy in there for a reason?
         self.prompt.print("Init successful!\n")
         return True
 
     def port_close(self):
-        self.prompt.print("Serial close!")
-        self.ser_obj.stop_process()
+        if self.ser_obj is not None:
+            self.t1.stop()
+            self.t2.stop()
+            self.prompt.print("Serial close!")
+            num_lines = self.ser_obj.stop_process()
+            self.prompt.print(f"Port closed: {num_lines} lines wrote\n")
+            self.ser_obj = None
         self.fr_port.set_status(False)
-        self.t2.stop()
-        self.t3.stop()
+
 
     def start_process(self, data_subfolder, file_ext, parameters):
         self.t3.stop()
@@ -238,5 +225,3 @@ class TabUSB(guic.ThemedFrame):
                                                                   parameters=parameters)
                          ).start()
 
-    def stop_process(self):
-        self.ser_obj.stop_process()

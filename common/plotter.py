@@ -100,19 +100,19 @@ def live_plot(self, data):
         plt.pause(.00000001)
 
 
-# TODO: this thing should be generic no? Not current dependent?
+
 class LivePlot:
-    def __init__(self):
+    def __init__(self, title, xlabel, ylabel, legend_loc="upper left"):
         style.use('fivethirtyeight')
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(1, 1, 1)
         self.xs = []
         self.ys = []
 
-        self.ax.set_title("Live Current Reading")
-        self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Current (A)")
-        self.ax.legend(loc="upper left")
+        self.ax.set_title(title)
+        self.ax.set_xlabel(xlabel)
+        self.ax.set_ylabel(ylabel)
+        self.ax.legend(legend_loc)
 
     def show_animation(self, animate, interval=500):
         self.ani = animation.FuncAnimation(self.fig, animate, interval=interval)

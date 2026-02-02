@@ -12,14 +12,10 @@ from tkinter import ttk
 import tkinter.messagebox as tkmb
 
 # import needed packages
-import threading
 import time
-from time import localtime, strftime
-import math
 from datetime import datetime
 
 # import user defined modules
-from analysis.csv_helper import CSVHelper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from gui import gui_helper as guih

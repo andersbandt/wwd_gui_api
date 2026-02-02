@@ -6,11 +6,11 @@
 """
 
 # import needed modules
-from analysis import csv_helper as csvh
+from common import csv_helper as csvh
 from time import strftime, localtime
 from dataclasses import dataclass
 
-from analysis.csv_helper import CSVHelper
+from common.csv_helper import CSVHelper
 from enum import Enum
 import numpy as np
 
@@ -19,6 +19,7 @@ import numpy as np
 #### file stuff  ################
 #################################
 
+# TODO: CLAUDE should see if it would be so much easier to include basefilepath here!
 def build_log_name(prefix, file_name_ext, extension, date_strf='%Y%m%d%H%M%S'):
     # FILENAME SETUP
     recName = prefix + "_" + strftime(date_strf, localtime())
@@ -32,23 +33,6 @@ def build_log_name(prefix, file_name_ext, extension, date_strf='%Y%m%d%H%M%S'):
 #################################
 #### .log (text_data)  ##########
 #################################
-
-def init_text(basefilepath, data_folder, start_msg):
-    filename = build_log_name(
-        "",
-        "",
-        "log",
-        date_strf='%Y%m%d')
-    filepath= f"{basefilepath}/{data_folder}/{filename}"
-    open_text(filepath, start_msg)
-    print("Text file output started!!!")
-    print("\toutput started at file: ", filename)
-    return filename
-
-
-def open_text(filename, log_start_msg):
-    with open(filename, mode='a', newline='') as file:
-        file.write(log_start_msg)
 
 
 def append_text(filename, data):

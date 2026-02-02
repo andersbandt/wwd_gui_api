@@ -13,7 +13,7 @@ import os
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
-from common.SerialReader import SerialReader
+from common.serial_helper import SerialProcessor
 
 # import GUI modules
 from gui import gui_class as guic
@@ -238,8 +238,7 @@ class TabMainDashboard(guic.ThemedFrame):
 
         self.prompt.print(f"Init with port: {port}")
         try:
-            self.ser_obj = SerialReader(port,
-                                        9600)
+            self.ser_obj = SerialProcessor(port,9600)
         except serial.serialutil.SerialException as e:
             self.prompt.print(f"Can't init with port: {e}", "error")
             guih.alert_user("Can't start COM port", e, "error")

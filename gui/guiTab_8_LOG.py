@@ -732,8 +732,9 @@ class TabLog(guic.ThemedFrame):
             # Collect data
             row = self._collect_data_row()
 
-            # Add stimulus value to the row
-            row["Stimulus_Value"] = stimulus_value
+            # Add stimulus value to the row (use actual parameter name)
+            param_name = logger.get_stimulus_column_name(self.stimulus_config.stimulus_type)
+            row[param_name] = stimulus_value
             row["Stimulus_Step"] = str(step_num)
 
             # Update progress
@@ -763,9 +764,11 @@ class TabLog(guic.ThemedFrame):
             # Collect data
             row = self._collect_data_row()
 
-            # Add stimulus values to the row
-            row["Stimulus_Outer_Value"] = outer_value
-            row["Stimulus_Inner_Value"] = inner_value
+            # Add stimulus values to the row (use actual parameter names)
+            outer_name = logger.get_stimulus_column_name(self.stimulus_config.outer_loop.stimulus_type)
+            inner_name = logger.get_stimulus_column_name(self.stimulus_config.inner_loop.stimulus_type)
+            row[outer_name] = outer_value
+            row[inner_name] = inner_value
             row["Stimulus_Step"] = step_num
 
             # Update progress

@@ -4,7 +4,9 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+import json
 from pathlib import Path
+from collections import namedtuple
 
 # import needed GUI packages
 import tkinter as tk
@@ -13,16 +15,17 @@ from tkinter import filedialog
 
 # import user defined modules
 from common import path_helper
+from common import plotter
 
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: CLAUDE should have saveable setup configs
-
-
 # TODO: abstract away more of the actual plotting that is happening
+
+# Define named tuple for file data
+FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
 
 
 def focus_next_widget(event):
@@ -43,8 +46,12 @@ class TabGraph(guic.ThemedFrame):
         self.data_dir = path_helper.get_full_data_path()
         self.files = []
 
+        # set up preset configuration
+        self.preset_dir = os.path.join(self.basefilepath, "config", "graph_presets")
+        os.makedirs(self.preset_dir, exist_ok=True)
+
         self.fr_setup = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_analysis = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_files = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up prompt
         self.prompt = guic.Prompt(self,
@@ -58,11 +65,14 @@ class TabGraph(guic.ThemedFrame):
 
         # place everything in grid
         self.fr_setup.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_analysis.grid(row=1, column=1, pady=15, padx=15)
+        self.fr_files.grid(row=1, column=1, pady=15, padx=15)
         self.prompt.grid(row=2, column=0, columnspan=4, padx=30, pady=12)
 
         # refresh initial file last
         self.refresh_files()
+
+        # refresh presets dropdown
+        self.refresh_presets()
 
     def initTabContent(self):
         print("Initializing tab 8 (Graph) content")
@@ -73,9 +83,30 @@ class TabGraph(guic.ThemedFrame):
         l1.grid(column=0, row=0, columnspan=4)
 
         self.init_fr_setup()
-        self.init_fr_analysis()
+        self.init_fr_files()
 
     def init_fr_setup(self):
+        # Preset configuration UI
+        tk.Label(self.fr_setup, text="Preset:").grid(row=0, column=0, padx=5, pady=2, sticky='e')
+
+        self.preset_combo = ttk.Combobox(self.fr_setup, width=18, state='readonly')
+        self.preset_combo.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.preset_combo.bind('<<ComboboxSelected>>', self.on_preset_select)
+
+        btn_save_preset = tk.Button(self.fr_setup, text="Save",
+                                     command=self.save_preset,
+                                     bg=self.theme_config["success"],
+                                     fg=self.theme_config["fg_dark"],
+                                     height=1, width=8)
+        btn_save_preset.grid(row=1, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
+        btn_load_preset = tk.Button(self.fr_setup, text="Load",
+                                     command=self.load_preset,
+                                     bg=self.theme_config["light_2"],
+                                     fg=self.theme_config["fg_dark"],
+                                     height=1, width=8)
+        btn_load_preset.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='w')
+
         # TODO: make it more intuitive on what is labeling and what is data specific
         # graph labeling
         tk.Label(self.fr_setup, text="Title").grid(row=2, column=0, padx=5, pady=2)
@@ -142,9 +173,8 @@ class TabGraph(guic.ThemedFrame):
         self.data_labeler = tk.Text(self.fr_setup, height=1, width=20)
         self.data_labeler.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-    # TODO: CLAUDE - change this name to files maybe? or something not analysis?
-    def init_fr_analysis(self):
-        fr_m = self.fr_analysis
+    def init_fr_files(self):
+        fr_m = self.fr_files
 
         # add directory search
         self.lbl_data_directory = tk.Label(fr_m, text=self.data_dir, fg=self.theme_config["fg_light"], bg=self.theme_config["bg_light"])
@@ -156,7 +186,7 @@ class TabGraph(guic.ThemedFrame):
 
 
         # Create Listbox with multi-select support and scrollbar
-        listbox_frame = tk.Frame(self.fr_analysis)
+        listbox_frame = tk.Frame(self.fr_files)
         listbox_frame.grid(row=1, column=0, rowspan=4, padx=self.theme_config["pad"]["xpad_m"], pady=self.theme_config["pad"]["ypad_m"])
 
         scrollbar = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
@@ -235,7 +265,7 @@ class TabGraph(guic.ThemedFrame):
             self.file_selection_label.config(text=f"{num_selected} files selected")
 
     def get_selected_files(self):
-        """Get list of selected file data tuples"""
+        """Get list of selected file data (FileData named tuples)"""
         selected_indices = self.file_listbox.curselection()
         if not selected_indices:
             return []
@@ -245,11 +275,10 @@ class TabGraph(guic.ThemedFrame):
             if idx < len(self.files):
                 selected_files.append(self.files[idx])
 
-        # TODO: should this return actually be a dict?
         return selected_files
 
     def refresh_files(self):
-        files = [] # list of (filepath, vars_dict)
+        files = []  # list of FileData named tuples
 
         def grab_files():
             for filename in os.listdir(self.data_dir):
@@ -272,11 +301,11 @@ class TabGraph(guic.ThemedFrame):
                 df = pd.read_csv(filepath)
 
                 # append to running list of files
-                files.append((
-                    filename,
-                    filepath,
-                    parts,
-                    df))
+                files.append(FileData(
+                    filename=filename,
+                    filepath=filepath,
+                    parts=parts,
+                    df=df))
             return files
 
         # update file list
@@ -303,58 +332,74 @@ class TabGraph(guic.ThemedFrame):
 
         self.prompt.print(f"Graphing {len(selected_files)} selected file(s)...")
 
-        # set up plot
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.set_xlabel(self.x_label.get("1.0", "end").strip("\n"))
-        ax.set_ylabel(self.y_label.get("1.0", "end").strip("\n"))
-        ax.set_title(self.title.get("1.0", "end").strip("\n"))
-        ax.grid(True)
-        plt.tight_layout()
+        # Parse GUI values
+        try:
+            x_scale_str = self.x_scale.get().strip()
+            y_scale_str = self.y_scale.get().strip()
+            x_scale = float(x_scale_str)
+            y_scale = float(y_scale_str)
+        except ValueError as e:
+            error_msg = (
+                f"Invalid scale factor: {str(e)}\n\n"
+                f"X-scale: '{x_scale_str}'\n"
+                f"Y-scale: '{y_scale_str}'\n\n"
+                f"Accepted formats:\n"
+                f"  • Decimal: 0.001, 1.5, 1000\n"
+                f"  • Scientific: 1e-3, 1.5e2, 2E+4\n"
+                f"  • Integer: 1, 10, 1000"
+            )
+            guih.alert_user("Invalid Scale Factor", error_msg, "error")
+            self.prompt.print(f"Error: Invalid scale factor - X: '{x_scale_str}', Y: '{y_scale_str}'", "error")
+            return False
 
-        # iterate across selected files only
-        for filename, filepath, file_parts, df in selected_files:
-            # setup X and Y data
-            x_key = self.x_var.get("1.0", "end").strip("\n")
-            y_key = self.y_var.get("1.0", "end").strip("\n")
+        # Determine labeling mode and configuration
+        if self.var_use_file_labeler.get():
+            labeling_mode = 'filename'
             try:
-                x_data = df[x_key]
-                y_data = df[y_key]
-            except KeyError as e:
-                guih.alert_user("Key error in data file", f"Key {e} is not found in {filename}", "error")
-                self.prompt.print(f"Error: Column '{e}' not found in {filename}", "error")
-                continue
-            try:
-                # TODO: would be cool to be able to handle like 10e-3 here ...
-                x_scale = float(self.x_scale.get())
-                y_scale = float(self.y_scale.get())
-            except ValueError as e:
-                guih.alert_user("Scale factor not integer", str(e), "error")
-                return False
+                file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
+            except ValueError:
+                file_label_idx = 0
+            label_config = {'file_label_idx': file_label_idx}
+        elif self.var_use_data_labeler.get():
+            labeling_mode = 'data'
+            data_label_var = self.data_labeler.get("1.0", "end").strip("\n")
+            label_config = {'data_label_var': data_label_var}
+        else:
+            labeling_mode = 'none'
+            label_config = {}
 
-            # label graphs by FILENAME
-            if self.var_use_file_labeler.get():
-                try:
-                    file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
-                    label = file_parts[file_label_idx]
-                except (ValueError, IndexError):
-                    label = filename
-                ax.plot(x_data * x_scale, y_data * y_scale, label=label, marker='o', markersize=3)
-            # label graphs by DATA
-            elif self.var_use_data_labeler.get():
-                label_var = self.data_labeler.get("1.0", "end").strip("\n")
-                for label_val in sorted(df[label_var].dropna().unique()):
-                    df_tmp = df[df[label_var] == label_val]
-                    label = f"{label_var}={label_val}"
-                    ax.plot(df_tmp[x_key] * x_scale, df_tmp[y_key] * y_scale, label=label, marker='o', markersize=3)
-            # no label
-            else:
-                ax.plot(x_data * x_scale, y_data * y_scale, marker='o', markersize=3)
-
-        # show plot
-        ax.legend()
-        plt.show()
-        self.prompt.print("Graph complete!")
-        return True
+        # Call abstracted plotting function
+        try:
+            plotter.plot_multi_file_data(
+                file_data_list=selected_files,
+                x_var=self.x_var.get("1.0", "end").strip("\n"),
+                y_var=self.y_var.get("1.0", "end").strip("\n"),
+                x_scale=x_scale,
+                y_scale=y_scale,
+                title=self.title.get("1.0", "end").strip("\n"),
+                xlabel=self.x_label.get("1.0", "end").strip("\n"),
+                ylabel=self.y_label.get("1.0", "end").strip("\n"),
+                labeling_mode=labeling_mode,
+                label_config=label_config,
+                figsize=(10, 6),
+                marker='o',
+                markersize=3,
+                show_grid=True
+            )
+            self.prompt.print("Graph complete!")
+            return True
+        except KeyError as e:
+            guih.alert_user("Key Error in Data File", str(e), "error")
+            self.prompt.print(f"Error: {str(e)}", "error")
+            return False
+        except ValueError as e:
+            guih.alert_user("Value Error", str(e), "error")
+            self.prompt.print(f"Error: {str(e)}", "error")
+            return False
+        except Exception as e:
+            guih.alert_user("Plotting Error", f"An unexpected error occurred: {str(e)}", "error")
+            self.prompt.print(f"Error: {str(e)}", "error")
+            return False
 
     def analyze_files(self):
         # Get selected files
@@ -387,6 +432,139 @@ class TabGraph(guic.ThemedFrame):
 
         self.prompt.print("\nAnalysis complete!")
         return True
+
+    ##############################################################################
+    ####      PRESET FUNCTIONS        ############################################
+    ##############################################################################
+
+    def refresh_presets(self):
+        """Scan preset directory and populate dropdown with available presets"""
+        preset_files = []
+        if os.path.exists(self.preset_dir):
+            for filename in os.listdir(self.preset_dir):
+                if filename.endswith('.json'):
+                    preset_files.append(filename[:-5])  # Remove .json extension
+
+        self.preset_combo['values'] = sorted(preset_files)
+        if preset_files:
+            self.preset_combo.set('')  # Clear selection
+
+    def on_preset_select(self, event):
+        """Callback when a preset is selected from dropdown"""
+        selected = self.preset_combo.get()
+        if selected:
+            self.load_preset()
+
+    def save_preset(self):
+        """Save current graph parameters to a preset file"""
+        # Ask user for preset name
+        from tkinter import simpledialog
+        preset_name = simpledialog.askstring("Save Preset", "Enter preset name:")
+
+        if not preset_name:
+            return
+
+        # Remove .json extension if user added it
+        if preset_name.endswith('.json'):
+            preset_name = preset_name[:-5]
+
+        # Gather all parameters
+        preset_data = {
+            "title": self.title.get("1.0", "end").strip("\n"),
+            "x_label": self.x_label.get("1.0", "end").strip("\n"),
+            "y_label": self.y_label.get("1.0", "end").strip("\n"),
+            "x_scale": self.x_scale.get(),
+            "y_scale": self.y_scale.get(),
+            "x_var": self.x_var.get("1.0", "end").strip("\n"),
+            "y_var": self.y_var.get("1.0", "end").strip("\n"),
+            "use_file_regex": self.var_use_file_regex.get(),
+            "file_filter": self.file_filter.get("1.0", "end").strip("\n"),
+            "use_file_labeler": self.var_use_file_labeler.get(),
+            "file_labeler": self.file_labeler.get("1.0", "end").strip("\n"),
+            "use_data_labeler": self.var_use_data_labeler.get(),
+            "data_labeler": self.data_labeler.get("1.0", "end").strip("\n"),
+            # Future use - data source configuration
+            # "data_dir": self.data_dir
+        }
+
+        # Save to JSON file
+        filepath = os.path.join(self.preset_dir, f"{preset_name}.json")
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(preset_data, f, indent=4)
+            self.prompt.print(f"Preset saved: {preset_name}")
+            self.refresh_presets()
+            self.preset_combo.set(preset_name)
+        except Exception as e:
+            guih.alert_user("Save Error", f"Failed to save preset: {str(e)}", "error")
+            self.prompt.print(f"Error saving preset: {str(e)}", "error")
+
+    def load_preset(self):
+        """Load a preset and populate all graph parameters"""
+        selected = self.preset_combo.get()
+        if not selected:
+            guih.alert_user("No Preset Selected", "Please select a preset to load", "warning")
+            return
+
+        filepath = os.path.join(self.preset_dir, f"{selected}.json")
+
+        try:
+            with open(filepath, 'r') as f:
+                preset_data = json.load(f)
+
+            # Clear and populate text widgets
+            self.title.delete("1.0", "end")
+            self.title.insert("1.0", preset_data.get("title", ""))
+
+            self.x_label.delete("1.0", "end")
+            self.x_label.insert("1.0", preset_data.get("x_label", ""))
+
+            self.y_label.delete("1.0", "end")
+            self.y_label.insert("1.0", preset_data.get("y_label", ""))
+
+            self.x_var.delete("1.0", "end")
+            self.x_var.insert("1.0", preset_data.get("x_var", ""))
+
+            self.y_var.delete("1.0", "end")
+            self.y_var.insert("1.0", preset_data.get("y_var", ""))
+
+            self.file_filter.delete("1.0", "end")
+            self.file_filter.insert("1.0", preset_data.get("file_filter", ""))
+
+            self.file_labeler.delete("1.0", "end")
+            self.file_labeler.insert("1.0", preset_data.get("file_labeler", ""))
+
+            self.data_labeler.delete("1.0", "end")
+            self.data_labeler.insert("1.0", preset_data.get("data_labeler", ""))
+
+            # Set spinbox values
+            self.x_scale.delete(0, "end")
+            self.x_scale.insert(0, preset_data.get("x_scale", "1"))
+
+            self.y_scale.delete(0, "end")
+            self.y_scale.insert(0, preset_data.get("y_scale", "1"))
+
+            # Set checkbox values
+            self.var_use_file_regex.set(preset_data.get("use_file_regex", 0))
+            self.var_use_file_labeler.set(preset_data.get("use_file_labeler", 0))
+            self.var_use_data_labeler.set(preset_data.get("use_data_labeler", 0))
+
+            # Future: data_dir loading
+            # if "data_dir" in preset_data:
+            #     self.data_dir = preset_data["data_dir"]
+            #     self.lbl_data_directory.config(text=self.data_dir)
+
+            self.prompt.print(f"Preset loaded: {selected}")
+
+        except FileNotFoundError:
+            guih.alert_user("Preset Not Found", f"Preset file not found: {selected}", "error")
+            self.prompt.print(f"Error: Preset file not found: {selected}", "error")
+        except json.JSONDecodeError as e:
+            guih.alert_user("Invalid Preset", f"Preset file is corrupted: {str(e)}", "error")
+            self.prompt.print(f"Error: Invalid preset file: {str(e)}", "error")
+        except Exception as e:
+            guih.alert_user("Load Error", f"Failed to load preset: {str(e)}", "error")
+            self.prompt.print(f"Error loading preset: {str(e)}", "error")
 
 
 

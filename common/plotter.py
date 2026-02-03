@@ -22,6 +22,121 @@ def save_fig():
 #### generic plotting ###########
 #################################
 
+def plot_multi_file_data(
+    file_data_list,
+    x_var, y_var,
+    x_scale=1, y_scale=1,
+    title=None, xlabel=None, ylabel=None,
+    labeling_mode='none',
+    label_config=None,
+    figsize=(10, 6),
+    marker='o',
+    markersize=3,
+    show_grid=True
+):
+    """
+    Plot data from multiple files with flexible labeling options.
+
+    Args:
+        file_data_list: List of FileData namedtuples (filename, filepath, parts, df)
+                       or any iterable with (filename, filepath, parts, df)
+        x_var: Column name for x-axis data
+        y_var: Column name for y-axis data
+        x_scale: Scale factor for x-axis data (default: 1)
+        y_scale: Scale factor for y-axis data (default: 1)
+        title: Plot title
+        xlabel: X-axis label
+        ylabel: Y-axis label
+        labeling_mode: 'none', 'filename', or 'data'
+        label_config: Dict with labeling configuration:
+                     - For 'filename' mode: {'file_label_idx': int}
+                     - For 'data' mode: {'data_label_var': str}
+        figsize: Figure size tuple (width, height)
+        marker: Marker style for plot
+        markersize: Size of markers
+        show_grid: Whether to show grid
+
+    Returns:
+        Tuple of (fig, ax) matplotlib objects
+
+    Raises:
+        KeyError: If x_var or y_var not found in dataframe
+        ValueError: If label configuration is invalid
+    """
+    if label_config is None:
+        label_config = {}
+
+    # Set up plot
+    fig, ax = plt.subplots(figsize=figsize)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    if show_grid:
+        ax.grid(True)
+    plt.tight_layout()
+
+    # Iterate through files and plot
+    for file_data in file_data_list:
+        # Unpack file data (works with namedtuple or regular tuple)
+        if hasattr(file_data, 'filename'):
+            # Named tuple access
+            filename = file_data.filename
+            file_parts = file_data.parts
+            df = file_data.df
+        else:
+            # Regular tuple unpacking
+            filename, _, file_parts, df = file_data
+
+        # Extract x and y data
+        if x_var not in df.columns:
+            raise KeyError(f"Column '{x_var}' not found in {filename}")
+        if y_var not in df.columns:
+            raise KeyError(f"Column '{y_var}' not found in {filename}")
+
+        x_data = df[x_var]
+        y_data = df[y_var]
+
+        # Apply labeling strategy
+        if labeling_mode == 'filename':
+            # Label by filename parts
+            try:
+                file_label_idx = label_config.get('file_label_idx', 0)
+                label = file_parts[file_label_idx]
+            except (ValueError, IndexError, TypeError):
+                label = filename
+            ax.plot(x_data * x_scale, y_data * y_scale,
+                   label=label, marker=marker, markersize=markersize)
+
+        elif labeling_mode == 'data':
+            # Label by data column
+            data_label_var = label_config.get('data_label_var')
+            if not data_label_var:
+                raise ValueError("data_label_var must be specified for 'data' labeling mode")
+            if data_label_var not in df.columns:
+                raise KeyError(f"Label column '{data_label_var}' not found in {filename}")
+
+            for label_val in sorted(df[data_label_var].dropna().unique()):
+                df_tmp = df[df[data_label_var] == label_val]
+                label = f"{data_label_var}={label_val}"
+                ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
+                       label=label, marker=marker, markersize=markersize)
+
+        else:
+            # No label
+            ax.plot(x_data * x_scale, y_data * y_scale,
+                   marker=marker, markersize=markersize)
+
+    # Show legend if any labels were added
+    if labeling_mode in ['filename', 'data']:
+        ax.legend()
+
+    plt.show()
+    return fig, ax
+
+
 # NOTE: not tested
 def plot_3d(x_axis, y_axis, z_axis):
     # Meshgrid for plotting

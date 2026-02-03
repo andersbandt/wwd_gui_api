@@ -320,6 +320,25 @@ def parse_serial_params(raw: str):
     return parts
 
 
+def get_stimulus_column_name(stimulus_type: StimulusType) -> str:
+    """
+    Convert a StimulusType to a descriptive column name for CSV headers.
+
+    Args:
+        stimulus_type: The type of stimulus
+
+    Returns:
+        String column name (e.g., "PS_Voltage", "FG_Frequency", "FG_Duty_Cycle")
+    """
+    column_map = {
+        StimulusType.PS_VOLTAGE: "PS_Voltage",
+        StimulusType.FG_FREQUENCY: "FG_Frequency",
+        StimulusType.FG_DUTY_CYCLE: "FG_Duty_Cycle",
+        StimulusType.NONE: "Stimulus_Value"  # Fallback
+    }
+    return column_map.get(stimulus_type, "Stimulus_Value")
+
+
 def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig = None):
     # SETUP CSV HEADER PARAMETERS
     headers = ["Time"]
@@ -354,11 +373,14 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
     # Stimulus columns (if stimulus mode enabled)
     if stimulus_config:
         if isinstance(stimulus_config, DualStimulusConfig) and stimulus_config.enabled:
-            # Dual stimulus: add columns for both outer and inner loops
-            headers += ["Stimulus_Outer_Value", "Stimulus_Inner_Value", "Stimulus_Step"]
+            # Dual stimulus: use actual parameter names for outer and inner loops
+            outer_name = get_stimulus_column_name(stimulus_config.outer_loop.stimulus_type)
+            inner_name = get_stimulus_column_name(stimulus_config.inner_loop.stimulus_type)
+            headers += [outer_name, inner_name, "Stimulus_Step"]
         elif isinstance(stimulus_config, StimulusConfig) and stimulus_config.enabled:
-            # Single stimulus: original behavior
-            headers += ["Stimulus_Value", "Stimulus_Step"]
+            # Single stimulus: use actual parameter name
+            param_name = get_stimulus_column_name(stimulus_config.stimulus_type)
+            headers += [param_name, "Stimulus_Step"]
 
     return headers
 

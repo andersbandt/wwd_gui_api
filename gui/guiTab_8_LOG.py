@@ -485,9 +485,20 @@ class TabLog(guic.ThemedFrame):
                         guih.alert_user("Can't start record!", "FG stimulus requires Function Generator connection!", "error")
                         return
 
+        # Validate that at least one instrument OR stimulus config is selected
+        has_instrument = (self.record_config.use_ser or
+                         self.record_config.use_dmm or
+                         self.record_config.use_ps or
+                         self.record_config.use_fg)
+        has_stimulus = self.var_use_stimulus.get()
 
-        # TODO: need to actually add back check for not requesting a single instrument (or StimulusConfig, because I like the option of only doing Stimulus)
-        # If we reach here, all requested instruments are ready and user has selected at least 1 instrument
+        if not has_instrument and not has_stimulus:
+            guih.alert_user("Can't start record!",
+                          "Please select at least one instrument to record OR enable stimulus mode",
+                          "warning")
+            return
+
+        # If we reach here, all requested instruments are ready and user has selected at least 1 instrument or stimulus
         logger.start_recording(self.csvh)
         self.record_status = True
         self.cc.recording = True  # Signal to ClassController that recording is active

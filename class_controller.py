@@ -12,7 +12,8 @@ class ClassController:
         # TODO: CLAUDE should somehow set some recording status and DISABLE gui_refresh on all tabs. Otherwise logging will crash when I click into another tab
         self.recording = False
 
-        self.ports_used = {}
+        self.ports_used = {}  # Tracks last used ports (for XML config)
+        self.active_connections = {}  # Tracks currently active connections {port: usage_name}
 
     def set_ser(self, ser):
         self.ser = ser
@@ -104,6 +105,56 @@ class ClassController:
             tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
         return True
+
+    def add_active_connection(self, port, usage):
+        """
+        Register a port as actively connected.
+
+        Args:
+            port: The port identifier (e.g., "COM3", "/dev/ttyUSB0", "ASRL3::INSTR")
+            usage: The name of the connection (e.g., "DMM", "Serial", "PS")
+        """
+        self.active_connections[port] = usage
+        print(f"Active connection added: {usage} @ {port}")
+
+    def remove_active_connection(self, port):
+        """
+        Unregister a port from active connections.
+
+        Args:
+            port: The port identifier to remove
+
+        Returns:
+            True if port was removed, False if it wasn't in active connections
+        """
+        if port in self.active_connections:
+            usage = self.active_connections.pop(port)
+            print(f"Active connection removed: {usage} @ {port}")
+            return True
+        return False
+
+    def is_port_active(self, port):
+        """
+        Check if a port is currently in active use.
+
+        Args:
+            port: The port identifier to check
+
+        Returns:
+            tuple: (is_active, usage_name) where is_active is bool and usage_name is str or None
+        """
+        if port in self.active_connections:
+            return (True, self.active_connections[port])
+        return (False, None)
+
+    def get_active_connections(self):
+        """
+        Get all currently active connections.
+
+        Returns:
+            dict: Copy of active_connections dictionary
+        """
+        return self.active_connections.copy()
 
 
 

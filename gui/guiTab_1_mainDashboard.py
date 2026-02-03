@@ -10,6 +10,8 @@ import tkinter as tk
 from tkinter import ttk
 import serial
 import os
+import platform
+import subprocess
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
@@ -18,6 +20,34 @@ from common.serial_helper import SerialProcessor
 # import GUI modules
 from gui import gui_class as guic
 from gui import gui_helper as guih
+
+
+def open_file_cross_platform(file_path):
+    """
+    Opens a file with the default application in a cross-platform way.
+    Works on Windows, Linux, and macOS.
+
+    Args:
+        file_path: Path to the file to open
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(file_path)
+        elif system == "Darwin":  # macOS
+            subprocess.run(["open", file_path], check=True)
+        else:  # Linux and other Unix-like systems
+            subprocess.run(["xdg-open", file_path], check=True)
+        return True
+    except Exception as e:
+        print(f"Error opening file: {e}")
+        return False
 
 
 # TODO ATE: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
@@ -102,7 +132,10 @@ class TabMainDashboard(guic.ThemedFrame):
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
         btn3 = tk.Button(fr_m, text=f"Open `config.ini`", bg=self.theme_config["dark_3"],
                          command=lambda: self.open_config_ini())
-        btn3.grid(row=6, column=1, padx=10, pady=5)
+        btn3.grid(row=6, column=0, padx=10, pady=5)
+        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", bg=self.theme_config["dark_3"],
+                         command=lambda: self.open_master_ini())
+        btn4.grid(row=6, column=2, padx=10, pady=5)
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -201,11 +234,14 @@ class TabMainDashboard(guic.ThemedFrame):
             self.prompt.print("ERROR: probably self.ser_obj is None", "error")
 
     def open_config_ini(self):
-        file_path = os.getcwd() + "/EEequipment/usbrelay/config.ini"  #tag:HARDCODE
-        if os.path.exists(file_path):
-            os.startfile(file_path)  # Opens the file with the default associated application # TODO ATE: might not work on Linux. Module "os" has no attribute `startfile`
-        else:
-            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist", "error")
+        file_path = os.path.join(os.getcwd(), "EEequipment", "usbrelay", "config.ini")
+        if not open_file_cross_platform(file_path):
+            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist or couldn't be opened", "error")
+
+    def open_master_ini(self):
+        file_path = os.path.join(os.getcwd(), "config", "master.ini")
+        if not open_file_cross_platform(file_path):
+            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist or couldn't be opened", "error")
 
     ##############################################################################
     ####      GUI KEYSTROKE / FOCUS FUNCTIONS        #############################

@@ -20,19 +20,15 @@ from EEequipment.usbrelay import usbrelay_controller
 # import tab classes
 from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
-from gui import guiTab_2_LOG
-from gui import guiTab_3_DMM
-from gui import guiTab_4_XDS110
-from gui import guiTab_5_USB
-from gui import guiTab_6_PS
+from gui import guiTab_2_DMM
+from gui import guiTab_3_XDS110
+from gui import guiTab_4_USB
+from gui import guiTab_5_PS
+from gui import guiTab_6_FG
 from gui import guiTab_7_ATE
-from gui import guiTab_8_GRAPH
-from gui import guiTab_9_FG
+from gui import guiTab_8_LOG
+from gui import guiTab_9_GRAPH
 
-
-# TODO: CLAUDE should reorder the tab order. Ending to be --> (PS, FG, ATE, LOG, GRAPH)
-
-# TODO: CLAUDE should add button to open `master.ini` like I have for the relay config file
 
 # TODO: CLAUDE just make some other darcula.json and have a theme settings (make a settings tab?). I think this would make any users happy!
 
@@ -91,17 +87,17 @@ class MainApplication(ThemedApp):
 
         # create Tab objects
         self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,self.theme_config, autoconnect[0])
-        self.tab2 = guiTab_2_LOG.TabLog(self.nb, self.controller, self.basefilepath, self.theme_config)
-        self.tab3 = guiTab_3_DMM.TabDMM(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[2])
-        self.tab4 = guiTab_4_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, self.theme_config)
-        self.tab5 = guiTab_5_USB.TabUSB(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[4])
-        self.tab6 = guiTab_6_PS.TabPS(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[5])
+        self.tab2 = guiTab_2_DMM.TabDMM(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[1])
+        self.tab3 = guiTab_3_XDS110.tabXDS110(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab4 = guiTab_4_USB.TabUSB(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[3])
+        self.tab5 = guiTab_5_PS.TabPS(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[4])
+        self.tab6 = guiTab_6_FG.TabFG(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[5])
         self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
-        self.tab8 = guiTab_8_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
-        self.tab9 = guiTab_9_FG.TabFG(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[8])
+        self.tab8 = guiTab_8_LOG.TabLog(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab9 = guiTab_9_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "Logger", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "ATE", "GRAPH", "FG Control"]
+        self.tab_names = ["MAIN", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "FG Control", "ATE", "Logger", "GRAPH"]
         tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8, self.tab9]
 
         # Add tabs dynamically using a loop
@@ -116,17 +112,17 @@ class MainApplication(ThemedApp):
         if selected_tab == self.tab_names[0]:
             guiTab_1_mainDashboard.TabMainDashboard.gui_refresh(self.tab1, "auto")
         elif selected_tab == self.tab_names[1]:
-            guiTab_2_LOG.TabLog.gui_refresh(self.tab2, "auto")
-        elif selected_tab == self.tab_names[2]:
-            guiTab_3_DMM.TabDMM.gui_refresh(self.tab3, "auto")
+            guiTab_2_DMM.TabDMM.gui_refresh(self.tab2, "auto")
         elif selected_tab == self.tab_names[3]:
-            guiTab_5_USB.TabUSB.gui_refresh(self.tab5, "auto")
+            guiTab_4_USB.TabUSB.gui_refresh(self.tab4, "auto")
+        elif selected_tab == self.tab_names[4]:
+            guiTab_5_PS.TabPS.gui_refresh(self.tab5, "auto")
         elif selected_tab == self.tab_names[5]:
-            guiTab_6_PS.TabPS.gui_refresh(self.tab6, "auto")
+            guiTab_6_FG.TabFG.gui_refresh(self.tab6, "auto")
         elif selected_tab == self.tab_names[6]:
             guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
-        elif selected_tab == self.tab_names[8]:
-            guiTab_9_FG.TabFG.gui_refresh(self.tab9, "auto")
+        elif selected_tab == self.tab_names[7]:
+            guiTab_8_LOG.TabLog.gui_refresh(self.tab8, "auto")
 
 
 ###########################################################

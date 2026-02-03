@@ -18,6 +18,7 @@ import json
 import threading
 import copy
 import xml.etree.ElementTree as ET
+from datetime import datetime
 
 # import user created modules
 from gui import gui_helper as guih
@@ -179,7 +180,6 @@ class ThemedFrame(tk.Frame):
         self.configure(bg=bg)
 
 
-# TODO: CLAUDE would be cool to add timestamps to printout here (probably as an option not the default)
 class Prompt(ThemedFrame):
     def __init__(self, master, theme_config, title, height, width):
         super().__init__(master, theme_config, height=height, width=width)
@@ -204,8 +204,13 @@ class Prompt(ThemedFrame):
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
     # gui_print: prints a message on a Tkinter frame
-    def print(self, message, print_type=None):
-        message = ">>>" + message + "\n"
+    def print(self, message, print_type=None, timestamp=False):
+        prefix = ">>>"
+        if timestamp:
+            time_str = datetime.now().strftime("%H:%M:%S")
+            prefix = f"[{time_str}] >>>"
+
+        message = prefix + message + "\n"
         if print_type == "error":
             self.prompt.insert(INSERT, message, "error")  # Apply 'error' tag
         else:
@@ -273,14 +278,13 @@ class ConnFrame(ThemedFrame):
             self.status_oval.set_color(self.theme_config["error"])
 
     def gui_refresh(self):
-        # TODO: CLAUDE (ask how I can detect connection status here)
+        # TODO: how I can detect connection status here. It's hard since i have generic connect and disconnect functions, so might be impossible
         self.set_status(self.status)
 
     def set_color(self, color):
         self.canvas1.itemconfig(self.status_oval, fill=color)
 
 
-# TODO: I need to prevent connections to test instruments that already have an active connection
 class SerialConnFrame(ConnFrame):
     def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
         super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd)
@@ -341,9 +345,35 @@ class SerialConnFrame(ConnFrame):
         self.status_oval.grid(row=5, column=2, padx=15, pady=3)
 
     def connect(self, set_used_port=True):
+        # Get the selected port
+        self.port = self.get_port()
+
+        # Check if port is already actively connected
+        is_active, active_usage = self.cc.is_port_active(self.port)
+        if is_active:
+            print(f"ERROR: Port {self.port} is already in use by {active_usage}")
+            self.status = False
+            self.gui_refresh()
+            return False
+
+        # Proceed with connection
         super().connect()
-        if self.status and set_used_port:
-            self.cc.set_used_port(self.port, self.name)
+
+        # If connection successful, track it
+        if self.status:
+            self.cc.add_active_connection(self.port, self.name)
+            if set_used_port:
+                self.cc.set_used_port(self.port, self.name)
+
+        return self.status
+
+    def disconnect(self):
+        # Remove from active connections if we have a port
+        if self.port:
+            self.cc.remove_active_connection(self.port)
+
+        # Call parent disconnect
+        super().disconnect()
 
     def set_port_func(self):
         selected_label = self.port_func_drop[1].get()

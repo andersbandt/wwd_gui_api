@@ -54,7 +54,8 @@ class TabLog(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        # TODO: honestly try out pack here, I think it would help the layout? Because fr_setup can slide left a TON
+        # TODO: CLAUDE should see if I can use pack here
+        #   or have grid be able to slide fr_setup far to the left
         self.fr_status.grid(row=1, column=0, pady=15, padx=15)
         self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
         self.fr_stimulus.grid(row=2, column=0, pady=15, padx=15)
@@ -187,7 +188,6 @@ class TabLog(guic.ThemedFrame):
                                 bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-    # TODO: my god this function is long ....
     def init_fr_stimulus(self):
         """Initialize stimulus sweep configuration UI"""
         # Title
@@ -506,7 +506,105 @@ class TabLog(guic.ThemedFrame):
 
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
-    # TODO: my god this function is long now
+
+
+    def set_stimulus(self):
+        # Map strings to enums   tag:HARDCODE
+        stimulus_type_map = {
+            "PS Voltage": logger.StimulusType.PS_VOLTAGE,
+            "FG Frequency": logger.StimulusType.FG_FREQUENCY,
+            "FG Duty Cycle": logger.StimulusType.FG_DUTY_CYCLE
+        }
+        sweep_mode_map = {
+            "Linear": logger.SweepMode.LINEAR,
+            "Logarithmic": logger.SweepMode.LOGARITHMIC
+        }
+
+        try:
+            if self.var_use_dual_stimulus.get():
+                # === DUAL STIMULUS MODE ===
+                # Create outer loop config
+                stimulus1_type_str = self.stimulus_type_drop[1].get()
+                sweep1_mode_str = self.sweep_mode_drop[1].get()
+
+                outer_config = logger.StimulusConfig(
+                    enabled=True,
+                    stimulus_type=stimulus_type_map[stimulus1_type_str],
+                    sweep_mode=sweep_mode_map[sweep1_mode_str],
+                    start_value=float(self.stim_start_entry.get()),
+                    stop_value=float(self.stim_stop_entry.get()),
+                    step_value=float(self.stim_step_entry.get()),
+                    settling_time=float(self.stim_settling_entry.get()),
+                    ps_channel=int(self.stim_ps_channel_drop[1].get())
+                )
+
+                # Create inner loop config
+                stimulus2_type_str = self.stimulus2_type_drop[1].get()
+                sweep2_mode_str = self.sweep2_mode_drop[1].get()
+
+                inner_config = logger.StimulusConfig(
+                    enabled=True,
+                    stimulus_type=stimulus_type_map[stimulus2_type_str],
+                    sweep_mode=sweep_mode_map[sweep2_mode_str],
+                    start_value=float(self.stim2_start_entry.get()),
+                    stop_value=float(self.stim2_stop_entry.get()),
+                    step_value=float(self.stim2_step_entry.get()),
+                    settling_time=0.0,  # Use outer loop settling time
+                    ps_channel=int(self.stim2_ps_channel_drop[1].get())
+                )
+
+                # Create dual stimulus config
+                self.stimulus_config = logger.DualStimulusConfig(
+                    enabled=True,
+                    outer_loop=outer_config,
+                    inner_loop=inner_config
+                )
+
+                # Validate the config
+                valid, error_msg = self.stimulus_config.validate()
+                if not valid:
+                    guih.alert_user("Invalid Dual Stimulus Config", error_msg, "error")
+                    raise ValueError(error_msg)
+
+                # Create the stimulus generator
+                self.stimulus_generator = logger.DualStimulusGenerator(self.stimulus_config)
+                self.is_dual_stimulus = True
+                self.prompt.print(f"Dual stimulus sweep configured: {len(self.stimulus_generator)} total steps")
+                self.prompt.print(f"  Outer loop: {len(self.stimulus_generator.outer_gen)} steps")
+                self.prompt.print(f"  Inner loop: {len(self.stimulus_generator.inner_gen)} steps")
+
+            else:
+                # === SINGLE STIMULUS MODE ===
+                stimulus_type_str = self.stimulus_type_drop[1].get()
+                sweep_mode_str = self.sweep_mode_drop[1].get()
+
+                self.stimulus_config = logger.StimulusConfig(
+                    enabled=True,
+                    stimulus_type=stimulus_type_map[stimulus_type_str],
+                    sweep_mode=sweep_mode_map[sweep_mode_str],
+                    start_value=float(self.stim_start_entry.get()),
+                    stop_value=float(self.stim_stop_entry.get()),
+                    step_value=float(self.stim_step_entry.get()),
+                    settling_time=float(self.stim_settling_entry.get()),
+                    ps_channel=int(self.stim_ps_channel_drop[1].get())
+                )
+
+                # Validate the config
+                valid, error_msg = self.stimulus_config.validate()
+                if not valid:
+                    guih.alert_user("Invalid Stimulus Config", error_msg, "error")
+                    raise ValueError(error_msg)
+
+                # Create the stimulus generator
+                self.stimulus_generator = logger.StimulusGenerator(self.stimulus_config)
+                self.is_dual_stimulus = False
+                self.prompt.print(f"Stimulus sweep configured: {len(self.stimulus_generator)} steps")
+
+        except ValueError as e:
+            guih.alert_user("Invalid Stimulus Values", str(e), "error")
+            raise
+
+
     def organize_record_params(self):
         # get all needed GUI elements
         prefix = "AREC"
@@ -526,103 +624,7 @@ class TabLog(guic.ThemedFrame):
 
         # create stimulus config if enabled
         if self.var_use_stimulus.get():
-            stimulus_type_str = self.stimulus_type_drop[1].get()
-            sweep_mode_str = self.sweep_mode_drop[1].get()
-
-            # Map strings to enums
-            stimulus_type_map = {
-                "PS Voltage": logger.StimulusType.PS_VOLTAGE,
-                "FG Frequency": logger.StimulusType.FG_FREQUENCY,
-                "FG Duty Cycle": logger.StimulusType.FG_DUTY_CYCLE
-            }
-            sweep_mode_map = {
-                "Linear": logger.SweepMode.LINEAR,
-                "Logarithmic": logger.SweepMode.LOGARITHMIC
-            }
-
-            try:
-                if self.var_use_dual_stimulus.get():
-                    # === DUAL STIMULUS MODE ===
-                    # Create outer loop config
-                    stimulus1_type_str = self.stimulus_type_drop[1].get()
-                    sweep1_mode_str = self.sweep_mode_drop[1].get()
-
-                    outer_config = logger.StimulusConfig(
-                        enabled=True,
-                        stimulus_type=stimulus_type_map[stimulus1_type_str],
-                        sweep_mode=sweep_mode_map[sweep1_mode_str],
-                        start_value=float(self.stim_start_entry.get()),
-                        stop_value=float(self.stim_stop_entry.get()),
-                        step_value=float(self.stim_step_entry.get()),
-                        settling_time=float(self.stim_settling_entry.get()),
-                        ps_channel=int(self.stim_ps_channel_drop[1].get())
-                    )
-
-                    # Create inner loop config
-                    stimulus2_type_str = self.stimulus2_type_drop[1].get()
-                    sweep2_mode_str = self.sweep2_mode_drop[1].get()
-
-                    inner_config = logger.StimulusConfig(
-                        enabled=True,
-                        stimulus_type=stimulus_type_map[stimulus2_type_str],
-                        sweep_mode=sweep_mode_map[sweep2_mode_str],
-                        start_value=float(self.stim2_start_entry.get()),
-                        stop_value=float(self.stim2_stop_entry.get()),
-                        step_value=float(self.stim2_step_entry.get()),
-                        settling_time=0.0,  # Use outer loop settling time
-                        ps_channel=int(self.stim2_ps_channel_drop[1].get())
-                    )
-
-                    # Create dual stimulus config
-                    self.stimulus_config = logger.DualStimulusConfig(
-                        enabled=True,
-                        outer_loop=outer_config,
-                        inner_loop=inner_config
-                    )
-
-                    # Validate the config
-                    valid, error_msg = self.stimulus_config.validate()
-                    if not valid:
-                        guih.alert_user("Invalid Dual Stimulus Config", error_msg, "error")
-                        raise ValueError(error_msg)
-
-                    # Create the stimulus generator
-                    self.stimulus_generator = logger.DualStimulusGenerator(self.stimulus_config)
-                    self.is_dual_stimulus = True
-                    self.prompt.print(f"Dual stimulus sweep configured: {len(self.stimulus_generator)} total steps")
-                    self.prompt.print(f"  Outer loop: {len(self.stimulus_generator.outer_gen)} steps")
-                    self.prompt.print(f"  Inner loop: {len(self.stimulus_generator.inner_gen)} steps")
-
-                else:
-                    # === SINGLE STIMULUS MODE ===
-                    stimulus_type_str = self.stimulus_type_drop[1].get()
-                    sweep_mode_str = self.sweep_mode_drop[1].get()
-
-                    self.stimulus_config = logger.StimulusConfig(
-                        enabled=True,
-                        stimulus_type=stimulus_type_map[stimulus_type_str],
-                        sweep_mode=sweep_mode_map[sweep_mode_str],
-                        start_value=float(self.stim_start_entry.get()),
-                        stop_value=float(self.stim_stop_entry.get()),
-                        step_value=float(self.stim_step_entry.get()),
-                        settling_time=float(self.stim_settling_entry.get()),
-                        ps_channel=int(self.stim_ps_channel_drop[1].get())
-                    )
-
-                    # Validate the config
-                    valid, error_msg = self.stimulus_config.validate()
-                    if not valid:
-                        guih.alert_user("Invalid Stimulus Config", error_msg, "error")
-                        raise ValueError(error_msg)
-
-                    # Create the stimulus generator
-                    self.stimulus_generator = logger.StimulusGenerator(self.stimulus_config)
-                    self.is_dual_stimulus = False
-                    self.prompt.print(f"Stimulus sweep configured: {len(self.stimulus_generator)} steps")
-
-            except ValueError as e:
-                guih.alert_user("Invalid Stimulus Values", str(e), "error")
-                raise
+            self.set_stimulus()
         else:
             self.stimulus_config = None
             self.stimulus_generator = None

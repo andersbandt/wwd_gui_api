@@ -105,7 +105,7 @@ class TabUSB(guic.ThemedFrame):
 
         if self.ser_obj is not None:
             if self.ser_obj.serStatus is False:
-                self.port_close() # TODO: if I ever add port detection in my fr_port need to delete this statement (handled in gui_refresh())
+                self.port_close()
 
 
     ##############################################################################

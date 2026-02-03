@@ -18,12 +18,10 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: have saveable setup configs
+# TODO: CLAUDE should have saveable setup configs
+
 
 # TODO: abstract away more of the actual plotting that is happening
-
-# TODO: have the analysis be more intuitive (the printout)
-
 
 
 def focus_next_widget(event):

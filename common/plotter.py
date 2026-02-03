@@ -76,6 +76,25 @@ def plot(x_data, y_data,
 
 
 
+# Simple numeric normalization (works if labels are numeric or can be cast to float)
+# If labels are strings, we'll just index them
+# try:
+#     # Attempt numeric normalization (e.g., PWM values like 0, 25, 50, 75, 100)
+#     import numpy as np
+#     lbl_arr = np.array(unique_labels, dtype=float)
+#     vmin, vmax = lbl_arr.min(), lbl_arr.max()
+#     norm_lbl = mcolors.Normalize(vmin=vmin, vmax=vmax)
+#     cmap_lbl = plt.get_cmap('tab10')  # or 'viridis', 'plasma' etc.
+#     color_for_label = {val: cmap_lbl(norm_lbl(float(val))) for val in unique_labels}
+# except Exception:
+#     # Fallback: categorical colors (e.g., strings)
+#     cmap_lbl = plt.get_cmap('tab10')
+#     color_for_label = {val: cmap_lbl(i % 10) for i, val in enumerate(unique_labels)}
+#
+# # Track which labels have already been added to the legend
+# legend_added = set()
+
+
 #################################
 #### liveplotting ###########
 #################################

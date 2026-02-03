@@ -30,11 +30,11 @@ from gui import guiTab_8_GRAPH
 from gui import guiTab_9_FG
 
 
-# TODO: reorder the tab order. Ending to be --> (PS, FG, ATE, LOG, GRAPH)
+# TODO: CLAUDE should reorder the tab order. Ending to be --> (PS, FG, ATE, LOG, GRAPH)
 
-# TODO: add button to open `master.ini` like I have for the relay config file
+# TODO: CLAUDE should add button to open `master.ini` like I have for the relay config file
 
-# TODO: just make some other darcula.json and have a theme settings (make a settings tab?). I think this would make any users happy!
+# TODO: CLAUDE just make some other darcula.json and have a theme settings (make a settings tab?). I think this would make any users happy!
 
 
 def parse_autoconnect_config():
@@ -87,7 +87,6 @@ class MainApplication(ThemedApp):
         if self.autoconnect:
             autoconnect = parse_autoconnect_config()
         else:
-            # TODO: cleanup this below
             autoconnect = [False for i in range(10)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
 
         # create Tab objects

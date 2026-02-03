@@ -27,8 +27,6 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
 
-# TODO: large (can I have it import a script to execute. For example how do I make my thermopile ramp saveable and repeatable
-
 
 class TabPS(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
@@ -244,7 +242,6 @@ class TabPS(guic.ThemedFrame):
 
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
-        # TODO: I think I need a timeout on these
         if self.cc.get_ps_status():
             status_decode = self.cc.ps.check_status()
         else:

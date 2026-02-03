@@ -10,6 +10,7 @@ import serial
 from datetime import datetime
 import queue
 import time
+import os
 
 # import user created modules
 from common import logger
@@ -70,7 +71,7 @@ class SerialProcessor(SerialGeneral):
             print(f"\tpath is at: {self.logfile.file_path}")
         elif data_mode == "raw" or data_mode == "timestamp":
             logname = logger.build_log_name("SER","","log", date_strf='%Y%m%d')
-            self.logfile = f"{self.basefilepath}\\{logname}"
+            self.logfile = os.path.join(self.basefilepath, logname)
             logger.append_text(self.logfile, "\n\n\n===================================\n"
                                                                    "=======INFO: USB LOG START=========\n"
                                                                    "===================================\n")
@@ -131,7 +132,7 @@ class SerialProcessor(SerialGeneral):
 
         # File logging mode (original behavior)
         # INIT OF LOG FILE
-        self.basefilepath = f"{basefilepath}\\{data_folder}"
+        self.basefilepath = os.path.join(basefilepath, data_folder)
         self.init_data(data_mode, parameters)
 
         # Loop while serial status is True and buffer is not empty

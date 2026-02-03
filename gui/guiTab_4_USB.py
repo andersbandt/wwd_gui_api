@@ -200,13 +200,13 @@ class TabUSB(guic.ThemedFrame):
             # File logging - raw mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, "data\\text_data", "raw") # tag:HARDCODE
+                args=(self.basefilepath, os.path.join("data", "text_data"), "raw") # tag:HARDCODE
             )
         elif output_mode == "Log to File (Timestamp)":
             # File logging - timestamp mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, "data\\text_data", "timestamp") # tag:HARDCODE
+                args=(self.basefilepath, os.path.join("data", "text_data"), "timestamp") # tag:HARDCODE
             )
         else:
             self.prompt.print(f"ERROR: Unknown output mode: {output_mode}", "error")

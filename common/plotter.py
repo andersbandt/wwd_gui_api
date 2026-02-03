@@ -22,6 +22,94 @@ def save_fig():
 #### generic plotting ###########
 #################################
 
+def plot(x_data, y_data,
+         xlabel=None,
+         ylabel=None,
+         title=None,
+         legend=None,
+         color=None,
+         vertical_lines=None,
+         figsize=None):
+    if figsize is None:
+        plt.figure()
+    else:
+        plt.figure(figsize=figsize) # NOTE: example would be figsize=(12, 6)
+
+    plt.plot(x_data, y_data, color=color)
+
+
+    # Add vertical lines
+    if vertical_lines is not None:
+        for index in vertical_lines:
+            plt.axvline(x=index, color='red', linestyle='--', linewidth=2)
+
+
+    # annotate plot
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title)
+    if legend is not None:
+        plt.legend(legend)
+
+
+    plt.show()
+
+
+
+# NOTE: not tested
+def plot_3d(x_axis, y_axis, z_axis):
+    # Meshgrid for plotting
+    x, y = np.meshgrid(x_axis, y_axis)
+
+    # 3D plot
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(x, y, z_axis, cmap='viridis')
+
+    ax.set_title('Frequency vs Duty Cycle vs Output Voltage')
+    ax.set_xlabel('Duty Cycle (%)')
+    ax.set_ylabel('Frequency (Hz)')
+    ax.set_zlabel('Output Voltage (V)')
+    fig.colorbar(surf, shrink=0.5, aspect=10, label='Voltage (V)')
+
+
+
+# TODO: make this function a more abstract plotter
+def plot_accuracy_generic(setpoints, measured,
+                          x_label="Set Value",
+                          y_label="Measured Value",
+                          title="Accuracy Plot"):
+    """
+    Simple generic accuracy plot:
+    - Plots measured vs. setpoints
+    - Adds an ideal 1:1 line
+    - Lets caller specify axis labels + title
+    """
+
+    setpoints = np.array(setpoints)
+    measured = np.array(measured)
+
+    plt.figure(figsize=(7, 5))
+    plt.plot(setpoints, measured, 'o-', label='Measured')
+
+    # Ideal 1:1 reference line
+    lo = min(setpoints.min(), measured.min())
+    hi = max(setpoints.max(), measured.max())
+    plt.plot([lo, hi], [lo, hi], 'k--', label='Ideal 1:1')
+
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+
 def plot_multi_file_data(
     file_data_list,
     x_var, y_var,
@@ -135,61 +223,6 @@ def plot_multi_file_data(
 
     plt.show()
     return fig, ax
-
-
-# NOTE: not tested
-def plot_3d(x_axis, y_axis, z_axis):
-    # Meshgrid for plotting
-    x, y = np.meshgrid(x_axis, y_axis)
-
-    # 3D plot
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(x, y, z_axis, cmap='viridis')
-
-    ax.set_title('Frequency vs Duty Cycle vs Output Voltage')
-    ax.set_xlabel('Duty Cycle (%)')
-    ax.set_ylabel('Frequency (Hz)')
-    ax.set_zlabel('Output Voltage (V)')
-    fig.colorbar(surf, shrink=0.5, aspect=10, label='Voltage (V)')
-
-
-def plot(x_data, y_data,
-         xlabel=None,
-         ylabel=None,
-         title=None,
-         legend=None,
-         color=None,
-         vertical_lines=None,
-         figsize=None):
-    if figsize is None:
-        plt.figure()
-    else:
-        plt.figure(figsize=figsize) # NOTE: example would be figsize=(12, 6)
-
-    plt.plot(x_data, y_data, color=color)
-
-
-    # Add vertical lines
-    if vertical_lines is not None:
-        for index in vertical_lines:
-            plt.axvline(x=index, color='red', linestyle='--', linewidth=2)
-
-
-    # annotate plot
-    if xlabel is not None:
-        plt.xlabel(xlabel)
-    if ylabel is not None:
-        plt.ylabel(ylabel)
-    if title is not None:
-        plt.title(title)
-    if legend is not None:
-        plt.legend(legend)
-
-
-    plt.show()
-
-
 
 # Simple numeric normalization (works if labels are numeric or can be cast to float)
 # If labels are strings, we'll just index them

@@ -40,12 +40,6 @@
         "xpad_l": 5,
         "ypad_l": 10
     },
-    "tab1_background": "#FFFFFF",
-    "tab2_background": "#F5F5F5",
-    "tab3_background": "#FFFFFF",
-    "tab4_background": "#F5F5F5",
-    "tab5_background": "#FFFFFF",
-    "tab6_background": "#F5F5F5",
     "button": {
         "background": "#2196F3",
         "foreground": "#FFFFFF",

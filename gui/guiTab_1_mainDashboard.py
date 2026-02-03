@@ -66,15 +66,22 @@ class TabMainDashboard(guic.ThemedFrame):
         self.relay_btns = []
 
         # init frames within tab
-        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None)
-        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_main_status.status = self.cc.relay.status
-        self.fr_control = tk.Frame(self, bg="#00bcd4")
-        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
+        self.fr_control = tk.Frame(self, bg=self.theme_config["dark_1"])
         self.fr_relay_control = tk.Frame(self, bg=self.theme_config["light_3"])
+
+        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None)
+
+
+
+        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
         self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
 
-        # add some other GUI variables
+
+
+        # add some variables for AutoConn frame
+        self.fr_main_status.status = self.cc.relay.status
+        # TODO: this canvas should definitely not be set here
         self.canvas1 = tk.Canvas(self.fr_main_status, width=50, height=50)
 
         # setup prompt
@@ -115,7 +122,7 @@ class TabMainDashboard(guic.ThemedFrame):
         fr_m = self.fr_relay_control
 
         # add button for GUI refresh of relay states
-        btn2 = tk.Button(fr_m, text=f"Refresh states", bg=self.theme_config["dark_2"],
+        btn2 = tk.Button(fr_m, text=f"Refresh states", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_2"],
                          command=lambda: self.gui_refresh("call"))
         btn2.grid(row=0, column=1, padx=10, pady=12)
 
@@ -130,26 +137,27 @@ class TabMainDashboard(guic.ThemedFrame):
         # add some text with user information
         note = tk.Label(fr_m, text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
-        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", bg=self.theme_config["dark_3"],
+        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
                          command=lambda: self.open_config_ini())
         btn3.grid(row=6, column=0, padx=10, pady=5)
-        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", bg=self.theme_config["dark_3"],
+        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
                          command=lambda: self.open_master_ini())
         btn4.grid(row=6, column=2, padx=10, pady=5)
 
     def init_fr_control(self):
         fr_m = self.fr_control
 
+        # TODO: have the style of this reference theme settings
         self.label_control = tk.Label(fr_m,
                                       text="Focus this frame and type something",
                                       bg="lightgrey",
                                       font=("Arial", 14))
 
-        btn1 = tk.Button(fr_m, text=f"Button 1", bg=self.theme_config["dark_1"],
+        btn1 = tk.Button(fr_m, text=f"BUTTON 1",fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"],
                          command=lambda: self.send_command("a"))
-        btn2 = tk.Button(fr_m, text=f"Button 2", bg=self.theme_config["dark_2"],
+        btn2 = tk.Button(fr_m, text=f"BUTTON 2",fg=self.theme_config["fg_dark"],  bg=self.theme_config["light_2"],
                          command=lambda: self.send_command("b"))
-        btn3 = tk.Button(fr_m, text=f"Both buttons", bg=self.theme_config["dark_3"],
+        btn3 = tk.Button(fr_m, text=f"BOTH BUTTON",fg=self.theme_config["fg_dark"],  bg=self.theme_config["light_3"],
                          command=lambda: self.send_command("c"))
 
         self.label_control.grid(row=0, column=0, columnspan=3, pady=10, padx=10)

@@ -4,9 +4,10 @@
     "light_3": "#F1FA8C",
     "light_4": "#8BE9FD",
     "light_5": "#FFB86C",
-    "dark_1": "#882222",
-    "dark_2": "#282A36",
-    "dark_3": "#6272a4",
+    "light_6": "#bd93f9",
+    "dark_1": "#6272a4",
+    "dark_2": "#44475a",
+    "dark_3": "#282A36",
     "bg_dark": "#2B2B2B",
     "bg_light": "#6272A4",
     "fg_light": "#F8F8F2",
@@ -28,6 +29,7 @@
     "font": {
         "family": "Arial",
         "size": 12,
+        "size_s": 9,
         "style": "bold"
     },
     "pad": {
@@ -40,12 +42,6 @@
         "xpad_l": 5,
         "ypad_l": 10
     },
-    "tab1_background": "#3C3F41",
-    "tab2_background": "#2B2B2B",
-    "tab3_background": "#3C3F41",
-    "tab4_background": "#2B2B2B",
-    "tab5_background": "#3C3F41",
-    "tab6_background": "#2B2B2B",
     "button": {
         "background": "#4A4A4A",
         "foreground": "#FFFFFF",

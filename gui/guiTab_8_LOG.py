@@ -9,6 +9,7 @@ from datetime import datetime
 
 # import user defined modules
 from common import logger
+from common import plotter
 from common import path_helper
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
@@ -20,6 +21,9 @@ from gui.gui_class import ColorCircle
 
 # TODO: I should probably add an option to even save the data file at all. Useful for stimulus generating (and testing)
 
+# TODO: big plans for a live plotter here. I'm picturing some N number of subplots. Start with just moving over PS liveplot to here
+
+# TODO: have the labels on this page reference some ttk Style
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -188,7 +192,7 @@ class TabLog(guic.ThemedFrame):
 
         # set up button START live GRAPH
         btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
-                                command=lambda: None,
+                                command=lambda: self.live_plot(),
                                 bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
@@ -719,7 +723,6 @@ class TabLog(guic.ThemedFrame):
             self.record_status = False
             raise e
 
-
     def _thread_record_single_stimulus(self):
         """Single parameter stimulus sweep"""
         for step_num, stimulus_value in enumerate(self.stimulus_generator, 1):
@@ -782,8 +785,6 @@ class TabLog(guic.ThemedFrame):
             # Append to CSV
             self.csvh.add_row_from_dict(row)
 
-
-
     def _collect_data_row(self):
         row = {"Time": datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
 
@@ -837,7 +838,7 @@ class TabLog(guic.ThemedFrame):
         return row
 
     def _apply_stimulus(self, value, dual=None):
-        # TODO: do I need to ensure the power supply is on here? output_on?
+        # TODO: do I need to ensure the power supply is on here? output_on? Or do it right at the start of recording thread?
         """Apply the stimulus value to the appropriate instrument"""
         if dual is None:
             stim_type = self.stimulus_config.stimulus_type
@@ -863,8 +864,28 @@ class TabLog(guic.ThemedFrame):
             raise ValueError(f"Unknown stimulus type: {stim_type}")
 
 
+    ##############################################################################
+    ####      PLOTTING FUNCTIONS        ##########################################
+    ##############################################################################
 
+    def live_plot(self):
+        # TODO: get creative about labeling here
+        lplt = plotter.LivePlot("Live plot", "X-axis", "Y-axis")
 
+        def animate(i):
+            for j in range(0, 10):
+                # TODO: actually retrieve the desired channel here (currently 1 is hardcoded)
+                reading = self.cc.ps.get_current(1)
+                # timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+                lplt.xs.append(len(lplt.xs))  # or a timestamp
+                lplt.ys.append(reading)
+
+            # Clear and plot again, but avoid clearing the entire plot for better visual
+            lplt.ax.clear()
+            lplt.ax.plot(lplt.xs[-2000:], lplt.ys[-2000:], label="Current (A)")
+
+        lplt.show_animation(animate, interval=200)
 
 
 

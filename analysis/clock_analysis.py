@@ -267,7 +267,7 @@ if __name__ == "__main__":
 
     ### LINEAR FIT TRAIN
     # NOTE: the end slope is wildly different than least squares analysis
-    #  HINT: (ONLY WHEN I USE AN ARRAY OF TRAINING DATA) one for one trainning / verification works ...!!!
+    #  HINT: (ONLY WHEN I USE AN ARRAY OF TRAINING DATA) one for one training / verification works ...!!!
     # train_time_offset = full_create_time_offset(train_dataframe)
     # linear_fit_train(train_dataframe["ms"], train_time_offset)
 

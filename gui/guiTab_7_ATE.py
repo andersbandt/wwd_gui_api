@@ -10,9 +10,12 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
 
-# import uGUI modules
+# import user GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
+
+# import user created modules
+from common import plotter
 
 # import needed packages
 from datetime import datetime
@@ -342,10 +345,12 @@ class TabATE(guic.ThemedFrame):
 
             # Display results
             self.prompt.print("\n".join(results), "normal")
-
             self.prompt.print("Accuracy test complete!")
             self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
-            # TODO: bonus points for making a nice plot after this is done
+
+
+            # Plot results
+            plotter.plot_accuracy_generic(set_voltages, measured_voltages)
 
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Communication Error", f"Error communicating with equipment: {str(e)}", "error")

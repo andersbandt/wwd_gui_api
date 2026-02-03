@@ -63,6 +63,8 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
+# TODO: (claude). I should have it do a complete review of styling and if I'm missing anything (things getting resized in scale_theme properly, consisttency, additions, etc)
+
 
 ##########################################
 ### APP AND FRAMES       #################
@@ -190,8 +192,7 @@ class Prompt(ThemedFrame):
         self.set_bg(self.theme_config["light_4"])
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
-        # TODO: add some theme styling back to this button
-        clear_button = tk.Button(self, text="Clear console", command=self.clear)
+        clear_button = tk.Button(self, text="Clear console", command=self.clear, fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"])
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
 
         # set up text_data box for user communication
@@ -202,7 +203,7 @@ class Prompt(ThemedFrame):
                                                 bg=self.theme_config["dark_2"],
                                                 fg=self.theme_config["fg_light"],
                                                 borderwidth=10)
-        self.prompt.tag_configure("error", foreground="red")
+        self.prompt.tag_configure("error", foreground=self.theme_config["error"])
         self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
@@ -322,7 +323,7 @@ class SerialConnFrame(ConnFrame):
         # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",
                                    command=self.refresh_ports,
-                                   bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"])
+                                   fg=self.theme_config["fg_light"], bg=self.theme_config["light_1"])
         refresh_button.grid(row=1, column=2, pady=1)
 
         # initialize port list dropdown
@@ -334,15 +335,15 @@ class SerialConnFrame(ConnFrame):
         self.refresh_ports(first_run=True)
 
         # add Buttons for Connect / Disconnect
-        btn_connect_serial = tk.Button(self, text="Connect to COM",
-                                       command=self.connect,
-                                       bg=self.theme_config["dark_3"], fg=self.theme_config["fg_dark"], height=1,
-                                       width=15)
+        btn_connect_serial = tk.Button(self, text="Connect to COM", command=self.connect,
+                                       fg=self.theme_config["fg_light"], bg=self.theme_config["light_6"],
+                                       font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_s"], "bold"),
+                                       height=1, width=15)
         btn_connect_serial.grid(row=3, column=1, padx=15, pady=1)
-        btn_disconnect_serial = tk.Button(self, text="Disconnect COM",
-                                          command=self.disconnect,
-                                          bg=self.theme_config["dark_2"], fg=self.theme_config["fg_light"], height=1,
-                                          width=15)
+        btn_disconnect_serial = tk.Button(self, text="Disconnect COM", command=self.disconnect,
+                                       fg=self.theme_config["error"], bg=self.theme_config["dark_3"],
+                                    font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_s"], "bold"),
+                                          height=1, width=15)
         btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
 
         # place CONNECT button and STATUS indicator

@@ -102,7 +102,11 @@ class MainApplication(ThemedApp):
         self.basefilepath = os.getcwd()
         self.controller = ClassController()
 
-        usb_dev = usbrelay_controller.find()
+        try:  # NOTE: I think I get weird libpath / StopIteration things if I don't have this thing properly installed
+            usb_dev = usbrelay_controller.find()
+        except Exception as e:
+            print(f"Can't locate USB_RELAY because of {e}")
+            usb_dev = None
         self.controller.set_relay(
             usbrelay_controller.USBRelayController(usb_dev)
         )

@@ -231,7 +231,6 @@ class TabLog(guic.ThemedFrame):
             row=1, column=2, columnspan=2, padx=5, pady=5
         )
 
-        # TODO: maybe say either the user can do step value OR number of steps
         # === FIRST STIMULUS (or Outer Loop) ===
         tk.Label(self.fr_stimulus, text="--- Parameter 1 (Outer Loop) ---",
                  font=('TkDefaultFont', 9, 'bold')).grid(row=2, column=0, columnspan=2, pady=5)
@@ -264,11 +263,26 @@ class TabLog(guic.ThemedFrame):
         self.stim_stop_entry.grid(row=6, column=1, padx=5, pady=2)
         self.stim_stop_entry.insert(0, "10.0")
 
-        # Step value
-        tk.Label(self.fr_stimulus, text="Step Value:").grid(row=7, column=0, sticky='w', padx=5, pady=2)
+        # Step mode dropdown (Increment OR Number of Steps)
+        tk.Label(self.fr_stimulus, text="Step Mode:").grid(row=7, column=0, sticky='w', padx=5, pady=2)
+        self.step_mode_drop = guih.generate_drop_down(
+            self.fr_stimulus,
+            ["Increment", "Number of Steps"],
+            callback_func=self.toggle_step_mode
+        )
+        self.step_mode_drop[0].grid(row=7, column=1, padx=5, pady=2)
+
+        # Step value (shown when step_mode = Increment)
+        self.lbl_stim_step = tk.Label(self.fr_stimulus, text="Step Value:")
+        self.lbl_stim_step.grid(row=8, column=0, sticky='w', padx=5, pady=2)
         self.stim_step_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_step_entry.grid(row=7, column=1, padx=5, pady=2)
+        self.stim_step_entry.grid(row=8, column=1, padx=5, pady=2)
         self.stim_step_entry.insert(0, "1.0")
+
+        # Num steps (shown when step_mode = Number of Steps)
+        self.lbl_stim_numsteps = tk.Label(self.fr_stimulus, text="Number of Steps:")
+        self.stim_numsteps_entry = tk.Entry(self.fr_stimulus, width=15)
+        self.stim_numsteps_entry.insert(0, "10")
 
         # Settling time
         tk.Label(self.fr_stimulus, text="Settling Time (s):").grid(row=8, column=0, sticky='w', padx=5, pady=2)

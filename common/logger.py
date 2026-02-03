@@ -121,15 +121,23 @@ class SweepMode(Enum):
     LOGARITHMIC = "Logarithmic"
 
 
+class StepMode(Enum):
+    """How to specify the step size"""
+    INCREMENT = "Increment"  # User specifies step_value (increment amount)
+    NUM_STEPS = "Number of Steps"  # User specifies total number of steps
+
+
 @dataclass
 class StimulusConfig:
     """Configuration for stimulus-based logging"""
     enabled: bool = False
     stimulus_type: StimulusType = StimulusType.NONE
     sweep_mode: SweepMode = SweepMode.LINEAR
+    step_mode: StepMode = StepMode.INCREMENT  # How to specify steps
     start_value: float = 0.0
     stop_value: float = 0.0
-    step_value: float = 0.0
+    step_value: float = 0.0  # Used when step_mode = INCREMENT
+    num_steps: int = 10  # Used when step_mode = NUM_STEPS
     settling_time: float = 0.5  # Time to wait after changing stimulus before logging (seconds)
     ps_channel: int = 1  # Which PS channel to sweep (if PS_VOLTAGE)
 
@@ -144,15 +152,19 @@ class StimulusConfig:
         if self.start_value == self.stop_value:
             return False, "Start and stop values cannot be the same"
 
-        if self.step_value <= 0:
-            return False, "Step value must be positive"
+        # Validate based on step mode
+        if self.step_mode == StepMode.INCREMENT:
+            if self.step_value <= 0:
+                return False, "Step value must be positive"
+            # Check that step is reasonable
+            if abs(self.stop_value - self.start_value) < self.step_value:
+                return False, "Step size is larger than sweep range"
+        elif self.step_mode == StepMode.NUM_STEPS:
+            if self.num_steps < 2:
+                return False, "Number of steps must be at least 2"
 
         if self.settling_time < 0:
             return False, "Settling time cannot be negative"
-
-        # Check that step is reasonable
-        if abs(self.stop_value - self.start_value) < self.step_value:
-            return False, "Step size is larger than sweep range"
 
         return True, ""
 
@@ -172,11 +184,21 @@ class StimulusGenerator:
 
         start = self.config.start_value
         stop = self.config.stop_value
-        step = self.config.step_value
 
+        # Determine number of steps based on step_mode
+        if self.config.step_mode == StepMode.INCREMENT:
+            # Calculate num_steps from step_value (increment)
+            step = self.config.step_value
+            num_steps = int(abs(stop - start) / step) + 1
+        elif self.config.step_mode == StepMode.NUM_STEPS:
+            # Use user-specified num_steps
+            num_steps = self.config.num_steps
+        else:
+            raise ValueError(f"Unknown step mode: {self.config.step_mode}")
+
+        # Generate values based on sweep_mode
         if self.config.sweep_mode == SweepMode.LINEAR:
             # Linear sweep
-            num_steps = int(abs(stop - start) / step) + 1
             values = np.linspace(start, stop, num_steps)
 
         elif self.config.sweep_mode == SweepMode.LOGARITHMIC:
@@ -184,10 +206,8 @@ class StimulusGenerator:
             if start <= 0 or stop <= 0:
                 raise ValueError("Logarithmic sweep requires positive values")
 
-            # Calculate number of steps in log space
             log_start = np.log10(start)
             log_stop = np.log10(stop)
-            num_steps = int(abs(log_stop - log_start) / np.log10(1 + step/start)) + 1
             values = np.logspace(log_start, log_stop, num_steps)
 
         else:

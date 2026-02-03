@@ -12,6 +12,7 @@ from tkinter import ttk
 from tkinter import filedialog
 
 # import user defined modules
+from common import path_helper
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -39,7 +40,7 @@ class TabGraph(guic.ThemedFrame):
         self.grid(row=0, column=0)
 
         # set up file information
-        self.data_dir = basefilepath + "/data/"
+        self.data_dir = path_helper.get_full_data_path()
         self.files = []
 
         self.fr_setup = tk.Frame(self, bg=self.theme_config["light_4"])

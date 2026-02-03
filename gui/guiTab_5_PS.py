@@ -17,6 +17,7 @@ from datetime import datetime
 
 # import user defined modules
 from common import plotter
+from common import path_helper
 from common.csv_helper import CSVHelper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
@@ -57,7 +58,7 @@ class TabPS(guic.ThemedFrame):
 
         # set up recording / data information
         self.recName = False
-        self.data_dir = "data/ps_data/"
+        self.data_dir = path_helper.get_full_data_path(subdir="ps_data")
 
         # set up prompt
         self.prompt = guic.Prompt(self,

@@ -15,6 +15,7 @@ import time
 from datetime import datetime
 
 # import user defined modules
+from common import path_helper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
@@ -46,7 +47,7 @@ class TabFG(guic.ThemedFrame):
 
         # set up recording / data information
         self.recName = False
-        self.data_dir = "data/fg_data/"
+        self.data_dir = path_helper.get_full_data_path(subdir="fg_data")
 
         # set up prompt
         self.prompt = guic.Prompt(self,

@@ -9,6 +9,7 @@ from datetime import datetime
 
 # import user defined modules
 from common import logger
+from common import path_helper
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
@@ -31,20 +32,23 @@ class TabLog(guic.ThemedFrame):
         self.record_speed = 1
         self.record_status = False
         self.recCnt = 0
-        self.data_dir = basefilepath + "/data/"
+        self.data_dir = path_helper.get_full_data_path()
         self.csvh = None
         self.record_config = None
         self.stimulus_config = None
         self.stimulus_generator = None
         self.is_dual_stimulus = False
 
-        self.fr_status = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_setup = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_stimulus = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_analysis = tk.Frame(self, bg=self.theme_config["light_4"])
+        # Create container for all frames to use pack for better spacing control
+        self.fr_top_container = tk.Frame(self, bg=self.theme_config["bg_dark"])
 
-        # set up prompt
-        self.prompt = guic.Prompt(self,
+        self.fr_status = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
+        self.fr_setup = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
+        self.fr_stimulus = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
+        self.fr_analysis = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
+
+        # set up prompt (also in container)
+        self.prompt = guic.Prompt(self.fr_top_container,
                                   self.theme_config,
                                    "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
@@ -53,13 +57,23 @@ class TabLog(guic.ThemedFrame):
         # initialize tab content
         self.initTabContent()
 
-        # place everything in grid
-        # TODO: CLAUDE should see if I can use pack here
-        #   or have grid be able to slide fr_setup far to the left
-        self.fr_status.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_setup.grid(row=1, column=1, pady=15, padx=15)
-        self.fr_stimulus.grid(row=2, column=0, pady=15, padx=15)
-        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=12)
+        # Place container with grid (only one grid call on main tab)
+        self.fr_top_container.grid(row=1, column=0, sticky="nw")
+
+        # Pack all frames inside the container for tight, flexible layout
+        # Create top row: status and setup side-by-side
+        top_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
+        top_row.pack(fill="x", padx=15, pady=15)
+
+        self.fr_status.pack(in_=top_row, side="left", padx=(0, 15))
+        self.fr_setup.pack(in_=top_row, side="left")
+
+        # Create bottom row: stimulus and prompt side-by-side
+        bottom_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
+        bottom_row.pack(fill="x", padx=15, pady=(0, 15))
+
+        self.fr_stimulus.pack(in_=bottom_row, side="left", padx=(0, 15))
+        self.prompt.pack(in_=bottom_row, side="left")
 
         # TODO: implement dynamic padding here (below values are for compact)
         # self.fr_status.grid(row=1, column=0, pady=3, padx=3)

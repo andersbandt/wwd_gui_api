@@ -19,8 +19,22 @@ import numpy as np
 #### file stuff  ################
 #################################
 
-# TODO: CLAUDE should see if it would be so much easier to include basefilepath here!
 def build_log_name(prefix, file_name_ext, extension, date_strf='%Y%m%d%H%M%S'):
+    """
+    Build a timestamped log filename.
+
+    Args:
+        prefix: Prefix for the filename (e.g., "SER", "DMM")
+        file_name_ext: Optional extension to add to filename (can be None or empty string)
+        extension: File extension without dot (e.g., "csv", "log", "txt")
+        date_strf: Date format string for timestamp
+
+    Returns:
+        str: Formatted filename (e.g., "SER_20250203_143022_test.log")
+
+    Note: This function only generates the filename, not the full path.
+          Use path_helper.get_full_data_path() to get the directory path.
+    """
     # FILENAME SETUP
     recName = prefix + "_" + strftime(date_strf, localtime())
     if file_name_ext is not None:

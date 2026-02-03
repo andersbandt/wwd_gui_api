@@ -1,0 +1,15 @@
+{
+    "title": "Output power over frequency and duty cycle",
+    "x_label": "Frequency (kHz)",
+    "y_label": "DMM (V)",
+    "x_scale": "10e-3",
+    "y_scale": "1",
+    "x_var": "Stimulus_Outer_Value",
+    "y_var": "DMM_Meas1",
+    "use_file_regex": 0,
+    "file_filter": "",
+    "use_file_labeler": 0,
+    "file_labeler": "",
+    "use_data_labeler": 1,
+    "data_labeler": "Stimulus_Inner_Value"
+}

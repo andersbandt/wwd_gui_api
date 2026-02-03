@@ -18,6 +18,8 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
 
+# TODO: I should probably add an option to even save the data file at all. Useful for stimulus generating (and testing)
+
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -42,52 +44,40 @@ class TabLog(guic.ThemedFrame):
         # Create container for all frames to use pack for better spacing control
         self.fr_top_container = tk.Frame(self, bg=self.theme_config["bg_dark"])
 
-        self.fr_status = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
-        self.fr_setup = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
-        self.fr_stimulus = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
-        self.fr_analysis = tk.Frame(self.fr_top_container, bg=self.theme_config["light_4"])
+        # create rows in container
+        top_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
+        bottom_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
+        top_row.pack(fill="x", padx=15, pady=self.theme_config["size"]["ypad_m"])
+        bottom_row.pack(fill="x", padx=15, pady=(0, 15))
 
+        # create Frames in container
+        self.fr_status = tk.Frame(top_row, bg=self.theme_config["light_4"])
+        self.fr_setup = tk.Frame(top_row, bg=self.theme_config["light_4"])
+        self.fr_stimulus = tk.Frame(bottom_row, bg=self.theme_config["light_4"])
         # set up prompt (also in container)
-        self.prompt = guic.Prompt(self.fr_top_container,
-                                  self.theme_config,
-                                   "Data Logger Output",
+        self.prompt = guic.Prompt(bottom_row, self.theme_config, "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+                                  width=self.theme_config["size"]["w_prompt_s"])
+
+        # pack all Frames
+        self.fr_status.pack(side="left", padx=(0, 15))
+        self.fr_setup.pack(side="left")
+        self.fr_stimulus.pack(side="left", padx=(0, 15))
+        self.prompt.pack(side="left")
+
+        # Place container with grid (only one grid call on main tab)
+        self.fr_top_container.grid(row=1, column=0)
 
         # initialize tab content
         self.initTabContent()
 
-        # Place container with grid (only one grid call on main tab)
-        self.fr_top_container.grid(row=1, column=0, sticky="nw")
-
-        # Pack all frames inside the container for tight, flexible layout
-        # Create top row: status and setup side-by-side
-        top_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
-        top_row.pack(fill="x", padx=15, pady=15)
-
-        self.fr_status.pack(in_=top_row, side="left", padx=(0, 15))
-        self.fr_setup.pack(in_=top_row, side="left")
-
-        # Create bottom row: stimulus and prompt side-by-side
-        bottom_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
-        bottom_row.pack(fill="x", padx=15, pady=(0, 15))
-
-        self.fr_stimulus.pack(in_=bottom_row, side="left", padx=(0, 15))
-        self.prompt.pack(in_=bottom_row, side="left")
-
-        # TODO: implement dynamic padding here (below values are for compact)
-        # self.fr_status.grid(row=1, column=0, pady=3, padx=3)
-        # self.fr_setup.grid(row=1, column=1, pady=3, padx=3)
-        # self.fr_stimulus.grid(row=2, column=0, pady=1)
-        # self.prompt.grid(row=2, column=1, pady=1)
-
     def initTabContent(self):
-        print("Initializing tab 2 (Logger) content")
+        print("Initializing tab 8 (Logger) content")
 
         # print welcome text_data
         l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
                        font=(self.theme_config["font"]["family"], 16))
-        l1.grid(column=0, row=0, columnspan=4)
+        l1.grid(row=0, column=0, columnspan=4)
 
         self.init_fr_status()
         self.init_fr_setup()
@@ -233,7 +223,7 @@ class TabLog(guic.ThemedFrame):
 
         # === FIRST STIMULUS (or Outer Loop) ===
         tk.Label(self.fr_stimulus, text="--- Parameter 1 (Outer Loop) ---",
-                 font=('TkDefaultFont', 9, 'bold')).grid(row=2, column=0, columnspan=2, pady=5)
+                 font=('TkDefaultFont', 9, 'bold')).grid(row=2, column=0, columnspan=2)
 
         # Stimulus type dropdown
         tk.Label(self.fr_stimulus, text="Stimulus Type:").grid(row=3, column=0, sticky='w', padx=5, pady=2)
@@ -264,25 +254,16 @@ class TabLog(guic.ThemedFrame):
         self.stim_stop_entry.insert(0, "10.0")
 
         # Step mode dropdown (Increment OR Number of Steps)
-        tk.Label(self.fr_stimulus, text="Step Mode:").grid(row=7, column=0, sticky='w', padx=5, pady=2)
         self.step_mode_drop = guih.generate_drop_down(
             self.fr_stimulus,
-            ["Increment", "Number of Steps"],
-            callback_func=self.toggle_step_mode
+            ["Increment size", "Number of Steps"],
         )
-        self.step_mode_drop[0].grid(row=7, column=1, padx=5, pady=2)
+        self.step_mode_drop[0].grid(row=7, column=0, stick='w', padx=5, pady=2)
 
-        # Step value (shown when step_mode = Increment)
-        self.lbl_stim_step = tk.Label(self.fr_stimulus, text="Step Value:")
-        self.lbl_stim_step.grid(row=8, column=0, sticky='w', padx=5, pady=2)
+        # Step value (used for both INCREMENT and NUM_STEPS modes)
         self.stim_step_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_step_entry.grid(row=8, column=1, padx=5, pady=2)
+        self.stim_step_entry.grid(row=7, column=1, padx=5, pady=2)
         self.stim_step_entry.insert(0, "1.0")
-
-        # Num steps (shown when step_mode = Number of Steps)
-        self.lbl_stim_numsteps = tk.Label(self.fr_stimulus, text="Number of Steps:")
-        self.stim_numsteps_entry = tk.Entry(self.fr_stimulus, width=15)
-        self.stim_numsteps_entry.insert(0, "10")
 
         # Settling time
         tk.Label(self.fr_stimulus, text="Settling Time (s):").grid(row=8, column=0, sticky='w', padx=5, pady=2)
@@ -290,8 +271,9 @@ class TabLog(guic.ThemedFrame):
         self.stim_settling_entry.grid(row=8, column=1, padx=5, pady=2)
         self.stim_settling_entry.insert(0, "0.5")
 
-        # PS Channel (only relevant for PS voltage)
-        tk.Label(self.fr_stimulus, text="PS Channel:").grid(row=9, column=0, sticky='w', padx=5, pady=2)
+        # Equipment channel
+        # TODO: actually make sure this is implemented (will require me to properly implement channel handling in EE equipment too!)
+        tk.Label(self.fr_stimulus, text="Channel:").grid(row=9, column=0, sticky='w', padx=5, pady=2)
         self.stim_ps_channel_drop = guih.generate_drop_down(
             self.fr_stimulus,
             [1, 2]
@@ -336,25 +318,27 @@ class TabLog(guic.ThemedFrame):
         self.stim2_stop_entry.grid(row=6, column=3, padx=5, pady=2)
         self.stim2_stop_entry.insert(0, "90.0")
 
-        # Step value 2
-        self.lbl_stim2_step = tk.Label(self.fr_stimulus, text="Step Value:")
-        self.lbl_stim2_step.grid(row=7, column=2, sticky='w', padx=5, pady=2)
+        # Step mode dropdown (Increment OR Number of Steps)
+        self.step2_mode_drop = guih.generate_drop_down(
+            self.fr_stimulus,
+            ["Increment size", "Number of Steps"],
+        )
+        self.step2_mode_drop[0].grid(row=7, column=2, stick='w', padx=5, pady=2)
+
+        # Step value 2 (used for both INCREMENT and NUM_STEPS modes)
         self.stim2_step_entry = tk.Entry(self.fr_stimulus, width=15)
         self.stim2_step_entry.grid(row=7, column=3, padx=5, pady=2)
-        self.stim2_step_entry.insert(0, "10.0")
+        self.stim2_step_entry.insert(0, "1.0")
 
         # PS Channel 2 (only relevant for PS voltage)
-        self.lbl_stim2_ps_channel = tk.Label(self.fr_stimulus, text="Channel:")
-        self.lbl_stim2_ps_channel.grid(row=9, column=2, sticky='w', padx=5, pady=2)
-        self.stim2_ps_channel_drop = guih.generate_drop_down(
+        self.lbl_stim2_channel = tk.Label(self.fr_stimulus, text="Channel:")
+        self.lbl_stim2_channel.grid(row=9, column=2, sticky='w', padx=5, pady=2)
+        self.stim2_channel_drop = guih.generate_drop_down(
             self.fr_stimulus,
             [1, 2]
         )
-        self.stim2_ps_channel_drop[0].grid(row=9, column=3, padx=5, pady=2)
+        self.stim2_channel_drop[0].grid(row=9, column=3, padx=5, pady=2)
 
-        # Status label for showing sweep progress
-        self.stim_progress_label = tk.Label(self.fr_stimulus, text="", relief='sunken', width=40)
-        self.stim_progress_label.grid(row=10, column=0, columnspan=4, padx=5, pady=5)
 
         # Store second stimulus widgets for easy show/hide
         self.stim2_widgets = [
@@ -362,8 +346,8 @@ class TabLog(guic.ThemedFrame):
             self.lbl_stim2_mode, self.sweep2_mode_drop[0],
             self.lbl_stim2_start, self.stim2_start_entry,
             self.lbl_stim2_stop, self.stim2_stop_entry,
-            self.lbl_stim2_step, self.stim2_step_entry,
-            self.lbl_stim2_ps_channel, self.stim2_ps_channel_drop[0]
+            self.step2_mode_drop[0], self.stim2_step_entry,
+            self.lbl_stim2_channel, self.stim2_channel_drop[0]
         ]
 
         # Initially hide stimulus controls
@@ -520,8 +504,8 @@ class TabLog(guic.ThemedFrame):
         self.data_dir = filedialog.askdirectory()
         self.lbl_data_directory.config(text=self.data_dir)
 
-    # TODO: this function needs to know if we want serial data to base our timing off that value (record samples at each UART output)
     def set_record_speed(self):
+        # TODO: this function needs to know if we want serial data to base our timing off that value (record samples at each UART output)
         # changes the recording speed based on recording speed GUI element
         def parse_time_to_seconds(time_str):
             """Convert a time string to seconds.
@@ -547,8 +531,6 @@ class TabLog(guic.ThemedFrame):
 
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
-
-
     def set_stimulus(self):
         # Map strings to enums   tag:HARDCODE
         stimulus_type_map = {
@@ -556,9 +538,14 @@ class TabLog(guic.ThemedFrame):
             "FG Frequency": logger.StimulusType.FG_FREQUENCY,
             "FG Duty Cycle": logger.StimulusType.FG_DUTY_CYCLE
         }
+        # TODO: does this thing actually do anything?
         sweep_mode_map = {
             "Linear": logger.SweepMode.LINEAR,
             "Logarithmic": logger.SweepMode.LOGARITHMIC
+        }
+        step_mode_map = {
+            "Increment": logger.StepMode.INCREMENT,
+            "Number of Steps": logger.StepMode.NUM_STEPS
         }
 
         try:
@@ -567,31 +554,35 @@ class TabLog(guic.ThemedFrame):
                 # Create outer loop config
                 stimulus1_type_str = self.stimulus_type_drop[1].get()
                 sweep1_mode_str = self.sweep_mode_drop[1].get()
+                step1_mode_str = self.step_mode_drop[1].get()
 
                 outer_config = logger.StimulusConfig(
                     enabled=True,
                     stimulus_type=stimulus_type_map[stimulus1_type_str],
                     sweep_mode=sweep_mode_map[sweep1_mode_str],
+                    step_mode=step_mode_map[step1_mode_str],
                     start_value=float(self.stim_start_entry.get()),
                     stop_value=float(self.stim_stop_entry.get()),
                     step_value=float(self.stim_step_entry.get()),
                     settling_time=float(self.stim_settling_entry.get()),
-                    ps_channel=int(self.stim_ps_channel_drop[1].get())
+                    channel=int(self.stim_ps_channel_drop[1].get())
                 )
 
                 # Create inner loop config
                 stimulus2_type_str = self.stimulus2_type_drop[1].get()
                 sweep2_mode_str = self.sweep2_mode_drop[1].get()
+                step2_mode_str = self.step2_mode_drop[1].get()
 
                 inner_config = logger.StimulusConfig(
                     enabled=True,
                     stimulus_type=stimulus_type_map[stimulus2_type_str],
                     sweep_mode=sweep_mode_map[sweep2_mode_str],
+                    step_mode=step_mode_map[step2_mode_str],
                     start_value=float(self.stim2_start_entry.get()),
                     stop_value=float(self.stim2_stop_entry.get()),
                     step_value=float(self.stim2_step_entry.get()),
                     settling_time=0.0,  # Use outer loop settling time
-                    ps_channel=int(self.stim2_ps_channel_drop[1].get())
+                    channel=int(self.stim2_channel_drop[1].get())
                 )
 
                 # Create dual stimulus config
@@ -618,16 +609,18 @@ class TabLog(guic.ThemedFrame):
                 # === SINGLE STIMULUS MODE ===
                 stimulus_type_str = self.stimulus_type_drop[1].get()
                 sweep_mode_str = self.sweep_mode_drop[1].get()
+                step_mode_str = self.step_mode_drop[1].get()
 
                 self.stimulus_config = logger.StimulusConfig(
                     enabled=True,
                     stimulus_type=stimulus_type_map[stimulus_type_str],
                     sweep_mode=sweep_mode_map[sweep_mode_str],
+                    step_mode=step_mode_map[step_mode_str],
                     start_value=float(self.stim_start_entry.get()),
                     stop_value=float(self.stim_stop_entry.get()),
                     step_value=float(self.stim_step_entry.get()),
                     settling_time=float(self.stim_settling_entry.get()),
-                    ps_channel=int(self.stim_ps_channel_drop[1].get())
+                    channel=int(self.stim_ps_channel_drop[1].get())
                 )
 
                 # Validate the config
@@ -644,7 +637,6 @@ class TabLog(guic.ThemedFrame):
         except ValueError as e:
             guih.alert_user("Invalid Stimulus Values", str(e), "error")
             raise
-
 
     def organize_record_params(self):
         # get all needed GUI elements
@@ -752,7 +744,6 @@ class TabLog(guic.ThemedFrame):
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
             self.labelRNums.config(text=progress_text)
-            self.stim_progress_label.config(text=progress_text)
 
             # Append to CSV
             self.csvh.add_row_from_dict(row)
@@ -768,6 +759,7 @@ class TabLog(guic.ThemedFrame):
             # Apply both stimuli
             self._apply_stimulus(outer_value, dual=1)
             self._apply_stimulus(inner_value, dual=2)
+            self.prompt.print(f"Step {step_num}: Outer={outer_value:.3f}, Inner={inner_value:.3f}")
 
             # Wait for settling (use outer loop settling time)
             time.sleep(self.stimulus_config.outer_loop.settling_time)
@@ -786,12 +778,11 @@ class TabLog(guic.ThemedFrame):
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
             self.labelRNums.config(text=progress_text)
-            self.stim_progress_label.config(text=progress_text)
 
             # Append to CSV
             self.csvh.add_row_from_dict(row)
 
-            self.prompt.print(f"Step {step_num}: Outer={outer_value:.3f}, Inner={inner_value:.3f}")
+
 
     def _collect_data_row(self):
         row = {"Time": datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
@@ -846,6 +837,7 @@ class TabLog(guic.ThemedFrame):
         return row
 
     def _apply_stimulus(self, value, dual=None):
+        # TODO: do I need to ensure the power supply is on here? output_on?
         """Apply the stimulus value to the appropriate instrument"""
         if dual is None:
             stim_type = self.stimulus_config.stimulus_type

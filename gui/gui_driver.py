@@ -124,6 +124,7 @@ class MainApplication(ThemedApp):
         else:
             autoconnect = [False for i in range(10)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
 
+
         # create Tab objects
         self.tab1 = guiTab_1_mainDashboard.TabMainDashboard(self.nb, self.controller, self.basefilepath,self.theme_config, autoconnect[0])
         self.tab2 = guiTab_2_DMM.TabDMM(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[1])

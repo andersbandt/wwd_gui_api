@@ -13,6 +13,11 @@ import argparse
 from gui import gui_driver
 
 
+# TODO: add back those notes about tkinter installation on Linux and what not to README.md
+# TODO: give the README a solid review
+
+
+
 def main():
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="A description of your script.")

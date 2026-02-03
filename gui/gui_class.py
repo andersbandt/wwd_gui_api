@@ -89,10 +89,12 @@ class ThemedApp:
             # Scale padding and prompt sizes to 75%
             self.theme_config = scale_theme(
                 self.theme_config, 0.75,
+                "font.size"
                 "pad.xpad_s",
                 "pad.ypad_s",
                 "size.w_prompt",
-                "size.h_prompt"
+                "size.h_prompt",
+                "size.w_prompt_s"
             )
 
             # Scale button height more aggressively to 45%
@@ -188,6 +190,7 @@ class Prompt(ThemedFrame):
         self.set_bg(self.theme_config["light_4"])
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
+        # TODO: add some theme styling back to this button
         clear_button = tk.Button(self, text="Clear console", command=self.clear)
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
 
@@ -204,11 +207,12 @@ class Prompt(ThemedFrame):
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
     # gui_print: prints a message on a Tkinter frame
-    def print(self, message, print_type=None, timestamp=False):
-        prefix = ">>>"
+    # TODO: add some toggle switch for timestamps? What's best to handle that?
+    def print(self, message, print_type=None, timestamp=True):
+        prefix = ">>> "
         if timestamp:
             time_str = datetime.now().strftime("%H:%M:%S")
-            prefix = f"[{time_str}] >>>"
+            prefix = f"[{time_str}]>>> "
 
         message = prefix + message + "\n"
         if print_type == "error":
@@ -282,7 +286,7 @@ class ConnFrame(ThemedFrame):
         self.set_status(self.status)
 
     def set_color(self, color):
-        self.canvas1.itemconfig(self.status_oval, fill=color)
+        self.status_oval.set_color(color)
 
 
 class SerialConnFrame(ConnFrame):

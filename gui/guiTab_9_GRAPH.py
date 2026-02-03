@@ -22,6 +22,8 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+# TODO: add a button to clear all graphing fields
+
 
 # Define named tuple for file data
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])

@@ -1,6 +1,9 @@
 
 import xml.etree.ElementTree as ET
 
+
+# TODO: we need to have the "Port already in use" error message be broadcast to the user
+
 class ClassController:
     def __init__(self):
         self.ser = None

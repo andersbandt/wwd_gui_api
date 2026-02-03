@@ -133,13 +133,12 @@ class StimulusConfig:
     enabled: bool = False
     stimulus_type: StimulusType = StimulusType.NONE
     sweep_mode: SweepMode = SweepMode.LINEAR
-    step_mode: StepMode = StepMode.INCREMENT  # How to specify steps
+    step_mode: StepMode = StepMode.INCREMENT
     start_value: float = 0.0
     stop_value: float = 0.0
-    step_value: float = 0.0  # Used when step_mode = INCREMENT
-    num_steps: int = 10  # Used when step_mode = NUM_STEPS
-    settling_time: float = 0.5  # Time to wait after changing stimulus before logging (seconds)
-    ps_channel: int = 1  # Which PS channel to sweep (if PS_VOLTAGE)
+    step_value: float = 0.0  # used for both step modes (INCREMENT and NUM_STEPS)
+    settling_time: float = 0.5  # time to wait after changing stimulus before logging (seconds)
+    channel: int = 1  # which equipment channel to use
 
     def validate(self):
         """Validate the stimulus configuration"""
@@ -160,7 +159,7 @@ class StimulusConfig:
             if abs(self.stop_value - self.start_value) < self.step_value:
                 return False, "Step size is larger than sweep range"
         elif self.step_mode == StepMode.NUM_STEPS:
-            if self.num_steps < 2:
+            if self.step_value < 2:
                 return False, "Number of steps must be at least 2"
 
         if self.settling_time < 0:
@@ -192,7 +191,11 @@ class StimulusGenerator:
             num_steps = int(abs(stop - start) / step) + 1
         elif self.config.step_mode == StepMode.NUM_STEPS:
             # Use user-specified num_steps
-            num_steps = self.config.num_steps
+            num_steps = self.config.step_value
+            try:
+                num_steps = int(num_steps)
+            except ValueError:
+                raise ValueError(f"Invalid step size {num_steps}. Must be a positive integer")
         else:
             raise ValueError(f"Unknown step mode: {self.config.step_mode}")
 

@@ -45,8 +45,8 @@ class TabATE(guic.ThemedFrame):
                                   self.theme_config,
                                    "ATE Output",
                                   height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+                                  width=self.theme_config["size"]["w_prompt_s"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # initialize tab content
         self.initTabContent()
@@ -54,8 +54,8 @@ class TabATE(guic.ThemedFrame):
         # place everything in grid
         self.fr_info.grid(row=0, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
         self.fr_control.grid(row=1, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
-        self.fr_accuracy.grid(row=2, column=0, columnspan=2, padx=15, pady=self.theme_config["pad"]["ypad_s"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_accuracy.grid(row=2, column=0, padx=2, pady=self.theme_config["pad"]["ypad_s"])
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"])
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -78,7 +78,7 @@ class TabATE(guic.ThemedFrame):
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
-        self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
+        self.labelInfo.grid(row=0, column=0, columnspan=2)
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("all")
@@ -98,11 +98,11 @@ class TabATE(guic.ThemedFrame):
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
         # Position the device information labels
-        self.ate_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
-        self.labelID.grid(row=2, column=0, sticky='W', padx=5, pady=2)
-        self.labelIDValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
-        self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=2)
-        self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=2)
+        self.ate_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=1)
+        self.labelID.grid(row=2, column=0, sticky='W', padx=5, pady=1)
+        self.labelIDValue.grid(row=2, column=1, sticky='W', padx=5, pady=1)
+        self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=1)
+        self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=1)
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -142,7 +142,7 @@ class TabATE(guic.ThemedFrame):
         title_label.grid(row=0, column=0, columnspan=4, pady=5)
 
         # Description
-        desc_label = ttk.Label(fr_m, text='Sweep PS voltage and measure with DMM to calculate accuracy statistics', style="TLabel")
+        desc_label = ttk.Label(fr_m, text='Sweep PS voltage with DMM', style="TLabel")
         desc_label.grid(row=1, column=0, columnspan=4, pady=2)
 
         # Sweep configuration
@@ -178,16 +178,6 @@ class TabATE(guic.ThemedFrame):
                                          fg=self.theme_config["fg_dark"],
                                          height=2, width=20)
         self.acc_run_button.grid(row=2, column=2, rowspan=3, padx=20, pady=10)
-
-        # Results display
-        ttk.Label(fr_m, text="Results:", style="TLabel").grid(row=7, column=0, sticky='nw', padx=5, pady=5)
-        self.acc_results_text = tk.Text(fr_m, height=10, width=80, wrap=tk.WORD)
-        self.acc_results_text.grid(row=8, column=0, columnspan=4, padx=10, pady=5)
-
-        # Scrollbar for results
-        scrollbar = tk.Scrollbar(fr_m, command=self.acc_results_text.yview)
-        scrollbar.grid(row=8, column=4, sticky='ns', pady=5)
-        self.acc_results_text.config(yscrollcommand=scrollbar.set)
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
@@ -246,11 +236,6 @@ class TabATE(guic.ThemedFrame):
             guih.alert_user("Invalid Input", "Start and stop voltages cannot be the same", "error")
             return
 
-        # Clear previous results
-        self.acc_results_text.delete("1.0", tk.END)
-        self.acc_results_text.insert(tk.END, "Running accuracy test...\n\n")
-        self.acc_results_text.update()
-
         self.prompt.print("Starting instrument accuracy test...")
         self.prompt.print(f"Sweep: {start_voltage}V to {stop_voltage}V in {num_steps} steps")
 
@@ -262,9 +247,9 @@ class TabATE(guic.ThemedFrame):
             step_mode=logger.StepMode.NUM_STEPS,
             start_value=start_voltage,
             stop_value=stop_voltage,
-            num_steps=num_steps,
+            step_value=num_steps,
             settling_time=settling_time,
-            ps_channel=ps_channel
+            channel=ps_channel
         )
 
         # Validate configuration
@@ -283,9 +268,10 @@ class TabATE(guic.ThemedFrame):
 
         # Perform sweep
         try:
+            self.cc.ps.output_on(ps_channel)
             for step_num, voltage in enumerate(stimulus_gen, 1):
                 # Set PS voltage
-                self.cc.ps.set_voltage(ps_channel, voltage)
+                self.cc.ps.set_voltage(voltage, channel=ps_channel)
 
                 # Wait for settling
                 time.sleep(settling_time)
@@ -304,7 +290,12 @@ class TabATE(guic.ThemedFrame):
                 # Update progress
                 self.prompt.print(f"Step {step_num}/{num_steps}: Set={voltage:.4f}V, Measured={dmm_reading:.4f}V, Error={error:.4f}V")
 
+            # end test
+            self.cc.ps.output_off(ps_channel)
+
             # Calculate statistics
+            # TODO: give some proper thought to what accuracy really means and reporting values
+            #   honestly maybe include a cool user explanation you can call with a button
             errors_array = np.array(errors)
             set_array = np.array(set_voltages)
             measured_array = np.array(measured_voltages)
@@ -350,11 +341,11 @@ class TabATE(guic.ThemedFrame):
             results.append("=" * 80)
 
             # Display results
-            self.acc_results_text.delete("1.0", tk.END)
-            self.acc_results_text.insert(tk.END, "\n".join(results))
+            self.prompt.print("\n".join(results), "normal")
 
             self.prompt.print("Accuracy test complete!")
             self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
+            # TODO: bonus points for making a nice plot after this is done
 
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Communication Error", f"Error communicating with equipment: {str(e)}", "error")

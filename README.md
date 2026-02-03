@@ -1,5 +1,6 @@
 # WWD GUI API
 
+
 > **Free, open-source lab automation and test equipment control for engineers who can't afford LabVIEW**
 
 A Python-based GUI application for controlling test equipment, automating data collection, and analyzing measurements. Built for embedded systems engineers, electronics hobbyists, and anyone who needs to automate their lab without spending thousands on commercial software.
@@ -10,7 +11,7 @@ A Python-based GUI application for controlling test equipment, automating data c
 
 ---
 
-## 🎯 Why This Exists
+## Why This Exists
 
 **The Problem:**
 - LabVIEW costs $3,000-5,000+ and has a steep learning curve

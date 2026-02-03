@@ -64,6 +64,7 @@
       "ypad_l": 10,
       "xpad": 5,
       "w_prompt": 110,
+      "w_prompt_s": 85,
       "h_prompt": 14
     }
 }

@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <PortsUsed>
     <USB_serial>COM14</USB_serial>
-    <DMM_Serial>GPIB0::2::INSTR</DMM_Serial>
     <ATE_serial>/dev/ttyACM4</ATE_serial>
     <FG_PyVISA>GPIB0::10::INSTR</FG_PyVISA>
     <PS_PyVISA>GPIB0::5::INSTR</PS_PyVISA>
+    <DMM_Serial>GPIB0::23::INSTR</DMM_Serial>
 </PortsUsed>

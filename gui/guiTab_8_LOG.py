@@ -462,12 +462,14 @@ class TabLog(guic.ThemedFrame):
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument
         logger.start_recording(self.csvh)
         self.record_status = True
+        self.cc.recording = True  # Signal to ClassController that recording is active
         self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
         self.prompt.print(f"Recording every {self.record_speed} seconds ...")
         threading.Thread(target=self.thread_record).start()
 
     def stop_record(self):
         self.record_status = False
+        self.cc.recording = False  # Signal to ClassController that recording has stopped
         self.prompt.print("Stopping data record!")
         # threading.Thread(target=self.thread_record). # TODO: do I have to stop the thread here?
 

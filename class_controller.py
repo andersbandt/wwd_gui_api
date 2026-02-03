@@ -9,7 +9,7 @@ class ClassController:
         self.relay = None
         self.fg = None
 
-        # TODO: CLAUDE should somehow set some recording status and DISABLE gui_refresh on all tabs. Otherwise logging will crash when I click into another tab
+        # Recording status flag - set by logging tab to prevent gui_refresh during active recording
         self.recording = False
 
         self.ports_used = {}  # Tracks last used ports (for XML config)

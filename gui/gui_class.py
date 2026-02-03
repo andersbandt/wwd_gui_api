@@ -278,7 +278,7 @@ class ConnFrame(ThemedFrame):
             self.status_oval.set_color(self.theme_config["error"])
 
     def gui_refresh(self):
-        # TODO: how I can detect connection status here. It's hard since i have generic connect and disconnect functions, so might be impossible
+        # TODO: in order to detect connection status here I need to also pass in a `status_cmd`
         self.set_status(self.status)
 
     def set_color(self, color):

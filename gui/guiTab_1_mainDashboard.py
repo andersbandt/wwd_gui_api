@@ -128,7 +128,7 @@ class TabMainDashboard(guic.ThemedFrame):
             self.relay_btns.append(btn)
 
         # add some text with user information
-        note = tk.Label(fr_m,text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
+        note = tk.Label(fr_m, text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
         btn3 = tk.Button(fr_m, text=f"Open `config.ini`", bg=self.theme_config["dark_3"],
                          command=lambda: self.open_config_ini())

@@ -1,5 +1,5 @@
 """
-@file     guiTab_5_USB.py
+@file     guiTab_4_USB.py
 @author   Anders Bandt
 @date     March 2024
 @brief    control device through serial (COM) port
@@ -12,6 +12,8 @@ from tkinter import ttk
 import threading
 import serial
 from datetime import datetime
+import configparser
+import os
 
 # import user defined modules
 from common.serial_helper import SerialProcessor
@@ -53,6 +55,7 @@ class TabUSB(guic.ThemedFrame):
         self.fr_state.grid(row=1, column=1, padx=30, pady=12)
         self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
         self.test_drop = None  # fr_state
+        self.output_mode_drop = None  # fr_state - output mode selector
         self.output_file_name = None  # fr_state
 
         # initialize threads (actual init is in thread_print) or something
@@ -64,7 +67,7 @@ class TabUSB(guic.ThemedFrame):
         self.initTabContent()
 
     def initTabContent(self):
-        print("Initializing tab 5 (USB) content")
+        print("Initializing tab 4 (USB) content")
         self.init_fr_state()
 
     def init_fr_state(self):
@@ -94,10 +97,18 @@ class TabUSB(guic.ThemedFrame):
         c1 = tk.Checkbutton(self.fr_state, text='Record?', variable=var2, onvalue=1, offvalue=0)
         c1.grid(row=2, column=4, padx=2)
 
+        # add output mode selector
+        Label(self.fr_state, text="Output Mode").grid(row=3, column=1, padx=5, pady=5)
+        self.output_mode_drop = guih.generate_drop_down(
+            self.fr_state,
+            ["Display on Screen", "Log to File (Raw)", "Log to File (Timestamp)"]
+        )
+        self.output_mode_drop[0].grid(row=3, column=3, padx=15, pady=5)
+
         # add output file name box
-        Label(self.fr_state, text="Output file name").grid(row=3, column=1, padx=5, pady=5)
+        Label(self.fr_state, text="Output file name").grid(row=4, column=1, padx=5, pady=5)
         self.output_file_name = Text(self.fr_state, height=2, width=20)
-        self.output_file_name.grid(row=3, column=3)
+        self.output_file_name.grid(row=4, column=3)
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
@@ -140,7 +151,8 @@ class TabUSB(guic.ThemedFrame):
             command = "CR81"
             self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
         else:
-            print("Fuck man no known test command")
+            print(f"ERROR: Unknown test command: {test_type_command}")
+            self.prompt.print(f"ERROR: Unknown test command: {test_type_command}", "error")
             return False
 
         self.prompt.print(f"INFO: issuing command {command} ...")
@@ -153,8 +165,20 @@ class TabUSB(guic.ThemedFrame):
             return False
 
     #################################
-    #### THREADS SHIT    ############
+    #### THREADS    #################
     #################################
+
+    def display_serial_data(self, timestamp, data):
+        """
+        Callback for displaying serial data on GUI prompt.
+        Called from SerialProcessor thread, uses tkinter's after() for thread safety.
+
+        Args:
+            timestamp: Timestamp string from serial data
+            data: Serial data string
+        """
+        # Schedule GUI update on main thread (thread-safe)
+        self.after(0, lambda: self.prompt.print(f"{data.strip()}", timestamp=True))
 
     def thread_print_display(self):
         self.t1 = guic.StoppableThread(
@@ -162,30 +186,76 @@ class TabUSB(guic.ThemedFrame):
             kwargs={'printmode': False})
         self.t1.start()
 
-        # TODO: CLAUDE should add some user input to allow for timestamp mode to be selected here
-        #   in same user interface add mode for printing out back?
-        self.t2 = guic.StoppableThread(
-            target=self.ser_obj.process_data,
-            args=(self.basefilepath, "data\\text_data", "raw") # tag:HARDCODE
-        )
-        self.t2.start()
+        # Get selected output mode from dropdown
+        output_mode = self.output_mode_drop[1].get()
 
+        if output_mode == "Display on Screen":
+            # GUI display mode
+            self.t2 = guic.StoppableThread(
+                target=self.ser_obj.process_data,
+                args=(None, None, None, None),
+                kwargs={'gui_callback': self.display_serial_data}
+            )
+        elif output_mode == "Log to File (Raw)":
+            # File logging - raw mode
+            self.t2 = guic.StoppableThread(
+                target=self.ser_obj.process_data,
+                args=(self.basefilepath, "data\\text_data", "raw") # tag:HARDCODE
+            )
+        elif output_mode == "Log to File (Timestamp)":
+            # File logging - timestamp mode
+            self.t2 = guic.StoppableThread(
+                target=self.ser_obj.process_data,
+                args=(self.basefilepath, "data\\text_data", "timestamp") # tag:HARDCODE
+            )
+        else:
+            self.prompt.print(f"ERROR: Unknown output mode: {output_mode}", "error")
+            return False
+
+        self.t2.start()
         return True
 
     #################################
     #### SERIAL (COM)  ##############
     #################################
 
+    def get_baud_rate(self):
+        """
+        Read baud rate from master.ini config file.
+
+        Returns:
+            int: Baud rate from config, defaults to 9600 if not found
+        """
+        config_file_path = "config/master.ini"
+        default_baud = 9600
+
+        if not os.path.exists(config_file_path):
+            print(f"Config file not found. Using default baud rate: {default_baud}")
+            return default_baud
+
+        config = configparser.ConfigParser()
+        config.read(config_file_path)
+
+        if "USB" not in config:
+            print(f"[USB] section not found in config. Using default baud rate: {default_baud}")
+            return default_baud
+
+        try:
+            baud_rate = config["USB"].getint("baud_rate", default_baud)
+            print(f"Using baud rate from config: {baud_rate}")
+            return baud_rate
+        except ValueError:
+            print(f"Invalid baud rate in config. Using default: {default_baud}")
+            return default_baud
+
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
         port = self.fr_port.get_port()
+        baud_rate = self.get_baud_rate()
 
-        # TODO: CLAUDE (prompt user for baud rate here). Best solution I can come up with
-        #   actually let's put it in a setting in the `master.ini` file !!!
-
-        self.prompt.print(f"Init with port: {port}")
+        self.prompt.print(f"Init with port: {port} @ {baud_rate} baud")
         try:
-            self.ser_obj = SerialProcessor(port, 9600)
+            self.ser_obj = SerialProcessor(port, baud_rate)
         except serial.serialutil.SerialException as e:
             self.prompt.print(f"ERROR: {e}")
             self.prompt.print(f"Can't init with port\n")

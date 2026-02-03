@@ -30,9 +30,6 @@ from gui import guiTab_8_LOG
 from gui import guiTab_9_GRAPH
 
 
-# TODO: CLAUDE just make some other darcula.json and have a theme settings (make a settings tab?). I think this would make any users happy!
-
-
 def parse_autoconnect_config():
     # initialize the config parser
     config_file_path = "config/master.ini" # tag:HARDCODE
@@ -56,6 +53,44 @@ def parse_autoconnect_config():
         else:
             autoconn_vars.append(False)
     return autoconn_vars
+
+
+def parse_theme_config():
+    """
+    Parse the theme configuration from master.ini.
+
+    Returns:
+        str: Path to the theme file (e.g., "config/darcula.json")
+    """
+    config_file_path = "config/master.ini"
+    default_theme = "config/darcula.json"
+
+    if not os.path.exists(config_file_path):
+        print(f"Configuration file {config_file_path} does not exist. Using default theme.")
+        return default_theme
+
+    config = configparser.ConfigParser()
+    config.read(config_file_path)
+
+    # Check if THEME section exists
+    if "THEME" not in config:
+        print("Missing [THEME] section in config. Using default theme.")
+        return default_theme
+
+    # Get theme_file setting
+    theme_file = config["THEME"].get("theme_file", "darcula.json").strip()
+
+    # Ensure it has the config/ prefix if not already present
+    if not theme_file.startswith("config/"):
+        theme_file = f"config/{theme_file}"
+
+    # Verify the theme file exists
+    if not os.path.exists(theme_file):
+        print(f"Theme file {theme_file} does not exist. Using default theme.")
+        return default_theme
+
+    print(f"Using theme: {theme_file}")
+    return theme_file
 
 
 class MainApplication(ThemedApp):
@@ -108,6 +143,11 @@ class MainApplication(ThemedApp):
         return True
 
     def on_tab_changed(self, event):
+        # Skip gui_refresh during active recording to prevent crashes
+        if self.controller.recording:
+            print("Skipping gui_refresh: recording in progress")
+            return
+
         selected_tab = event.widget.tab(event.widget.select(), "text")
         if selected_tab == self.tab_names[0]:
             guiTab_1_mainDashboard.TabMainDashboard.gui_refresh(self.tab1, "auto")
@@ -167,11 +207,14 @@ def main(autoconnect):
 
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
+    # load theme configuration
+    theme_file = parse_theme_config()
+
     # place main app
     app = MainApplication(window,
                           h,
                           w,
-                          "config/darcula.json",
+                          theme_file,
                           autoconnect,
                           compact)
 

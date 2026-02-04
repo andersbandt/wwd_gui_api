@@ -63,7 +63,8 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
-# TODO: (claude). I should have it do a complete review of styling and if I'm missing anything (things getting resized in scale_theme properly, consisttency, additions, etc)
+# TODO: Claude should parse everything and make some recomendations on styling (remove reduntant stuff, consistenty)
+# TODO: Claude should audit all the frame spacing and make sure they reference theme_config
 
 
 ##########################################
@@ -89,14 +90,21 @@ class ThemedApp:
 
         if compact:
             # Scale padding and prompt sizes to 75%
+            # TODO: audit that I'm resizing everything I need to here
             self.theme_config = scale_theme(
                 self.theme_config, 0.75,
-                "font.size"
                 "pad.xpad_s",
                 "pad.ypad_s",
                 "size.w_prompt",
-                "size.h_prompt",
-                "size.w_prompt_s"
+                "size.h_prompt"
+                #"size.w_prompt_s"
+            )
+
+            # TODO: I want the notebook tbs to remain unaffected by this resizing
+            # TODO: I also want prompt text resizing to be affected differently
+            self.theme_config = scale_theme(
+                self.theme_config, 0.60,
+                "font.size"
             )
 
             # Scale button height more aggressively to 45%
@@ -146,11 +154,12 @@ class ThemedApp:
         self.style.configure("TButtonOn.TButton", background=self.theme_config["success"])
         self.style.configure("TButtonOff.TButton", background=self.theme_config["error"])
 
-        self.style.map('TButton',
-                       background=[('active', self.theme_config["button"]["active_background"])],
-                       foreground=[('active', self.theme_config["button"]["active_foreground"])])
+        # self.style.map('TButton',
+        #                background=[('active', self.theme_config["button"]["active_background"])],
+        #                foreground=[('active', self.theme_config["button"]["active_foreground"])])
 
         # Configure label styles
+        # generic label
         self.style.configure('TLabel',
                              background=self.theme_config["label"]["background"],
                              foreground=self.theme_config["label"]["foreground"],
@@ -158,13 +167,15 @@ class ThemedApp:
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
+        # small label
         self.style.configure('TSpunkLabel.TLabel',
                              background=self.theme_config["dark_1"],
                              foreground=self.theme_config["fg_light"],
                              font=(self.theme_config["font"]["family"],
-                                   self.theme_config["font"]["size"],
+                                   self.theme_config["font"]["size_s"],
                                    self.theme_config["font"]["style"]))
 
+        # header labels
         self.style.configure('TPinkLabel.TLabel',
                              background=self.theme_config["light_1"],
                              foreground="white",

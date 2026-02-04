@@ -1,11 +1,22 @@
 
-# import needed packages
+# TODO: ask claude to enforce file header formatting for tabs only
+
+# import needed GUI modules
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
+
+# import user defined GUI modules
+from gui import gui_helper as guih
+from gui import gui_class as guic
+from gui.gui_class import ColorCircle
+
+# import needed modules
 import threading
 import time
 from datetime import datetime
+import pandas as pd
+from queue import Queue
 
 # import user defined modules
 from common import logger
@@ -13,17 +24,14 @@ from common import plotter
 from common import path_helper
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
-# import user defined GUI modules
-from gui import gui_helper as guih
-from gui import gui_class as guic
-from gui.gui_class import ColorCircle
-
 
 # TODO: I should probably add an option to even save the data file at all. Useful for stimulus generating (and testing)
 
-# TODO: big plans for a live plotter here. I'm picturing some N number of subplots. Start with just moving over PS liveplot to here
-
 # TODO: have the labels on this page reference some ttk Style
+
+# TODO: while I have my nice UART evm I should play with serial logging more
+#   can it detect the proper number of named serial parameters first time? Just add names?
+
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -55,9 +63,9 @@ class TabLog(guic.ThemedFrame):
         bottom_row.pack(fill="x", padx=15, pady=(0, 15))
 
         # create Frames in container
-        self.fr_status = tk.Frame(top_row, bg=self.theme_config["light_4"])
-        self.fr_setup = tk.Frame(top_row, bg=self.theme_config["light_4"])
-        self.fr_stimulus = tk.Frame(bottom_row, bg=self.theme_config["light_4"])
+        self.fr_status = tk.Frame(top_row, bg=self.theme_config["dark_2"])
+        self.fr_setup = tk.Frame(top_row, bg=self.theme_config["dark_2"])
+        self.fr_stimulus = tk.Frame(bottom_row, bg=self.theme_config["dark_2"])
         # set up prompt (also in container)
         self.prompt = guic.Prompt(bottom_row, self.theme_config, "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
@@ -119,7 +127,8 @@ class TabLog(guic.ThemedFrame):
         self.lbl_data_directory.grid(row=2, column=0)
         btn_set_directory = tk.Button(self.fr_setup, text="Set directory",
                                  command=lambda: self.set_record_directory(),
-                                 bg=self.theme_config["light_1"], fg="black", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+                                 fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"],
+                                height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_set_directory.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # add output file name box
@@ -132,8 +141,7 @@ class TabLog(guic.ThemedFrame):
         ttk.Checkbutton(self.fr_setup,
                         text="Use Serial",
                         variable=self.var_use_ser,
-                        onvalue=1,
-                        offvalue=0,
+                        onvalue=1, offvalue=0,
                         command=self.toggle_use_ser).grid(row=3, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
 
@@ -141,22 +149,19 @@ class TabLog(guic.ThemedFrame):
         ttk.Checkbutton(self.fr_setup,
                         text="Use DMM",
                         variable=self.var_use_dmm,
-                        onvalue=1,
-                        offvalue=0).grid(row=3, column=1)
+                        onvalue=1, offvalue=0).grid(row=3, column=1)
 
         self.var_use_ps = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use PS",
                         variable=self.var_use_ps,
-                        onvalue=1,
-                        offvalue=0).grid(row=3, column=2)
+                        onvalue=1, offvalue=0).grid(row=3, column=2)
 
         self.var_use_fg = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
                         text="Use FG",
                         variable=self.var_use_fg,
-                        onvalue=1,
-                        offvalue=0).grid(row=3, column=3)
+                        onvalue=1, offvalue=0).grid(row=3, column=3)
 
         # add serial parameters box
         self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial parameters")
@@ -178,38 +183,51 @@ class TabLog(guic.ThemedFrame):
         # set up button START recording
         btn_start_entry = tk.Button(self.fr_setup, text="Start Record",
                                  command=lambda: self.start_record(),
-                                 bg=self.theme_config["success"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+                                 bg=self.theme_config["success"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_start_entry.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button STOP recording
         btn_stop_entry = tk.Button(self.fr_setup, text="Stop Record",
                                 command=lambda: self.stop_record(),
-                                bg=self.theme_config["error"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+                                bg=self.theme_config["error"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_stop_entry.grid(row=5, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         self.labelRNums = ttk.Label(self.fr_setup, text='', width=12, relief='sunken')
         self.labelRNums.grid(row=5, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
 
+        # add check button to graph data
+        self.var_graph_data = tk.IntVar()
+        ttk.Checkbutton(self.fr_setup,
+                        text="Graph",
+                        variable=self.var_graph_data,
+                        onvalue=1,
+                        offvalue=0).grid(row=6, column=2)
+
+        # add check button to graph data
+        self.var_save_data = tk.IntVar(value=1)
+        ttk.Checkbutton(self.fr_setup,
+                        text="Save data",
+                        variable=self.var_save_data,
+                        onvalue=1,
+                        offvalue=0).grid(row=6, column=3)
+
         # set up button START live GRAPH
         btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
-                                command=lambda: self.live_plot(),
-                                bg=self.theme_config["dark_3"], fg="white", height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
+                                command=lambda: self.start_live_plot(),
+                                bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
     def init_fr_stimulus(self):
         """Initialize stimulus sweep configuration UI"""
         # Title
-        ttk.Label(self.fr_stimulus, text="Stimulus Sweep", style="TPinkLabel.TLabel").grid(
-            row=0, column=0, columnspan=2, pady=5, padx=10
-        )
+        ttk.Label(self.fr_stimulus, text="Stimulus Sweep", style="TPinkLabel.TLabel").grid(row=0, column=0, columnspan=2, pady=5, padx=10)
 
         # Enable stimulus checkbox
         self.var_use_stimulus = tk.IntVar()
         ttk.Checkbutton(self.fr_stimulus,
                         text="Enable Stimulus Sweep",
                         variable=self.var_use_stimulus,
-                        onvalue=1,
-                        offvalue=0,
+                        onvalue=1, offvalue=0,
                         command=self.toggle_stimulus).grid(
             row=1, column=0, columnspan=2, padx=5, pady=5
         )
@@ -219,8 +237,7 @@ class TabLog(guic.ThemedFrame):
         ttk.Checkbutton(self.fr_stimulus,
                         text="Enable Dual Sweep (Nested Loop)",
                         variable=self.var_use_dual_stimulus,
-                        onvalue=1,
-                        offvalue=0,
+                        onvalue=1, offvalue=0,
                         command=self.toggle_dual_stimulus).grid(
             row=1, column=2, columnspan=2, padx=5, pady=5
         )
@@ -230,29 +247,29 @@ class TabLog(guic.ThemedFrame):
                  font=('TkDefaultFont', 9, 'bold')).grid(row=2, column=0, columnspan=2)
 
         # Stimulus type dropdown
-        tk.Label(self.fr_stimulus, text="Stimulus Type:").grid(row=3, column=0, sticky='w', padx=5, pady=2)
+        ttk.Label(self.fr_stimulus, text="Stimulus Type:", style="TSpunkLabel.TLabel").grid(row=3, column=0, sticky='w', padx=5, pady=2)
         self.stimulus_type_drop = guih.generate_drop_down(
             self.fr_stimulus,
-            ["PS Voltage", "FG Frequency", "FG Duty Cycle"]
+            [s.value for s in logger.StimulusType if s is not logger.StimulusType.NONE],
         )
         self.stimulus_type_drop[0].grid(row=3, column=1, padx=5, pady=2)
 
         # Sweep mode dropdown
-        tk.Label(self.fr_stimulus, text="Sweep Mode:").grid(row=4, column=0, sticky='w', padx=5, pady=2)
+        ttk.Label(self.fr_stimulus, text="Sweep Mode:", style="TSpunkLabel.TLabel").grid(row=4, column=0, sticky='w', padx=5, pady=2)
         self.sweep_mode_drop = guih.generate_drop_down(
             self.fr_stimulus,
-            ["Linear", "Logarithmic"]
+            [s.value for s in logger.SweepMode],
         )
         self.sweep_mode_drop[0].grid(row=4, column=1, padx=5, pady=2)
 
         # Start value
-        tk.Label(self.fr_stimulus, text="Start Value:").grid(row=5, column=0, sticky='w', padx=5, pady=2)
+        ttk.Label(self.fr_stimulus, text="Start Value:", style="TSpunkLabel.TLabel").grid(row=5, column=0, sticky='w', padx=5, pady=2)
         self.stim_start_entry = tk.Entry(self.fr_stimulus, width=15)
         self.stim_start_entry.grid(row=5, column=1, padx=5, pady=2)
         self.stim_start_entry.insert(0, "1.0")
 
         # Stop value
-        tk.Label(self.fr_stimulus, text="Stop Value:").grid(row=6, column=0, sticky='w', padx=5, pady=2)
+        ttk.Label(self.fr_stimulus, text="Stop Value:", style="TSpunkLabel.TLabel").grid(row=6, column=0, sticky='w', padx=5, pady=2)
         self.stim_stop_entry = tk.Entry(self.fr_stimulus, width=15)
         self.stim_stop_entry.grid(row=6, column=1, padx=5, pady=2)
         self.stim_stop_entry.insert(0, "10.0")
@@ -260,7 +277,7 @@ class TabLog(guic.ThemedFrame):
         # Step mode dropdown (Increment OR Number of Steps)
         self.step_mode_drop = guih.generate_drop_down(
             self.fr_stimulus,
-            ["Increment size", "Number of Steps"],
+            [s.value for s in logger.StepMode],
         )
         self.step_mode_drop[0].grid(row=7, column=0, stick='w', padx=5, pady=2)
 
@@ -270,14 +287,14 @@ class TabLog(guic.ThemedFrame):
         self.stim_step_entry.insert(0, "1.0")
 
         # Settling time
-        tk.Label(self.fr_stimulus, text="Settling Time (s):").grid(row=8, column=0, sticky='w', padx=5, pady=2)
+        ttk.Label(self.fr_stimulus, text="Settling Time (s):", style="TSpunkLabel.TLabel").grid(row=8, column=0, sticky='w', padx=5, pady=2)
         self.stim_settling_entry = tk.Entry(self.fr_stimulus, width=15)
         self.stim_settling_entry.grid(row=8, column=1, padx=5, pady=2)
         self.stim_settling_entry.insert(0, "0.5")
 
         # Equipment channel
         # TODO: actually make sure this is implemented (will require me to properly implement channel handling in EE equipment too!)
-        tk.Label(self.fr_stimulus, text="Channel:").grid(row=9, column=0, sticky='w', padx=5, pady=2)
+        ttk.Label(self.fr_stimulus, text="Channel:", style="TSpunkLabel.TLabel").grid(row=9, column=0, sticky='w', padx=5, pady=2)
         self.stim_ps_channel_drop = guih.generate_drop_down(
             self.fr_stimulus,
             [1, 2]
@@ -285,12 +302,12 @@ class TabLog(guic.ThemedFrame):
         self.stim_ps_channel_drop[0].grid(row=9, column=1, padx=5, pady=2)
 
         # === SECOND STIMULUS (Inner Loop) - Only shown when dual sweep enabled ===
-        self.lbl_stim2_header = tk.Label(self.fr_stimulus, text="--- Parameter 2 (Inner Loop) ---",
+        self.lbl_stim2_header = ttk.Label(self.fr_stimulus, text="--- Parameter 2 (Inner Loop) ---",
                                           font=('TkDefaultFont', 9, 'bold'))
         self.lbl_stim2_header.grid(row=2, column=2, columnspan=2, pady=5)
 
         # Stimulus 2 type dropdown
-        self.lbl_stim2_type = tk.Label(self.fr_stimulus, text="Stimulus Type:")
+        self.lbl_stim2_type = ttk.Label(self.fr_stimulus, text="Stimulus Type:", style="TSpunkLabel.TLabel")
         self.lbl_stim2_type.grid(row=3, column=2, sticky='w', padx=5, pady=2)
         self.stimulus2_type_drop = guih.generate_drop_down(
             self.fr_stimulus,
@@ -300,7 +317,7 @@ class TabLog(guic.ThemedFrame):
         self.stimulus2_type_drop[1].set("FG Duty Cycle")  # Default to different param
 
         # Sweep mode 2 dropdown
-        self.lbl_stim2_mode = tk.Label(self.fr_stimulus, text="Sweep Mode:")
+        self.lbl_stim2_mode = ttk.Label(self.fr_stimulus, text="Sweep Mode:", style="TSpunkLabel.TLabel")
         self.lbl_stim2_mode.grid(row=4, column=2, sticky='w', padx=5, pady=2)
         self.sweep2_mode_drop = guih.generate_drop_down(
             self.fr_stimulus,
@@ -309,14 +326,14 @@ class TabLog(guic.ThemedFrame):
         self.sweep2_mode_drop[0].grid(row=4, column=3, padx=5, pady=2)
 
         # Start value 2
-        self.lbl_stim2_start = tk.Label(self.fr_stimulus, text="Start Value:")
+        self.lbl_stim2_start = ttk.Label(self.fr_stimulus, text="Start Value:", style="TSpunkLabel.TLabel")
         self.lbl_stim2_start.grid(row=5, column=2, sticky='w', padx=5, pady=2)
         self.stim2_start_entry = tk.Entry(self.fr_stimulus, width=15)
         self.stim2_start_entry.grid(row=5, column=3, padx=5, pady=2)
         self.stim2_start_entry.insert(0, "10.0")
 
         # Stop value 2
-        self.lbl_stim2_stop = tk.Label(self.fr_stimulus, text="Stop Value:")
+        self.lbl_stim2_stop = ttk.Label(self.fr_stimulus, text="Stop Value:", style="TSpunkLabel.TLabel")
         self.lbl_stim2_stop.grid(row=6, column=2, sticky='w', padx=5, pady=2)
         self.stim2_stop_entry = tk.Entry(self.fr_stimulus, width=15)
         self.stim2_stop_entry.grid(row=6, column=3, padx=5, pady=2)
@@ -335,7 +352,7 @@ class TabLog(guic.ThemedFrame):
         self.stim2_step_entry.insert(0, "1.0")
 
         # PS Channel 2 (only relevant for PS voltage)
-        self.lbl_stim2_channel = tk.Label(self.fr_stimulus, text="Channel:")
+        self.lbl_stim2_channel = ttk.Label(self.fr_stimulus, text="Channel:", style="TSpunkLabel.TLabel")
         self.lbl_stim2_channel.grid(row=9, column=2, sticky='w', padx=5, pady=2)
         self.stim2_channel_drop = guih.generate_drop_down(
             self.fr_stimulus,
@@ -421,6 +438,7 @@ class TabLog(guic.ThemedFrame):
         # Organize parameters first
         self.organize_record_params()
         self.record_status = False
+        self.recorded_data = []
         self.recCnt = 0
 
         # Check Serial if requested
@@ -487,7 +505,9 @@ class TabLog(guic.ThemedFrame):
             return
 
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument or stimulus
-        logger.start_recording(self.csvh)
+        # TODO: Claude should check to see if this is the cleanest way to manage NOT saving data
+        if self.var_save_data.get():
+            logger.start_recording(self.csvh)
         self.record_status = True
         self.cc.recording = True  # Signal to ClassController that recording is active
         self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
@@ -497,8 +517,11 @@ class TabLog(guic.ThemedFrame):
     def stop_record(self):
         self.record_status = False
         self.cc.recording = False  # Signal to ClassController that recording has stopped
-        self.prompt.print("Stopping data record!")
-        # threading.Thread(target=self.thread_record). # TODO: do I have to stop the thread here?
+        self.prompt.print("Stopped data record!")
+
+        # plot data if requested
+        if self.record_config.make_graph:
+            self.final_plot()
 
     ##############################################################################
     ####      RECORDING FUNCTIONS        #########################################
@@ -536,35 +559,23 @@ class TabLog(guic.ThemedFrame):
         self.record_speed = parse_time_to_seconds(self.RecSpdVal.get())
 
     def set_stimulus(self):
-        # Map strings to enums   tag:HARDCODE
-        stimulus_type_map = {
-            "PS Voltage": logger.StimulusType.PS_VOLTAGE,
-            "FG Frequency": logger.StimulusType.FG_FREQUENCY,
-            "FG Duty Cycle": logger.StimulusType.FG_DUTY_CYCLE
-        }
-        # TODO: does this thing actually do anything?
-        sweep_mode_map = {
-            "Linear": logger.SweepMode.LINEAR,
-            "Logarithmic": logger.SweepMode.LOGARITHMIC
-        }
-        step_mode_map = {
-            "Increment": logger.StepMode.INCREMENT,
-            "Number of Steps": logger.StepMode.NUM_STEPS
-        }
+        stimulus_type_str = self.stimulus_type_drop[1].get()
+        sweep_mode_str = self.sweep_mode_drop[1].get()
+        step_mode_str = self.step_mode_drop[1].get()
 
         try:
             if self.var_use_dual_stimulus.get():
                 # === DUAL STIMULUS MODE ===
-                # Create outer loop config
-                stimulus1_type_str = self.stimulus_type_drop[1].get()
-                sweep1_mode_str = self.sweep_mode_drop[1].get()
-                step1_mode_str = self.step_mode_drop[1].get()
+                # only need to get these values from GUI elements in dual-stimulus mode
+                stimulus2_type_str = self.stimulus2_type_drop[1].get()
+                sweep2_mode_str = self.sweep2_mode_drop[1].get()
+                step2_mode_str = self.step2_mode_drop[1].get()
 
                 outer_config = logger.StimulusConfig(
                     enabled=True,
-                    stimulus_type=stimulus_type_map[stimulus1_type_str],
-                    sweep_mode=sweep_mode_map[sweep1_mode_str],
-                    step_mode=step_mode_map[step1_mode_str],
+                    stimulus_type=logger.StimulusType(stimulus_type_str),
+                    sweep_mode=logger.SweepMode(sweep_mode_str),
+                    step_mode=logger.StepMode(step_mode_str),
                     start_value=float(self.stim_start_entry.get()),
                     stop_value=float(self.stim_stop_entry.get()),
                     step_value=float(self.stim_step_entry.get()),
@@ -573,19 +584,15 @@ class TabLog(guic.ThemedFrame):
                 )
 
                 # Create inner loop config
-                stimulus2_type_str = self.stimulus2_type_drop[1].get()
-                sweep2_mode_str = self.sweep2_mode_drop[1].get()
-                step2_mode_str = self.step2_mode_drop[1].get()
-
                 inner_config = logger.StimulusConfig(
                     enabled=True,
-                    stimulus_type=stimulus_type_map[stimulus2_type_str],
-                    sweep_mode=sweep_mode_map[sweep2_mode_str],
-                    step_mode=step_mode_map[step2_mode_str],
+                    stimulus_type=logger.StimulusType(stimulus2_type_str),
+                    sweep_mode=logger.SweepMode(sweep2_mode_str),
+                    step_mode=logger.StepMode(step2_mode_str),
                     start_value=float(self.stim2_start_entry.get()),
                     stop_value=float(self.stim2_stop_entry.get()),
                     step_value=float(self.stim2_step_entry.get()),
-                    settling_time=0.0,  # Use outer loop settling time
+                    settling_time=0.0,  # Use outer loop settling time # TODO: why is this 0.0?
                     channel=int(self.stim2_channel_drop[1].get())
                 )
 
@@ -611,15 +618,11 @@ class TabLog(guic.ThemedFrame):
 
             else:
                 # === SINGLE STIMULUS MODE ===
-                stimulus_type_str = self.stimulus_type_drop[1].get()
-                sweep_mode_str = self.sweep_mode_drop[1].get()
-                step_mode_str = self.step_mode_drop[1].get()
-
                 self.stimulus_config = logger.StimulusConfig(
                     enabled=True,
-                    stimulus_type=stimulus_type_map[stimulus_type_str],
-                    sweep_mode=sweep_mode_map[sweep_mode_str],
-                    step_mode=step_mode_map[step_mode_str],
+                    stimulus_type=logger.StimulusType(stimulus_type_str),
+                    sweep_mode=logger.SweepMode(sweep_mode_str),
+                    step_mode=logger.StepMode(step_mode_str),
                     start_value=float(self.stim_start_entry.get()),
                     stop_value=float(self.stim_stop_entry.get()),
                     step_value=float(self.stim_step_entry.get()),
@@ -644,8 +647,7 @@ class TabLog(guic.ThemedFrame):
 
     def organize_record_params(self):
         # get all needed GUI elements
-        prefix = "AREC"
-        data_dir = self.data_dir
+        prefix = "AREC" # tag:HARDCODE
         ext_text = self.output_file_name.get("1.0", "end").strip("\n")
 
         # create recording config
@@ -654,8 +656,9 @@ class TabLog(guic.ThemedFrame):
             self.var_use_dmm.get(),
             self.var_use_ps.get(),
             self.var_use_fg.get(),
-            1,
-            self.serial_log_params.get("1.0", "end").strip()
+            1, # TODO: this is a hardcode, als shouldn't be named `ps_channels`
+            self.serial_log_params.get("1.0", "end").strip(),
+            self.var_graph_data.get()
         )
         self.record_config.print()
 
@@ -669,7 +672,7 @@ class TabLog(guic.ThemedFrame):
 
         # setup recording
         self.recName, self.csvh = logger.setup_recording(
-                data_dir,
+                self.data_dir,
                 prefix,
                 ext_text,
                 self.record_config,
@@ -679,49 +682,67 @@ class TabLog(guic.ThemedFrame):
     def thread_record(self):
         # Check if stimulus-based recording
         if self.stimulus_config and self.stimulus_config.enabled:
-            self.thread_record_stimulus()
+            self.start_record_stimulus()
+        elif self.record_config.use_ser:
+            self.thread_record_serial()
         else:
             self.thread_record_timed()
 
     def thread_record_timed(self):
-        """Time-based recording (original behavior)"""
         while self.record_status:
             # Build a row of data based on what user wants
             row = self._collect_data_row()
+
+            # save row (locally and to a file if requested)
+            self.recorded_data.append(row)
+            if self.var_save_data.get():
+                self._save_data_row(row)
 
             # Update record counter and UI
             self.recCnt += 1
             self.labelRNums.config(text=f'#{self.recCnt:7d}')
 
-            # Append to CSV
-            self.csvh.add_row_from_dict(row)
-
             # Wait for next sample
             time.sleep(self.record_speed)
 
-    def thread_record_stimulus(self):
-        """Stimulus-based recording (sweep mode)"""
+    def start_record_stimulus(self):
         self.prompt.print(f"Starting stimulus sweep with {len(self.stimulus_generator)} steps")
 
+        # turn on power supply if being used
+        # TODO: I don't love how clunky this is (below). I should be able to just reference my stimulus_config variables to get all the info I need
+        #   and not have to reference self.is_dual_stimulus
+        # TODO: Claude can also broadly check how I can detect if I'm using a PS
+        if self.is_dual_stimulus:
+            if self.stimulus_config.outer_loop.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+                self.cc.ps.output_on(self.stimulus_config.channel)
+            elif self.stimulus_config.inner_loop.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+                self.cc.ps.output_on(self.stimulus_config.channel)
+        elif self.stimulus_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+            self.cc.ps.output_on(self.stimulus_config.channel)
+        # end of equipment configure
+
+        # start stimulus thread
         try:
             if self.is_dual_stimulus:
-                # === DUAL STIMULUS MODE ===
                 self._thread_record_dual_stimulus()
             else:
-                # === SINGLE STIMULUS MODE ===
                 self._thread_record_single_stimulus()
 
             # Sweep complete
             if self.record_status:
                 self.prompt.print("Stimulus sweep completed!")
-                self.record_status = False
+                self.stop_record()
                 return
 
         except Exception as e:
             self.prompt.print(f"Error during stimulus sweep: {e}")
             guih.alert_user("Error during stimulus sweep", str(e), "error")
-            self.record_status = False
+            self.stop_record()
             raise e
+
+    # TODO: finish implementing this
+    def thread_record_serial(self):
+        pass
 
     def _thread_record_single_stimulus(self):
         """Single parameter stimulus sweep"""
@@ -743,14 +764,15 @@ class TabLog(guic.ThemedFrame):
             row[param_name] = stimulus_value
             row["Stimulus_Step"] = str(step_num)
 
+            # Save row (locally and to a file if requested)
+            self.recorded_data.append(row)
+            if self.var_save_data.get():
+                self._save_data_row(row)
+
             # Update progress
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
             self.labelRNums.config(text=progress_text)
-
-            # Append to CSV
-            self.csvh.add_row_from_dict(row)
-
             self.prompt.print(f"Step {step_num}: Stimulus={stimulus_value:.3f}")
 
     def _thread_record_dual_stimulus(self):
@@ -777,13 +799,15 @@ class TabLog(guic.ThemedFrame):
             row[inner_name] = inner_value
             row["Stimulus_Step"] = step_num
 
+            # Save row (locally and to a file if requested)
+            self.recorded_data.append(row)
+            if self.var_save_data.get():
+                self._save_data_row(row)
+
             # Update progress
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
             self.labelRNums.config(text=progress_text)
-
-            # Append to CSV
-            self.csvh.add_row_from_dict(row)
 
     def _collect_data_row(self):
         row = {"Time": datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
@@ -797,7 +821,6 @@ class TabLog(guic.ThemedFrame):
             row["DMM_Meas1"] = self.cc.dmm.read_value()
 
         # Power Supply data if requested
-
         if self.record_config.use_ps:
             try:
                 time.sleep(5)
@@ -838,7 +861,6 @@ class TabLog(guic.ThemedFrame):
         return row
 
     def _apply_stimulus(self, value, dual=None):
-        # TODO: do I need to ensure the power supply is on here? output_on? Or do it right at the start of recording thread?
         """Apply the stimulus value to the appropriate instrument"""
         if dual is None:
             stim_type = self.stimulus_config.stimulus_type
@@ -851,7 +873,7 @@ class TabLog(guic.ThemedFrame):
                 return
 
         if stim_type == logger.StimulusType.PS_VOLTAGE:
-            channel = self.stimulus_config.ps_channel
+            channel = self.stimulus_config.channel
             self.cc.ps.set_voltage(value, channel=channel)
 
         elif stim_type == logger.StimulusType.FG_FREQUENCY:
@@ -863,12 +885,104 @@ class TabLog(guic.ThemedFrame):
         else:
             raise ValueError(f"Unknown stimulus type: {stim_type}")
 
+    def _save_data_row(self, row):
+        # self.csvh.add_row_from_dict(row)
+        self.bus.put(row)
 
     ##############################################################################
     ####      PLOTTING FUNCTIONS        ##########################################
     ##############################################################################
 
-    def live_plot(self):
+    def final_plot(self):
+        df = pd.DataFrame(self.recorded_data)
+        x_data = None
+        y_data = None
+        xlabel = ""
+        ylabel = ""
+        title = ""
+        # TODO: add corresponding xlabel and ylabel stuff here (conditional on config)
+        #   NOTE: there might be some reuse between final plot and live plot parameters
+
+        # get X data based on either time based or stimulus
+        if self.stimulus_config and self.stimulus_config.enabled:
+            title = "Stimulus based logging"
+            if self.stimulus_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+                x_data = df["PS_Voltage"]
+                xlabel = "PS Voltage (V)"
+        else:
+            x_data = df["Time"]
+            xlabel = "Time"
+            title = "Time based logging"
+
+        # TODO: 3D plots for this case? or that fancy label thing I have going on? Or both and the user can pick?
+        # if self.is_dual_stimulus:
+
+        if self.record_config.use_dmm:
+            y_data = df["DMM_Meas1"]
+            ylabel = "DMM (V)"
+
+        # TODO: for time plots would be so much cleaner to exclude date from information
+        plotter.plot(
+            x_data,
+            y_data,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            title=title
+        )
+
+    def start_live_plot(self):
+        # organize params based on record config
+        # if self.record_config.use_dmm:
+        #     pass
+        # if self.record_config.use_ps:
+        #     pass
+        xlabel = ""
+        ylabel = ""
+        title = ""
+        # TODO: have Claude conditionally have these labels being formed
+
+        self.bus = Queue(maxsize=50_000)
+        self._dash_thread = None
+
+        # don't save data
+        # TODO: evaluate this (would saving the data actually glitch out live plot so much? What's the overhead on that?
+        self.var_save_data.set(1)
+        self.start_record()
+
+        self.thread_live_plot(xlabel, ylabel, title)
+        for i in range(0, 100):
+            time.sleep(0.3)
+            self.push_live_data()
+
+    def stop_live_plot(self):
+        self._dash_thread.stop()
+
+    def thread_live_plot(self, xlabel, ylabel, title):
+        self._dash_thread = threading.Thread(
+            target=plotter.start_live_plot,
+            kwargs=dict(
+                data_bus=self.bus,
+                x_key="Time",
+                channels=["DMM_Meas1"],
+                buffer_size=3000,
+                refresh_ms=150,
+                xlabel=xlabel,
+                ylabel=ylabel,
+                title=title,
+                port=8050,
+                debug=False, # disabling debug
+            ),
+            daemon=True
+        )
+        self._dash_thread.start()
+
+    def push_live_data(self):
+        pass
+        # t = time.perf_counter()
+        # sample = {"t": t, "PS Voltage": 2.5, "FG Frequency": 1000.0}
+        # self.bus.put(sample)
+
+    def thread_live_plot_old(self):
         # TODO: get creative about labeling here
         lplt = plotter.LivePlot("Live plot", "X-axis", "Y-axis")
 
@@ -886,6 +1000,3 @@ class TabLog(guic.ThemedFrame):
             lplt.ax.plot(lplt.xs[-2000:], lplt.ys[-2000:], label="Current (A)")
 
         lplt.show_animation(animate, interval=200)
-
-
-

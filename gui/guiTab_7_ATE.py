@@ -151,7 +151,7 @@ class TabATE(guic.ThemedFrame):
         # Sweep configuration
         ttk.Label(fr_m, text="Start Voltage (V):", style="TLabel").grid(row=2, column=0, sticky='e', padx=5, pady=5)
         self.acc_start_entry = tk.Entry(fr_m, width=10)
-        self.acc_start_entry.insert(0, "0")
+        self.acc_start_entry.insert(0, "0.1") # NOTE: starting at 0V causes issues on most power supplies. Start at 100mV instead
         self.acc_start_entry.grid(row=2, column=1, sticky='w', padx=5, pady=5)
 
         ttk.Label(fr_m, text="Stop Voltage (V):", style="TLabel").grid(row=3, column=0, sticky='e', padx=5, pady=5)
@@ -166,7 +166,7 @@ class TabATE(guic.ThemedFrame):
 
         ttk.Label(fr_m, text="Settling Time (s):", style="TLabel").grid(row=5, column=0, sticky='e', padx=5, pady=5)
         self.acc_settling_entry = tk.Entry(fr_m, width=10)
-        self.acc_settling_entry.insert(0, "0.5")
+        self.acc_settling_entry.insert(0, "1.5")
         self.acc_settling_entry.grid(row=5, column=1, sticky='w', padx=5, pady=5)
 
         ttk.Label(fr_m, text="PS Channel:", style="TLabel").grid(row=6, column=0, sticky='e', padx=5, pady=5)
@@ -348,9 +348,16 @@ class TabATE(guic.ThemedFrame):
             self.prompt.print("Accuracy test complete!")
             self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
 
-
             # Plot results
-            plotter.plot_accuracy_generic(set_voltages, measured_voltages)
+            plotter.plot_trendline(
+                set_array,
+                measured_array,
+                x_label="Set voltage (V)",
+                y_label="Measured (V)",
+                title="PS vs. DMM accuracy")
+
+            # TODO: on top of this plot might be better to plot the residuals
+
 
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Communication Error", f"Error communicating with equipment: {str(e)}", "error")

@@ -70,12 +70,14 @@ class TabDMM(guic.ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=30, pady=12)
+
 
         # place Frames into grid
         self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
-        self.fr_control.grid(row=1, column=0, pady=10, padx=10)
-        self.prompt.grid(row=1, column=1, columnspan=4, padx=10, pady=10)
+        self.fr_control.grid(row=0, column=1, pady=10, padx=10)
+        self.fr_port.grid(row=0, column=2, padx=30, pady=12)
+        self.prompt.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky='W')
+
 
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")

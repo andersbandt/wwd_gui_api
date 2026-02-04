@@ -65,18 +65,13 @@ class TabPS(guic.ThemedFrame):
                                   self.theme_config,
                                    "PS Console Output",
                                   height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+                                  width=self.theme_config["size"]["w_prompt_s"])
 
         # initialize tab content
         self.initTabContent()
 
-        # place everything in grid
-        self.fr_info.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_status.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-
-        # set up serial port (has to be done after tab content is initialized)
+        # set up serial port
+        # NOTE: has to be done after tab content is initalized in initTabContent()
         self.fr_port = guic.SerialConnFrame(self,
                                             self.theme_config,
                                             self.cc,
@@ -86,7 +81,15 @@ class TabPS(guic.ThemedFrame):
                                             port_func=3)
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+
+        # place everything in grid
+        self.fr_info.grid(row=0, column=0, columnspan=2, pady=15, padx=15, sticky="W")
+        self.fr_port.grid(row=0, column=2, padx=15, pady=15)
+        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
+        self.fr_status.grid(row=1, column=1, pady=15, padx=15)
+        # TODO: if not in compact mode make it so prompt goes to the bottom row? and columnspan=4
+        self.prompt.grid(row=1, column=2, padx=30, pady=12, sticky="W")
+
 
     def initTabContent(self):
         print("Initializing tab 6 (PS) content")
@@ -255,9 +258,9 @@ class TabPS(guic.ThemedFrame):
                 self.ch1_toggle_btn.config(bg=self.theme_config["error"])
 
             if status_decode["ch1_mode"] == "CV":
-                self.ch1_mode.set_color("green")
+                self.ch1_mode.set_color(self.theme_config["success"])
             else:
-                self.ch1_mode.set_color("red")
+                self.ch1_mode.set_color(self.theme_config["error"])
 
             # if we have 2-channel PS
             if self.channel_count > 1:
@@ -267,9 +270,9 @@ class TabPS(guic.ThemedFrame):
                     self.ch2_toggle_btn.config(bg=self.theme_config["error"])
 
                 if status_decode["ch2_mode"] == "CV":
-                    self.ch2_mode.set_color("green")
+                    self.ch2_mode.set_color(self.theme_config["success"])
                 else:
-                    self.ch2_mode.set_color("red")
+                    self.ch2_mode.set_color(self.theme_config["error"])
 
         except KeyError as e:
             guih.alert_user("Can't set channel CC/CV states", f"KeyError:{e}", "error")
@@ -280,6 +283,7 @@ class TabPS(guic.ThemedFrame):
         print("gui_refresh for PS ...")
         if event == "auto":
             self.fr_port.refresh_ports()
+            print("End of refreshing ports")
         self.gui_refresh_info()
         self.gui_refresh_channel_state()
         print("end of gui_refresh for PS!")
@@ -451,7 +455,11 @@ class TabPS(guic.ThemedFrame):
 
     def port_close(self):
         self.prompt.print(f"Closing PYVISA resource!")
-        self.cc.ps.disconnect()
+        # TODO make sure all disconnect statements have some error handling around disconnect (or figure out how to handle it better)
+        try:
+            self.cc.ps.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't disconnect PS", e, "warning")
         self.fr_port.set_status(False)
         self.cc.set_ps(None)
         self.prompt.print(f"Connection is closed.")

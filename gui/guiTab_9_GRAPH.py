@@ -24,6 +24,15 @@ from gui import gui_class as guic
 
 # TODO: add a button to clear all graphing fields
 
+# TODO: give user the option between scatter and line plot ?
+
+# TODO: the filename filter actually would make more sense in the other frame
+
+# TODO: what is the textbox by the Filename labeler doing?
+# TODO: also the file name labeler is only displaying "AREC" right now
+
+# TODO: I don't think with my current implementation you can do both types of labeling (filename and data label). Check if that would be possible
+
 
 # Define named tuple for file data
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])

@@ -66,6 +66,7 @@ class RecordConfig:
     use_fg: bool = False
     ps_channels: int = 1  # will be set to 2 if user confirms and PS supports it
     serial_params: str = None
+    make_graph: bool = False
 
     def pretty(self) -> str:
         """
@@ -98,8 +99,15 @@ class RecordConfig:
         print(self.pretty())
 
 
-def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_params):
-    config = RecordConfig(use_ser=use_ser, use_dmm=use_dmm, use_ps=use_ps, use_fg=use_fg, ps_channels=ps_channels, serial_params=serial_params)
+# TODO: have to rename this ps_channels thing
+def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_params, make_graph):
+    config = RecordConfig(use_ser=use_ser,
+                          use_dmm=use_dmm,
+                          use_ps=use_ps,
+                          use_fg=use_fg,
+                          ps_channels=ps_channels,
+                          serial_params=serial_params,
+                          make_graph=make_graph)
     return config
 
 
@@ -125,6 +133,24 @@ class StepMode(Enum):
     """How to specify the step size"""
     INCREMENT = "Increment"  # User specifies step_value (increment amount)
     NUM_STEPS = "Number of Steps"  # User specifies total number of steps
+
+
+# Map strings to enums   tag:HARDCODE
+# TODO: I don't love these things. Shouldn't my drop downs source from these maps?
+#   and they should be stored in logger.py?
+# stimulus_type_map = {
+#     "PS Voltage": StimulusType.PS_VOLTAGE,
+#     "FG Frequency": StimulusType.FG_FREQUENCY,
+#     "FG Duty Cycle": StimulusType.FG_DUTY_CYCLE
+# }
+# sweep_mode_map = {
+#     "Linear": SweepMode.LINEAR,
+#     "Logarithmic": SweepMode.LOGARITHMIC
+# }
+# step_mode_map = {
+#     "Increment": StepMode.INCREMENT,
+#     "Number of Steps": StepMode.NUM_STEPS
+# }
 
 
 @dataclass
@@ -164,6 +190,38 @@ class StimulusConfig:
 
         if self.settling_time < 0:
             return False, "Settling time cannot be negative"
+
+        return True, ""
+
+
+@dataclass
+class DualStimulusConfig:
+    """Configuration for dual-parameter stimulus sweeps (nested loops)"""
+    enabled: bool = False
+    outer_loop: StimulusConfig = None  # Outer loop parameter
+    inner_loop: StimulusConfig = None  # Inner loop parameter
+
+    def validate(self):
+        """Validate the dual stimulus configuration"""
+        if not self.enabled:
+            return True, ""
+
+        if self.outer_loop is None or self.inner_loop is None:
+            return False, "Both outer and inner loop configurations are required"
+
+        # Validate outer loop
+        valid, error_msg = self.outer_loop.validate()
+        if not valid:
+            return False, f"Outer loop error: {error_msg}"
+
+        # Validate inner loop
+        valid, error_msg = self.inner_loop.validate()
+        if not valid:
+            return False, f"Inner loop error: {error_msg}"
+
+        # Check that stimulus types are different
+        if self.outer_loop.stimulus_type == self.inner_loop.stimulus_type:
+            return False, "Outer and inner loop must use different stimulus types"
 
         return True, ""
 
@@ -239,38 +297,6 @@ class StimulusGenerator:
     def get_progress(self):
         """Get current progress (current step, total steps)"""
         return self.current_index, len(self.values)
-
-
-@dataclass
-class DualStimulusConfig:
-    """Configuration for dual-parameter stimulus sweeps (nested loops)"""
-    enabled: bool = False
-    outer_loop: StimulusConfig = None  # Outer loop parameter
-    inner_loop: StimulusConfig = None  # Inner loop parameter
-
-    def validate(self):
-        """Validate the dual stimulus configuration"""
-        if not self.enabled:
-            return True, ""
-
-        if self.outer_loop is None or self.inner_loop is None:
-            return False, "Both outer and inner loop configurations are required"
-
-        # Validate outer loop
-        valid, error_msg = self.outer_loop.validate()
-        if not valid:
-            return False, f"Outer loop error: {error_msg}"
-
-        # Validate inner loop
-        valid, error_msg = self.inner_loop.validate()
-        if not valid:
-            return False, f"Inner loop error: {error_msg}"
-
-        # Check that stimulus types are different
-        if self.outer_loop.stimulus_type == self.inner_loop.stimulus_type:
-            return False, "Outer and inner loop must use different stimulus types"
-
-        return True, ""
 
 
 class DualStimulusGenerator:

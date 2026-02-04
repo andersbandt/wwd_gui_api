@@ -5,10 +5,21 @@ from matplotlib import style
 from drawnow import drawnow
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+from dash import Dash, dcc, html, Output, Input, State
+
 
 # import needed modules
 import secrets
 import hashlib
+from typing import Iterable, Mapping, Sequence
+import threading
+import time
+from collections import deque
+from queue import Queue, Empty
+
+
+# TODO: ask an AI for even more cool plots here
 
 
 def save_fig():
@@ -22,7 +33,9 @@ def save_fig():
 #### generic plotting ###########
 #################################
 
-def plot(x_data, y_data,
+def plot(
+        x_data,
+        y_data,
          xlabel=None,
          ylabel=None,
          title=None,
@@ -47,6 +60,7 @@ def plot(x_data, y_data,
     # annotate plot
     if xlabel is not None:
         plt.xlabel(xlabel)
+        plt.xticks(rotation=90)
     if ylabel is not None:
         plt.ylabel(ylabel)
     if title is not None:
@@ -77,16 +91,15 @@ def plot_3d(x_axis, y_axis, z_axis):
 
 
 
-# TODO: make this function a more abstract plotter
-def plot_accuracy_generic(setpoints, measured,
+def plot_trendline(setpoints, measured,
                           x_label="Set Value",
                           y_label="Measured Value",
                           title="Accuracy Plot"):
     """
     Simple generic accuracy plot:
     - Plots measured vs. setpoints
-    - Adds an ideal 1:1 line
-    - Lets caller specify axis labels + title
+    - Adds an ideal 1:1 line (VERY BASIC, literally just linear best fit with the first and last point)
+        so your dataset should already be linear for it to work well
     """
 
     setpoints = np.array(setpoints)
@@ -98,7 +111,7 @@ def plot_accuracy_generic(setpoints, measured,
     # Ideal 1:1 reference line
     lo = min(setpoints.min(), measured.min())
     hi = max(setpoints.max(), measured.max())
-    plt.plot([lo, hi], [lo, hi], 'k--', label='Ideal 1:1')
+    plt.plot([lo, hi], [lo, hi], 'k--', label='Ideal 1:1 (crude linear fit)')
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
@@ -110,8 +123,9 @@ def plot_accuracy_generic(setpoints, measured,
 
 
 
-def plot_multi_file_data(
-    file_data_list,
+
+# TODO: I should probably abstract away the actual plotting here so i can reuse features like the labeled legend from data and such
+def plot_multi_file_data(file_data_list,
     x_var, y_var,
     x_scale=1, y_scale=1,
     title=None, xlabel=None, ylabel=None,
@@ -120,8 +134,7 @@ def plot_multi_file_data(
     figsize=(10, 6),
     marker='o',
     markersize=3,
-    show_grid=True
-):
+    show_grid=True):
     """
     Plot data from multiple files with flexible labeling options.
 
@@ -224,6 +237,7 @@ def plot_multi_file_data(
     plt.show()
     return fig, ax
 
+
 # Simple numeric normalization (works if labels are numeric or can be cast to float)
 # If labels are strings, we'll just index them
 # try:
@@ -286,3 +300,133 @@ class LivePlot:
         plt.show()
 
 
+
+###############################
+### PLOTLY LIVE PLOTTING    ###
+###############################
+
+def start_live_plot(
+        data_bus: Queue,
+        x_key: str,
+        channels: Sequence[str],
+        buffer_size=3000,
+        refresh_ms=200,
+        x_label: str,
+        y_label: str,
+        title="Live Plot (Function-Based)",
+        host="127.0.0.1",
+        port=8050,
+        debug = False,
+):
+    # set up buffers
+    time_buf = deque(maxlen=buffer_size)
+    bufs = {ch: deque(maxlen=buffer_size) for ch in channels}
+
+    # Helper to append one sample
+    def _append_sample(sample: Mapping):
+        t = sample.get(x_key)
+        if t is None:
+            return  # ignore malformed packets
+        time_buf.append(t)
+        for ch in channels:
+            v = sample.get(ch)
+            # Append None if missing to create a gap; or repeat last value if preferred
+            bufs[ch].append(None if v is None else float(v))
+
+    # Helper to accept either a single sample or a batch (list/tuple)
+    def _ingest_from_bus():
+        drained = 0
+        while True:
+            try:
+                pkt = data_bus.get_nowait()
+            except Empty:
+                break
+            # Support command packets if you ever add them: e.g., {'__cmd__': 'clear'}
+            if isinstance(pkt, (list, tuple)):
+                for s in pkt:
+                    if isinstance(s, Mapping):
+                        _append_sample(s)
+            elif isinstance(pkt, Mapping):
+                _append_sample(pkt)
+            drained += 1
+        return drained
+
+
+    # dash app definition
+    app = Dash(__name__)
+    app.title = title
+
+    app.layout = html.Div([
+            html.H2(title),
+            dcc.Graph(id="graph"),
+            dcc.Interval(id="tick", interval=refresh_ms, n_intervals=0),
+        ]
+    )
+
+    @app.callback(Output("graph", "figure"), Input("tick", "n_intervals"))
+    def update_graph(_):
+        _ingest_from_bus()
+
+        if not time_buf:
+            return go.Figure(layout=go.Layout(template="plotly_white"))
+
+        # TODO: I actually think I would like the graphs on totally separate y-axis
+        # TODO: I also need to make the generation of them modular (like create N Scatter plots for N channels input)
+        i = 0
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    x=list(time_buf),
+                    y=list(bufs[channels[i]]),
+                    mode="lines",
+                    name=channels[i],
+                    line=dict(color="#1f77b4", width=2)
+                )
+                # go.Scatter(
+                #     x=list(time_buf),
+                #     y=list(bufs[right_ch]),
+                #     mode="lines",
+                #     name=right_ch,
+                #     line=dict(color="#ff7f0e", width=2),
+                #     yaxis="y2" # this binds this trace to the secondary axis
+                # )
+            ],
+            layout=go.Layout(
+                template="plotly_white",
+                margin=dict(l=60, r=40, t=35, b=50),
+                xaxis=dict(title=x_label),
+                yaxis=dict(title=y_label),
+                # yaxis2=dict(
+                #     title=right_ch,
+                #     overlaying="y",  # share the X and overlay on Y
+                #     side="right",
+                #     showgrid=False,
+                #     zeroline=False,
+                # ),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            ),
+        )
+        return fig
+
+
+    # TODO: can I auto-start the tab in a browser when run executes?
+    # start server
+    app.run(host=host,
+            port=port,
+            debug=debug,
+            use_reloader=False,
+            dev_tools_silence_routes_logging=True  # this hides very noisy printout
+            )
+
+
+# TODO: Claude should see if I need this cleanup stuff
+#     # -----------------------------
+#     # Cleanup on exit
+#     # -----------------------------
+#     import atexit
+#
+#     def cleanup():
+#         stop_event.set()
+#         thread.join(timeout=1.0)
+#
+#     atexit.register(cleanup)

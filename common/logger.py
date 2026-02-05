@@ -16,6 +16,39 @@ import numpy as np
 
 
 #################################
+#### Column Name Constants ######
+#################################
+
+# Column names used in CSV headers and data rows.
+# All code should reference these instead of hardcoding strings.
+
+COL_TIME = "Time"
+COL_SERIAL = "SerialData"
+COL_STIMULUS_STEP = "Stimulus_Step"
+
+# DMM columns
+COL_DMM_MEAS1 = "DMM_Meas1"
+
+# Power Supply columns
+COL_PS_VSET1 = "PS_Vset1"
+COL_PS_VMEAS1 = "PS_Vmeas1"
+COL_PS_IMEAS1 = "PS_Imeas1"
+COL_PS_VSET2 = "PS_Vset2"
+COL_PS_VMEAS2 = "PS_Vmeas2"
+COL_PS_IMEAS2 = "PS_Imeas2"
+
+# Function Generator columns
+COL_FG_FREQ = "FG_Freq"
+COL_FG_WAVEFORM = "FG_Waveform"
+
+# Stimulus column names (used in get_stimulus_column_name)
+COL_STIM_PS_VOLTAGE = "PS_Voltage"
+COL_STIM_FG_FREQUENCY = "FG_Frequency"
+COL_STIM_FG_DUTY_CYCLE = "FG_Duty_Cycle"
+COL_STIM_FALLBACK = "Stimulus_Value"
+
+
+#################################
 #### file stuff  ################
 #################################
 
@@ -64,7 +97,7 @@ class RecordConfig:
     use_dmm: bool = False
     use_ps: bool = False
     use_fg: bool = False
-    ps_channels: int = 1  # will be set to 2 if user confirms and PS supports it
+    channel: int = 1  # will be set to 2 if user confirms and PS supports it
     serial_params: str = None
     make_graph: bool = False
 
@@ -78,7 +111,7 @@ class RecordConfig:
             "Use DMM": self.use_dmm,
             "Use Power Supply (PS)": self.use_ps,
             "Use Function Generator (FG)": self.use_fg,
-            "PS Channels": self.ps_channels,
+            "Channel": self.channel,
             "Serial Params": self.serial_params or "(not set)",
         }
 
@@ -99,13 +132,12 @@ class RecordConfig:
         print(self.pretty())
 
 
-# TODO: have to rename this ps_channels thing
-def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channels, serial_params, make_graph):
+def create_record_config(use_ser, use_dmm, use_ps, use_fg, channel, serial_params, make_graph):
     config = RecordConfig(use_ser=use_ser,
                           use_dmm=use_dmm,
                           use_ps=use_ps,
                           use_fg=use_fg,
-                          ps_channels=ps_channels,
+                          channel=channel,
                           serial_params=serial_params,
                           make_graph=make_graph)
     return config
@@ -134,23 +166,6 @@ class StepMode(Enum):
     INCREMENT = "Increment"  # User specifies step_value (increment amount)
     NUM_STEPS = "Number of Steps"  # User specifies total number of steps
 
-
-# Map strings to enums   tag:HARDCODE
-# TODO: I don't love these things. Shouldn't my drop downs source from these maps?
-#   and they should be stored in logger.py?
-# stimulus_type_map = {
-#     "PS Voltage": StimulusType.PS_VOLTAGE,
-#     "FG Frequency": StimulusType.FG_FREQUENCY,
-#     "FG Duty Cycle": StimulusType.FG_DUTY_CYCLE
-# }
-# sweep_mode_map = {
-#     "Linear": SweepMode.LINEAR,
-#     "Logarithmic": SweepMode.LOGARITHMIC
-# }
-# step_mode_map = {
-#     "Increment": StepMode.INCREMENT,
-#     "Number of Steps": StepMode.NUM_STEPS
-# }
 
 
 @dataclass
@@ -193,6 +208,13 @@ class StimulusConfig:
 
         return True, ""
 
+    def uses_ps(self):
+        return self.stimulus_type == StimulusType.PS_VOLTAGE
+
+    @property
+    def is_dual(self):
+        return False
+
 
 @dataclass
 class DualStimulusConfig:
@@ -224,6 +246,22 @@ class DualStimulusConfig:
             return False, "Outer and inner loop must use different stimulus types"
 
         return True, ""
+
+    def uses_ps(self):
+        return self.outer_loop.uses_ps() or self.inner_loop.uses_ps()
+
+    @property
+    def channel(self):
+        """Return the PS channel from whichever loop uses PS voltage"""
+        if self.outer_loop.uses_ps():
+            return self.outer_loop.channel
+        if self.inner_loop.uses_ps():
+            return self.inner_loop.channel
+        return 1
+
+    @property
+    def is_dual(self):
+        return True
 
 
 class StimulusGenerator:
@@ -360,17 +398,27 @@ def get_stimulus_column_name(stimulus_type: StimulusType) -> str:
         String column name (e.g., "PS_Voltage", "FG_Frequency", "FG_Duty_Cycle")
     """
     column_map = {
-        StimulusType.PS_VOLTAGE: "PS_Voltage",
-        StimulusType.FG_FREQUENCY: "FG_Frequency",
-        StimulusType.FG_DUTY_CYCLE: "FG_Duty_Cycle",
-        StimulusType.NONE: "Stimulus_Value"  # Fallback
+        StimulusType.PS_VOLTAGE: COL_STIM_PS_VOLTAGE,
+        StimulusType.FG_FREQUENCY: COL_STIM_FG_FREQUENCY,
+        StimulusType.FG_DUTY_CYCLE: COL_STIM_FG_DUTY_CYCLE,
+        StimulusType.NONE: COL_STIM_FALLBACK,
     }
-    return column_map.get(stimulus_type, "Stimulus_Value")
+    return column_map.get(stimulus_type, COL_STIM_FALLBACK)
+
+
+def get_stimulus_label(stimulus_type: StimulusType) -> str:
+    """Human-readable axis label for a stimulus type."""
+    label_map = {
+        StimulusType.PS_VOLTAGE: "PS Voltage (V)",
+        StimulusType.FG_FREQUENCY: "Frequency (Hz)",
+        StimulusType.FG_DUTY_CYCLE: "Duty Cycle (%)",
+    }
+    return label_map.get(stimulus_type, "Stimulus")
 
 
 def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig = None):
     # SETUP CSV HEADER PARAMETERS
-    headers = ["Time"]
+    headers = [COL_TIME]
 
     # Serial/user-entered metadata (if selected)
     if record_config.use_ser:
@@ -381,35 +429,30 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
 
     # DMM selected?
     if record_config.use_dmm:
-        # dmm_params = ["DMM_Range", "DMM_Func1", "DMM_Meas1"]
-        dmm_params = ["DMM_Meas1"]
-        headers += dmm_params
+        headers += [COL_DMM_MEAS1]
 
     # Power Supply selected?
     if record_config.use_ps:
-        ps_params = ["PS_Vset1", "PS_Vmeas1", "PS_Imeas1"]
+        ps_params = [COL_PS_VSET1, COL_PS_VMEAS1, COL_PS_IMEAS1]
 
-        if record_config.ps_channels > 1:
-            ps_params += ["PS_Vset2", "PS_Vmeas2", "PS_Imeas2"]
+        if record_config.channels > 1:
+            ps_params += [COL_PS_VSET2, COL_PS_VMEAS2, COL_PS_IMEAS2]
 
         headers += ps_params
 
     # Function Generator selected?
     if record_config.use_fg:
-        fg_params = ["FG_Freq", "FG_Waveform"]
-        headers += fg_params
+        headers += [COL_FG_FREQ, COL_FG_WAVEFORM]
 
     # Stimulus columns (if stimulus mode enabled)
     if stimulus_config:
         if isinstance(stimulus_config, DualStimulusConfig) and stimulus_config.enabled:
-            # Dual stimulus: use actual parameter names for outer and inner loops
             outer_name = get_stimulus_column_name(stimulus_config.outer_loop.stimulus_type)
             inner_name = get_stimulus_column_name(stimulus_config.inner_loop.stimulus_type)
-            headers += [outer_name, inner_name, "Stimulus_Step"]
+            headers += [outer_name, inner_name, COL_STIMULUS_STEP]
         elif isinstance(stimulus_config, StimulusConfig) and stimulus_config.enabled:
-            # Single stimulus: use actual parameter name
             param_name = get_stimulus_column_name(stimulus_config.stimulus_type)
-            headers += [param_name, "Stimulus_Step"]
+            headers += [param_name, COL_STIMULUS_STEP]
 
     return headers
 

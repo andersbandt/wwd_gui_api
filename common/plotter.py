@@ -1,32 +1,22 @@
 
 # import plotter modules
-import matplotlib.animation as animation
-from matplotlib import style
-from drawnow import drawnow
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objs as go
-from dash import Dash, dcc, html, Output, Input, State
-
+from plotly.subplots import make_subplots
+from dash import Dash, dcc, html, Output, Input
 
 # import needed modules
-import secrets
-import hashlib
-from typing import Iterable, Mapping, Sequence
 import threading
-import time
+import webbrowser
+from typing import Mapping, Sequence
 from collections import deque
 from queue import Queue, Empty
 
 
-# TODO: ask an AI for even more cool plots here
-
-
-def save_fig():
-    random_string = secrets.token_hex(16)  # Generate 32 random hexadecimal characters (16 bytes)
-    hashed_value = hashlib.sha256(random_string.encode()).hexdigest()  # Hash the random string using SHA-256
-    hash_p = hashed_value[:5]  # Extract the first 5 characters of the hash to get a 5-digit hash
-    plt.savefig(f'tmp/{hash_p}.png')
+# consistent color palette for multi-series / multi-subplot plots
+COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+          '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
 
 #################################
@@ -50,12 +40,10 @@ def plot(
 
     plt.plot(x_data, y_data, color=color)
 
-
     # Add vertical lines
     if vertical_lines is not None:
         for index in vertical_lines:
             plt.axvline(x=index, color='red', linestyle='--', linewidth=2)
-
 
     # annotate plot
     if xlabel is not None:
@@ -68,27 +56,110 @@ def plot(
     if legend is not None:
         plt.legend(legend)
 
-
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
     plt.show()
 
 
+def plot_grouped(df, x_var, y_var, group_var,
+                 xlabel=None, ylabel=None, title=None,
+                 figsize=(10, 6), marker='o', markersize=3):
+    """
+    2D plot with one line per unique value of group_var.
 
-# NOTE: not tested
-def plot_3d(x_axis, y_axis, z_axis):
-    # Meshgrid for plotting
-    x, y = np.meshgrid(x_axis, y_axis)
+    Args:
+        df: DataFrame containing all data
+        x_var: Column name for x-axis
+        y_var: Column name for y-axis
+        group_var: Column name to group by (each unique value becomes a labeled series)
+    """
+    fig, ax = plt.subplots(figsize=figsize)
 
-    # 3D plot
-    fig = plt.figure(figsize=(10, 7))
+    for i, group_val in enumerate(sorted(df[group_var].dropna().unique())):
+        subset = df[df[group_var] == group_val]
+        ax.plot(subset[x_var], subset[y_var],
+                label=f"{group_var}={group_val}",
+                color=COLORS[i % len(COLORS)],
+                marker=marker, markersize=markersize)
+
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+    return fig, ax
+
+
+def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
+    """
+    Stacked subplots with shared x-axis, one subplot per channel.
+
+    Args:
+        x_data: Shared x-axis data (array-like)
+        channels: List of (y_data, ylabel) tuples for each subplot
+        xlabel: Label for the shared x-axis (bottom only)
+        title: Overall figure title
+        figsize_per_row: Height per subplot row in inches
+    """
+    n = len(channels)
+    fig, axes = plt.subplots(n, 1, figsize=(10, figsize_per_row * n),
+                             sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    for i, (ax, (y_data, ylabel)) in enumerate(zip(axes, channels)):
+        ax.plot(x_data, y_data, color=COLORS[i % len(COLORS)])
+        ax.set_ylabel(ylabel)
+        ax.grid(True, alpha=0.3)
+
+    axes[-1].set_xlabel(xlabel or "")
+    if title:
+        fig.suptitle(title)
+    plt.tight_layout()
+    plt.show()
+    return fig, axes
+
+
+def plot_3d_from_df(df, x_var, y_var, z_var,
+                    xlabel=None, ylabel=None, zlabel=None,
+                    title=None, figsize=(10, 7), cmap='viridis'):
+    """
+    3D surface plot from a DataFrame with two sweep variables and a measurement.
+
+    Pivots the DataFrame into a meshgrid and plots a surface.
+    Works directly with dual-stimulus sweep data.
+
+    Args:
+        df: DataFrame with columns x_var, y_var, z_var
+        x_var: Column for x-axis (e.g., outer stimulus)
+        y_var: Column for y-axis (e.g., inner stimulus)
+        z_var: Column for z-axis (e.g., measurement)
+    """
+    # Pivot to get z as a 2D grid indexed by (y_var, x_var)
+    pivot = df.pivot_table(index=y_var, columns=x_var, values=z_var, aggfunc='mean')
+    x_vals = pivot.columns.values.astype(float)
+    y_vals = pivot.index.values.astype(float)
+    X, Y = np.meshgrid(x_vals, y_vals)
+    Z = pivot.values
+
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(x, y, z_axis, cmap='viridis')
+    surf = ax.plot_surface(X, Y, Z, cmap=cmap, edgecolor='none', alpha=0.9)
 
-    ax.set_title('Frequency vs Duty Cycle vs Output Voltage')
-    ax.set_xlabel('Duty Cycle (%)')
-    ax.set_ylabel('Frequency (Hz)')
-    ax.set_zlabel('Output Voltage (V)')
-    fig.colorbar(surf, shrink=0.5, aspect=10, label='Voltage (V)')
-
+    ax.set_xlabel(xlabel or x_var)
+    ax.set_ylabel(ylabel or y_var)
+    ax.set_zlabel(zlabel or z_var)
+    if title:
+        ax.set_title(title)
+    fig.colorbar(surf, shrink=0.5, aspect=10, label=zlabel or z_var)
+    plt.tight_layout()
+    plt.show()
+    return fig, ax
 
 
 def plot_trendline(setpoints, measured,
@@ -116,15 +187,13 @@ def plot_trendline(setpoints, measured,
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.title(title)
-    plt.grid(True)
+    plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
     plt.show()
 
 
 
-
-# TODO: I should probably abstract away the actual plotting here so i can reuse features like the labeled legend from data and such
 def plot_multi_file_data(file_data_list,
     x_var, y_var,
     x_scale=1, y_scale=1,
@@ -176,8 +245,9 @@ def plot_multi_file_data(file_data_list,
     if title:
         ax.set_title(title)
     if show_grid:
-        ax.grid(True)
-    plt.tight_layout()
+        ax.grid(True, alpha=0.3)
+
+    color_idx = 0
 
     # Iterate through files and plot
     for file_data in file_data_list:
@@ -209,7 +279,9 @@ def plot_multi_file_data(file_data_list,
             except (ValueError, IndexError, TypeError):
                 label = filename
             ax.plot(x_data * x_scale, y_data * y_scale,
-                   label=label, marker=marker, markersize=markersize)
+                   label=label, color=COLORS[color_idx % len(COLORS)],
+                   marker=marker, markersize=markersize)
+            color_idx += 1
 
         elif labeling_mode == 'data':
             # Label by data column
@@ -223,87 +295,29 @@ def plot_multi_file_data(file_data_list,
                 df_tmp = df[df[data_label_var] == label_val]
                 label = f"{data_label_var}={label_val}"
                 ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
-                       label=label, marker=marker, markersize=markersize)
+                       label=label, color=COLORS[color_idx % len(COLORS)],
+                       marker=marker, markersize=markersize)
+                color_idx += 1
 
         else:
             # No label
             ax.plot(x_data * x_scale, y_data * y_scale,
+                   color=COLORS[color_idx % len(COLORS)],
                    marker=marker, markersize=markersize)
+            color_idx += 1
 
     # Show legend if any labels were added
     if labeling_mode in ['filename', 'data']:
         ax.legend()
 
+    plt.tight_layout()
     plt.show()
     return fig, ax
 
 
-# Simple numeric normalization (works if labels are numeric or can be cast to float)
-# If labels are strings, we'll just index them
-# try:
-#     # Attempt numeric normalization (e.g., PWM values like 0, 25, 50, 75, 100)
-#     import numpy as np
-#     lbl_arr = np.array(unique_labels, dtype=float)
-#     vmin, vmax = lbl_arr.min(), lbl_arr.max()
-#     norm_lbl = mcolors.Normalize(vmin=vmin, vmax=vmax)
-#     cmap_lbl = plt.get_cmap('tab10')  # or 'viridis', 'plasma' etc.
-#     color_for_label = {val: cmap_lbl(norm_lbl(float(val))) for val in unique_labels}
-# except Exception:
-#     # Fallback: categorical colors (e.g., strings)
-#     cmap_lbl = plt.get_cmap('tab10')
-#     color_for_label = {val: cmap_lbl(i % 10) for i, val in enumerate(unique_labels)}
-#
-# # Track which labels have already been added to the legend
-# legend_added = set()
-
-
-#################################
-#### liveplotting ###########
-#################################
-
-def live_plot(self, data):
-    plt.ion()
-    update_frequency = 10
-
-    # Ensure that index is not out of range
-    if len(data) > 1:
-        adc = int(data[2])
-        self.afe_adc.append(adc)
-
-        # trim array
-        self.plot_cnt = self.plot_cnt + 1
-        if self.plot_cnt > 100:
-            self.afe_adc.pop(0)
-
-    if self.plot_cnt % update_frequency == 0:
-        drawnow(self.makeFig)
-        # self.makeFig() # GPT suggested not using drawnow() but I haven't gotten this to work
-        plt.pause(.00000001)
-
-
-
-class LivePlot:
-    def __init__(self, title, xlabel, ylabel, legend_loc="upper left"):
-        style.use('fivethirtyeight')
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(1, 1, 1)
-        self.xs = []
-        self.ys = []
-
-        self.ax.set_title(title)
-        self.ax.set_xlabel(xlabel)
-        self.ax.set_ylabel(ylabel)
-        self.ax.legend(legend_loc)
-
-    def show_animation(self, animate, interval=500):
-        self.ani = animation.FuncAnimation(self.fig, animate, interval=interval)
-        plt.show()
-
-
-
-###############################
-### PLOTLY LIVE PLOTTING    ###
-###############################
+###################################
+### PLOTLY LIVE PLOTTING    #######
+###################################
 
 def start_live_plot(
         data_bus: Queue,
@@ -311,12 +325,11 @@ def start_live_plot(
         channels: Sequence[str],
         buffer_size=3000,
         refresh_ms=200,
-        x_label: str,
-        y_label: str,
-        title="Live Plot (Function-Based)",
+        x_label: str = "Time",
+        title="Live Plot",
         host="127.0.0.1",
         port=8050,
-        debug = False,
+        debug=False,
 ):
     # set up buffers
     time_buf = deque(maxlen=buffer_size)
@@ -341,7 +354,6 @@ def start_live_plot(
                 pkt = data_bus.get_nowait()
             except Empty:
                 break
-            # Support command packets if you ever add them: e.g., {'__cmd__': 'clear'}
             if isinstance(pkt, (list, tuple)):
                 for s in pkt:
                     if isinstance(s, Mapping):
@@ -367,66 +379,53 @@ def start_live_plot(
     def update_graph(_):
         _ingest_from_bus()
 
-        if not time_buf:
-            return go.Figure(layout=go.Layout(template="plotly_white"))
+        n_ch = len(channels)
 
-        # TODO: I actually think I would like the graphs on totally separate y-axis
-        # TODO: I also need to make the generation of them modular (like create N Scatter plots for N channels input)
-        i = 0
-        fig = go.Figure(
-            data=[
+        if not time_buf:
+            fig = make_subplots(rows=n_ch, cols=1, shared_xaxes=True)
+            fig.update_layout(template="plotly_white")
+            return fig
+
+        fig = make_subplots(
+            rows=n_ch, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.08,
+        )
+
+        x = list(time_buf)
+        for i, ch in enumerate(channels):
+            fig.add_trace(
                 go.Scatter(
-                    x=list(time_buf),
-                    y=list(bufs[channels[i]]),
+                    x=x,
+                    y=list(bufs[ch]),
                     mode="lines",
-                    name=channels[i],
-                    line=dict(color="#1f77b4", width=2)
-                )
-                # go.Scatter(
-                #     x=list(time_buf),
-                #     y=list(bufs[right_ch]),
-                #     mode="lines",
-                #     name=right_ch,
-                #     line=dict(color="#ff7f0e", width=2),
-                #     yaxis="y2" # this binds this trace to the secondary axis
-                # )
-            ],
-            layout=go.Layout(
-                template="plotly_white",
-                margin=dict(l=60, r=40, t=35, b=50),
-                xaxis=dict(title=x_label),
-                yaxis=dict(title=y_label),
-                # yaxis2=dict(
-                #     title=right_ch,
-                #     overlaying="y",  # share the X and overlay on Y
-                #     side="right",
-                #     showgrid=False,
-                #     zeroline=False,
-                # ),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            ),
+                    name=ch,
+                    line=dict(color=COLORS[i % len(COLORS)], width=2),
+                ),
+                row=i + 1, col=1
+            )
+            fig.update_yaxes(title_text=ch, row=i + 1, col=1)
+
+        # only label the bottom x-axis
+        fig.update_xaxes(title_text=x_label, row=n_ch, col=1)
+
+        fig.update_layout(
+            template="plotly_white",
+            margin=dict(l=60, r=40, t=35, b=50),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=300 * n_ch,
         )
         return fig
 
 
-    # TODO: can I auto-start the tab in a browser when run executes?
-    # start server
+    # auto-open browser after a short delay (server needs to be up first)
+    url = f"http://{host}:{port}"
+    threading.Timer(1.0, webbrowser.open, args=[url]).start()
+
+    # start server (blocking)
     app.run(host=host,
             port=port,
             debug=debug,
             use_reloader=False,
             dev_tools_silence_routes_logging=True  # this hides very noisy printout
             )
-
-
-# TODO: Claude should see if I need this cleanup stuff
-#     # -----------------------------
-#     # Cleanup on exit
-#     # -----------------------------
-#     import atexit
-#
-#     def cleanup():
-#         stop_event.set()
-#         thread.join(timeout=1.0)
-#
-#     atexit.register(cleanup)

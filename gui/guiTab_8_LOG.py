@@ -25,10 +25,6 @@ from common import path_helper
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
-# TODO: I should probably add an option to even save the data file at all. Useful for stimulus generating (and testing)
-
-# TODO: have the labels on this page reference some ttk Style
-
 # TODO: while I have my nice UART evm I should play with serial logging more
 #   can it detect the proper number of named serial parameters first time? Just add names?
 
@@ -51,7 +47,8 @@ class TabLog(guic.ThemedFrame):
         self.record_config = None
         self.stimulus_config = None
         self.stimulus_generator = None
-        self.is_dual_stimulus = False
+        self.bus = None
+        self._dash_thread = None
 
         # Create container for all frames to use pack for better spacing control
         self.fr_top_container = tk.Frame(self, bg=self.theme_config["bg_dark"])
@@ -201,7 +198,27 @@ class TabLog(guic.ThemedFrame):
                         text="Graph",
                         variable=self.var_graph_data,
                         onvalue=1,
-                        offvalue=0).grid(row=6, column=2)
+                        offvalue=0,
+                        command=self.toggle_graph_options).grid(row=6, column=2)
+
+        # graph sub-options (only visible when Graph is checked)
+        self.var_3d_plot = tk.IntVar()
+        self.chk_3d_plot = ttk.Checkbutton(self.fr_setup,
+                        text="3D Plot",
+                        variable=self.var_3d_plot,
+                        onvalue=1,
+                        offvalue=0)
+        self.chk_3d_plot.grid(row=7, column=2)
+        self.chk_3d_plot.grid_remove()
+
+        self.var_subplots = tk.IntVar(value=1)
+        self.chk_subplots = ttk.Checkbutton(self.fr_setup,
+                        text="Subplots",
+                        variable=self.var_subplots,
+                        onvalue=1,
+                        offvalue=0)
+        self.chk_subplots.grid(row=7, column=3)
+        self.chk_subplots.grid_remove()
 
         # add check button to graph data
         self.var_save_data = tk.IntVar(value=1)
@@ -211,11 +228,13 @@ class TabLog(guic.ThemedFrame):
                         onvalue=1,
                         offvalue=0).grid(row=6, column=3)
 
-        # set up button START live GRAPH
-        btn_live_graph = tk.Button(self.fr_setup, text="Live Graph",
-                                command=lambda: self.start_live_plot(),
-                                bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_live_graph.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        # live plot checkbox
+        self.var_live_plot = tk.IntVar()
+        ttk.Checkbutton(self.fr_setup,
+                        text="Live Plot",
+                        variable=self.var_live_plot,
+                        onvalue=1,
+                        offvalue=0).grid(row=6, column=1)
 
     def init_fr_stimulus(self):
         """Initialize stimulus sweep configuration UI"""
@@ -399,6 +418,16 @@ class TabLog(guic.ThemedFrame):
     ##############################################################################
     # NOTE: some of these are linked to Checkbuttons (instead of Buttons)
 
+    def toggle_graph_options(self):
+        """Show/hide graph sub-options based on Graph checkbox"""
+        if self.var_graph_data.get():
+            self.chk_3d_plot.grid()
+            self.chk_subplots.grid()
+        else:
+            self.chk_3d_plot.grid_remove()
+            self.chk_subplots.grid_remove()
+            self.var_3d_plot.set(0)
+
     def toggle_use_ser(self):
         if self.var_use_ser.get():
             self.lbl_use_ser.grid()
@@ -505,13 +534,17 @@ class TabLog(guic.ThemedFrame):
             return
 
         # If we reach here, all requested instruments are ready and user has selected at least 1 instrument or stimulus
-        # TODO: Claude should check to see if this is the cleanest way to manage NOT saving data
         if self.var_save_data.get():
             logger.start_recording(self.csvh)
         self.record_status = True
         self.cc.recording = True  # Signal to ClassController that recording is active
         self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
         self.prompt.print(f"Recording every {self.record_speed} seconds ...")
+
+        # Start live plot if requested
+        if self.var_live_plot.get():
+            self._start_live_plot()
+
         threading.Thread(target=self.thread_record).start()
 
     def stop_record(self):
@@ -611,7 +644,6 @@ class TabLog(guic.ThemedFrame):
 
                 # Create the stimulus generator
                 self.stimulus_generator = logger.DualStimulusGenerator(self.stimulus_config)
-                self.is_dual_stimulus = True
                 self.prompt.print(f"Dual stimulus sweep configured: {len(self.stimulus_generator)} total steps")
                 self.prompt.print(f"  Outer loop: {len(self.stimulus_generator.outer_gen)} steps")
                 self.prompt.print(f"  Inner loop: {len(self.stimulus_generator.inner_gen)} steps")
@@ -638,7 +670,6 @@ class TabLog(guic.ThemedFrame):
 
                 # Create the stimulus generator
                 self.stimulus_generator = logger.StimulusGenerator(self.stimulus_config)
-                self.is_dual_stimulus = False
                 self.prompt.print(f"Stimulus sweep configured: {len(self.stimulus_generator)} steps")
 
         except ValueError as e:
@@ -656,7 +687,8 @@ class TabLog(guic.ThemedFrame):
             self.var_use_dmm.get(),
             self.var_use_ps.get(),
             self.var_use_fg.get(),
-            1, # TODO: this is a hardcode, als shouldn't be named `ps_channels`
+            1, # TODO: this is a hardcode, need to add a GUI element for this
+            # TODO: do I also want to add a channel selector for FG ?
             self.serial_log_params.get("1.0", "end").strip(),
             self.var_graph_data.get()
         )
@@ -668,16 +700,19 @@ class TabLog(guic.ThemedFrame):
         else:
             self.stimulus_config = None
             self.stimulus_generator = None
-            self.is_dual_stimulus = False
 
-        # setup recording
-        self.recName, self.csvh = logger.setup_recording(
-                self.data_dir,
-                prefix,
-                ext_text,
-                self.record_config,
-                self.stimulus_config
-        )
+        # setup recording (only create CSV file if saving)
+        if self.var_save_data.get():
+            self.recName, self.csvh = logger.setup_recording(
+                    self.data_dir,
+                    prefix,
+                    ext_text,
+                    self.record_config,
+                    self.stimulus_config
+            )
+        else:
+            self.recName = ""
+            self.csvh = None
 
     def thread_record(self):
         # Check if stimulus-based recording
@@ -693,10 +728,9 @@ class TabLog(guic.ThemedFrame):
             # Build a row of data based on what user wants
             row = self._collect_data_row()
 
-            # save row (locally and to a file if requested)
+            # save row (locally and to sinks)
             self.recorded_data.append(row)
-            if self.var_save_data.get():
-                self._save_data_row(row)
+            self._save_data_row(row)
 
             # Update record counter and UI
             self.recCnt += 1
@@ -708,22 +742,13 @@ class TabLog(guic.ThemedFrame):
     def start_record_stimulus(self):
         self.prompt.print(f"Starting stimulus sweep with {len(self.stimulus_generator)} steps")
 
-        # turn on power supply if being used
-        # TODO: I don't love how clunky this is (below). I should be able to just reference my stimulus_config variables to get all the info I need
-        #   and not have to reference self.is_dual_stimulus
-        # TODO: Claude can also broadly check how I can detect if I'm using a PS
-        if self.is_dual_stimulus:
-            if self.stimulus_config.outer_loop.stimulus_type == logger.StimulusType.PS_VOLTAGE:
-                self.cc.ps.output_on(self.stimulus_config.channel)
-            elif self.stimulus_config.inner_loop.stimulus_type == logger.StimulusType.PS_VOLTAGE:
-                self.cc.ps.output_on(self.stimulus_config.channel)
-        elif self.stimulus_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+        # turn on power supply if being used as a stimulus
+        if self.stimulus_config.uses_ps():
             self.cc.ps.output_on(self.stimulus_config.channel)
-        # end of equipment configure
 
         # start stimulus thread
         try:
-            if self.is_dual_stimulus:
+            if self.stimulus_config.is_dual:
                 self._thread_record_dual_stimulus()
             else:
                 self._thread_record_single_stimulus()
@@ -762,12 +787,11 @@ class TabLog(guic.ThemedFrame):
             # Add stimulus value to the row (use actual parameter name)
             param_name = logger.get_stimulus_column_name(self.stimulus_config.stimulus_type)
             row[param_name] = stimulus_value
-            row["Stimulus_Step"] = str(step_num)
+            row[logger.COL_STIMULUS_STEP] = str(step_num)
 
-            # Save row (locally and to a file if requested)
+            # Save row (locally and to sinks)
             self.recorded_data.append(row)
-            if self.var_save_data.get():
-                self._save_data_row(row)
+            self._save_data_row(row)
 
             # Update progress
             self.recCnt += 1
@@ -797,12 +821,11 @@ class TabLog(guic.ThemedFrame):
             inner_name = logger.get_stimulus_column_name(self.stimulus_config.inner_loop.stimulus_type)
             row[outer_name] = outer_value
             row[inner_name] = inner_value
-            row["Stimulus_Step"] = step_num
+            row[logger.COL_STIMULUS_STEP] = step_num
 
-            # Save row (locally and to a file if requested)
+            # Save row (locally and to sinks)
             self.recorded_data.append(row)
-            if self.var_save_data.get():
-                self._save_data_row(row)
+            self._save_data_row(row)
 
             # Update progress
             self.recCnt += 1
@@ -810,36 +833,36 @@ class TabLog(guic.ThemedFrame):
             self.labelRNums.config(text=progress_text)
 
     def _collect_data_row(self):
-        row = {"Time": datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
+        row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
 
         # Serial data if requested
         if self.record_config.use_ser is True:
-            row["SerialData"] = self.cc.ser.read_line()
+            row[logger.COL_SERIAL] = self.cc.ser.read_line()
 
         # DMM data if requested
         if self.record_config.use_dmm:
-            row["DMM_Meas1"] = self.cc.dmm.read_value()
+            row[logger.COL_DMM_MEAS1] = self.cc.dmm.read_value()
 
         # Power Supply data if requested
         if self.record_config.use_ps:
             try:
                 time.sleep(5)
                 print("getting Vset1")
-                row["PS_Vset1"] = self.cc.ps.get_set_voltage(1)
+                row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
                 time.sleep(5)
                 print("getting Vmeas1")
                 # TODO: some issue with E3640A where if in stimulus mode it turns off the output very briefly for measurement here
                 #   I think the issue is at this line where output goes off
                 #   is the format getting weird? Idk
-                row["PS_Vmeas1"] = self.cc.ps.get_voltage(1)
+                row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
                 time.sleep(5)
                 print("getting Imeas1")
-                row["PS_Imeas1"] = self.cc.ps.get_current(1)
+                row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
                 time.sleep(5)
-                if self.record_config.ps_channels == 2:
-                    row["PS_Vset2"] = self.cc.ps.get_set_voltage(2)
-                    row["PS_Vmeas2"] = self.cc.ps.get_set_voltage(2)
-                    row["PS_Imeas1"] = self.cc.ps.get_current(1)
+                if self.record_config.channels == 2:
+                    row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
+                    row[logger.COL_PS_VMEAS2] = self.cc.ps.get_set_voltage(2)
+                    row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
             except COMMUNICATION_ERRORS as e:
                 self.record_status = False
                 guih.alert_user("Communication Error", str(e), "error")
@@ -848,33 +871,31 @@ class TabLog(guic.ThemedFrame):
         # Function Generator data if requested
         if self.record_config.use_fg:
             try:
-                row["FG_Freq"] = self.cc.fg.query(
+                row[logger.COL_FG_FREQ] = self.cc.fg.query(
                     self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
                 )
-                row["FG_Waveform"] = self.cc.fg.query(
+                row[logger.COL_FG_WAVEFORM] = self.cc.fg.query(
                     self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
                 )
             except Exception:
-                row["FG_Freq"] = "ERROR"
-                row["FG_Waveform"] = "ERROR"
+                row[logger.COL_FG_FREQ] = "ERROR"
+                row[logger.COL_FG_WAVEFORM] = "ERROR"
 
         return row
 
     def _apply_stimulus(self, value, dual=None):
         """Apply the stimulus value to the appropriate instrument"""
         if dual is None:
-            stim_type = self.stimulus_config.stimulus_type
+            loop_config = self.stimulus_config
+        elif dual == 1:
+            loop_config = self.stimulus_config.outer_loop
+        elif dual == 2:
+            loop_config = self.stimulus_config.inner_loop
         else:
-            if dual == 1:
-                stim_type = self.stimulus_config.outer_loop.stimulus_type
-            elif dual == 2:
-                stim_type = self.stimulus_config.inner_loop.stimulus_type
-            else:
-                return
+            return
 
-        if stim_type == logger.StimulusType.PS_VOLTAGE:
-            channel = self.stimulus_config.channel
-            self.cc.ps.set_voltage(value, channel=channel)
+        if loop_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
+            self.cc.ps.set_voltage(value, channel=loop_config.channel)
 
         elif stim_type == logger.StimulusType.FG_FREQUENCY:
             self.cc.fg.set_frequency(value)
@@ -886,8 +907,10 @@ class TabLog(guic.ThemedFrame):
             raise ValueError(f"Unknown stimulus type: {stim_type}")
 
     def _save_data_row(self, row):
-        # self.csvh.add_row_from_dict(row)
-        self.bus.put(row)
+        if self.var_save_data.get() and self.csvh:
+            self.csvh.add_row_from_dict(row)
+        if self.bus is not None:
+            self.bus.put(row)
 
     ##############################################################################
     ####      PLOTTING FUNCTIONS        ##########################################
@@ -895,108 +918,128 @@ class TabLog(guic.ThemedFrame):
 
     def final_plot(self):
         df = pd.DataFrame(self.recorded_data)
-        x_data = None
-        y_data = None
-        xlabel = ""
-        ylabel = ""
-        title = ""
-        # TODO: add corresponding xlabel and ylabel stuff here (conditional on config)
-        #   NOTE: there might be some reuse between final plot and live plot parameters
 
-        # get X data based on either time based or stimulus
+        # build list of y channels: (column_key, label)
+        y_channels = []
+        if self.record_config.use_dmm:
+            y_channels.append((logger.COL_DMM_MEAS1, "DMM (V)"))
+        if self.record_config.use_ps:
+            y_channels.append((logger.COL_PS_VMEAS1, "PS Voltage (V)"))
+            y_channels.append((logger.COL_PS_IMEAS1, "PS Current (A)"))
+
+        if not y_channels:
+            return
+
+        # determine x-axis
         if self.stimulus_config and self.stimulus_config.enabled:
+            if self.stimulus_config.is_dual:
+                stim_type = self.stimulus_config.outer_loop.stimulus_type
+            else:
+                stim_type = self.stimulus_config.stimulus_type
+            x_var = logger.get_stimulus_column_name(stim_type)
+            xlabel = logger.get_stimulus_label(stim_type)
             title = "Stimulus based logging"
-            if self.stimulus_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
-                x_data = df["PS_Voltage"]
-                xlabel = "PS Voltage (V)"
         else:
-            x_data = df["Time"]
+            x_var = logger.COL_TIME
             xlabel = "Time"
             title = "Time based logging"
 
-        # TODO: 3D plots for this case? or that fancy label thing I have going on? Or both and the user can pick?
-        # if self.is_dual_stimulus:
+        # dual stimulus special plots (3D or grouped)
+        if self.stimulus_config and self.stimulus_config.enabled and self.stimulus_config.is_dual:
+            outer_type = self.stimulus_config.outer_loop.stimulus_type
+            inner_type = self.stimulus_config.inner_loop.stimulus_type
+            outer_col = logger.get_stimulus_column_name(outer_type)
+            inner_col = logger.get_stimulus_column_name(inner_type)
+            outer_label = logger.get_stimulus_label(outer_type)
+            inner_label = logger.get_stimulus_label(inner_type)
 
-        if self.record_config.use_dmm:
-            y_data = df["DMM_Meas1"]
-            ylabel = "DMM (V)"
+            for y_var, ylabel in y_channels:
+                if self.var_3d_plot.get():
+                    plotter.plot_3d_from_df(
+                        df,
+                        x_var=outer_col,
+                        y_var=inner_col,
+                        z_var=y_var,
+                        xlabel=outer_label,
+                        ylabel=inner_label,
+                        zlabel=ylabel,
+                        title=f"{outer_label} vs {inner_label} vs {ylabel}",
+                    )
+                else:
+                    plotter.plot_grouped(
+                        df,
+                        x_var=outer_col,
+                        y_var=y_var,
+                        group_var=inner_col,
+                        xlabel=outer_label,
+                        ylabel=ylabel,
+                        title=f"{outer_label} vs {ylabel} (grouped by {inner_label})",
+                    )
+            return
 
-        # TODO: for time plots would be so much cleaner to exclude date from information
-        plotter.plot(
-            x_data,
-            y_data,
-            xlabel=xlabel,
-            ylabel=ylabel,
-            title=title
-        )
+        # single channel: simple plot
+        if len(y_channels) == 1:
+            y_var, ylabel = y_channels[0]
+            plotter.plot(df[x_var], df[y_var], xlabel=xlabel, ylabel=ylabel, title=title)
+            return
 
-    def start_live_plot(self):
-        # organize params based on record config
-        # if self.record_config.use_dmm:
-        #     pass
-        # if self.record_config.use_ps:
-        #     pass
-        xlabel = ""
-        ylabel = ""
-        title = ""
-        # TODO: have Claude conditionally have these labels being formed
+        # multiple channels
+        if self.var_subplots.get():
+            # stacked subplots, shared x-axis
+            channels = [(df[y_var], ylabel) for y_var, ylabel in y_channels]
+            plotter.plot_subplots(df[x_var], channels, xlabel=xlabel, title=title)
+        else:
+            # separate plot windows
+            for y_var, ylabel in y_channels:
+                plotter.plot(df[x_var], df[y_var], xlabel=xlabel, ylabel=ylabel, title=f"{title} - {ylabel}")
+
+    def _start_live_plot(self):
+        """Start the Dash live plot server if not already running"""
+        if self._dash_thread is not None and self._dash_thread.is_alive():
+            return  # Dash already running, reuse existing bus
 
         self.bus = Queue(maxsize=50_000)
-        self._dash_thread = None
 
-        # don't save data
-        # TODO: evaluate this (would saving the data actually glitch out live plot so much? What's the overhead on that?
-        self.var_save_data.set(1)
-        self.start_record()
+        # Determine x-axis: stimulus value if in stimulus mode, otherwise time
+        if self.stimulus_config and self.stimulus_config.enabled:
+            if self.stimulus_config.is_dual:
+                stim_type = self.stimulus_config.outer_loop.stimulus_type
+            else:
+                stim_type = self.stimulus_config.stimulus_type
+            x_key = logger.get_stimulus_column_name(stim_type)
+            x_label = logger.get_stimulus_label(stim_type)
+            title = "Stimulus Sweep"
+        else:
+            x_key = logger.COL_TIME
+            x_label = "Time"
+            title = "Live Plot"
 
-        self.thread_live_plot(xlabel, ylabel, title)
-        for i in range(0, 100):
-            time.sleep(0.3)
-            self.push_live_data()
+        # Build channels list from record config
+        channels = []
+        if self.record_config.use_dmm:
+            channels.append(logger.COL_DMM_MEAS1)
+        if self.record_config.use_ps:
+            channels.append(logger.COL_PS_VMEAS1)
+            channels.append(logger.COL_PS_IMEAS1)
 
-    def stop_live_plot(self):
-        self._dash_thread.stop()
+        if not channels:
+            self.prompt.print("No channels selected for live plot")
+            return
 
-    def thread_live_plot(self, xlabel, ylabel, title):
         self._dash_thread = threading.Thread(
             target=plotter.start_live_plot,
             kwargs=dict(
                 data_bus=self.bus,
-                x_key="Time",
-                channels=["DMM_Meas1"],
+                x_key=x_key,
+                channels=channels,
                 buffer_size=3000,
                 refresh_ms=150,
-                xlabel=xlabel,
-                ylabel=ylabel,
+                x_label=x_label,
                 title=title,
                 port=8050,
-                debug=False, # disabling debug
+                debug=False,
             ),
             daemon=True
         )
         self._dash_thread.start()
-
-    def push_live_data(self):
-        pass
-        # t = time.perf_counter()
-        # sample = {"t": t, "PS Voltage": 2.5, "FG Frequency": 1000.0}
-        # self.bus.put(sample)
-
-    def thread_live_plot_old(self):
-        # TODO: get creative about labeling here
-        lplt = plotter.LivePlot("Live plot", "X-axis", "Y-axis")
-
-        def animate(i):
-            for j in range(0, 10):
-                # TODO: actually retrieve the desired channel here (currently 1 is hardcoded)
-                reading = self.cc.ps.get_current(1)
-                # timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-
-                lplt.xs.append(len(lplt.xs))  # or a timestamp
-                lplt.ys.append(reading)
-
-            # Clear and plot again, but avoid clearing the entire plot for better visual
-            lplt.ax.clear()
-            lplt.ax.plot(lplt.xs[-2000:], lplt.ys[-2000:], label="Current (A)")
-
-        lplt.show_animation(animate, interval=200)
+        self.prompt.print("Live plot started at http://127.0.0.1:8050")

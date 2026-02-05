@@ -1,7 +1,12 @@
+"""
+@file     guiTab_9_GRAPH.py
+@author   Anders Bandt
+@date     January 2026
+@brief    handles plotting from saved .csv files
+"""
 
 
 # import needed packages
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import json
@@ -22,13 +27,9 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: add a button to clear all graphing fields
 
 # TODO: give user the option between scatter and line plot ?
 
-# TODO: the filename filter actually would make more sense in the other frame
-
-# TODO: what is the textbox by the Filename labeler doing?
 # TODO: also the file name labeler is only displaying "AREC" right now
 
 # TODO: I don't think with my current implementation you can do both types of labeling (filename and data label). Check if that would be possible
@@ -117,7 +118,8 @@ class TabGraph(guic.ThemedFrame):
                                      height=1, width=8)
         btn_load_preset.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='w')
 
-        # TODO: make it more intuitive on what is labeling and what is data specific
+        # TODO: Claude should add a button to clear all graphing fields
+
         # graph labeling
         tk.Label(self.fr_setup, text="Title").grid(row=2, column=0, padx=5, pady=2)
         tk.Label(self.fr_setup, text="X-axis").grid(row=3, column=0, padx=5, pady=2)
@@ -127,7 +129,6 @@ class TabGraph(guic.ThemedFrame):
         tk.Label(self.fr_setup, text="X-variable").grid(row=7, column=0, padx=5, pady=2)
         tk.Label(self.fr_setup, text="Y-variable").grid(row=8, column=0, padx=5, pady=2)
 
-        # TODO: the title text box might have to be bigger (can I make it dynamic?)
         self.title = tk.Text(self.fr_setup, height=2, width=20)
         self.x_label = tk.Text(self.fr_setup, height=1, width=20)
         self.y_label = tk.Text(self.fr_setup, height=1, width=20)
@@ -153,16 +154,6 @@ class TabGraph(guic.ThemedFrame):
         self.x_var.grid(row=7, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
         self.y_var.grid(row=8, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-        # add check box and text field to filter files by string
-        self.var_use_file_regex = tk.IntVar()
-        ttk.Checkbutton(self.fr_setup,
-                        text="Use Filename Filter",
-                        variable=self.var_use_file_regex,
-                        onvalue=1,
-                        offvalue=0).grid(row=9, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.file_filter = tk.Text(self.fr_setup, height=1, width=20)
-        self.file_filter.grid(row=9, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-
         # add check box and text field to label graphs by string in filename
         self.var_use_file_labeler = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
@@ -170,6 +161,7 @@ class TabGraph(guic.ThemedFrame):
                         variable=self.var_use_file_labeler,
                         onvalue=1,
                         offvalue=0).grid(row=10, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        # TODO: what is this text box actually doing?
         self.file_labeler = tk.Text(self.fr_setup, height=1, width=20)
         self.file_labeler.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
@@ -217,6 +209,16 @@ class TabGraph(guic.ThemedFrame):
         # Selection info label
         self.file_selection_label = tk.Label(fr_m, text="0 files selected", relief='sunken')
         self.file_selection_label.grid(row=6, column=0, padx=10, pady=5, sticky='ew')
+
+        # add check box and text field to filter files by string
+        self.var_use_file_regex = tk.IntVar()
+        ttk.Checkbutton(fr_m,
+                        text="Use Filename Filter",
+                        variable=self.var_use_file_regex,
+                        onvalue=1,
+                        offvalue=0).grid(row=9, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.file_filter = tk.Text(self.fr_setup, height=1, width=20)
+        self.file_filter.grid(row=7, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button to REFRESH FILES
         btn_refresh_files = tk.Button(fr_m, text="Refresh Files",

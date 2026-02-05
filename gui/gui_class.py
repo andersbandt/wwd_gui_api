@@ -63,8 +63,7 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
-# TODO: Claude should parse everything and make some recomendations on styling (remove reduntant stuff, consistenty)
-# TODO: Claude should audit all the frame spacing and make sure they reference theme_config
+# TODO: (GUI) Claude should audit all the frame spacing and make sure they reference theme_config
 
 
 ##########################################
@@ -90,18 +89,17 @@ class ThemedApp:
 
         if compact:
             # Scale padding and prompt sizes to 75%
-            # TODO: audit that I'm resizing everything I need to here
             self.theme_config = scale_theme(
                 self.theme_config, 0.75,
                 "pad.xpad_s",
                 "pad.ypad_s",
                 "size.w_prompt",
-                "size.h_prompt"
+                "size.h_prompt",
                 #"size.w_prompt_s"
+                "font.size_prompt"
             )
 
-            # TODO: I want the notebook tbs to remain unaffected by this resizing
-            # TODO: I also want prompt text resizing to be affected differently
+            # TODO: Claude should have the notebook tabs unaffected by this resizing
             self.theme_config = scale_theme(
                 self.theme_config, 0.60,
                 "font.size"
@@ -208,7 +206,7 @@ class Prompt(ThemedFrame):
 
         # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
-                                                font = (self.theme_config["font"]["family"], self.theme_config["font"]["size"]),
+                                                font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_prompt"]),
                                                 height=height,
                                                 width=width,
                                                 bg=self.theme_config["dark_2"],
@@ -219,7 +217,6 @@ class Prompt(ThemedFrame):
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
     # gui_print: prints a message on a Tkinter frame
-    # TODO: add some toggle switch for timestamps? What's best to handle that?
     def print(self, message, print_type=None, timestamp=True):
         prefix = ">>> "
         if timestamp:
@@ -367,7 +364,9 @@ class SerialConnFrame(ConnFrame):
         # Check if port is already actively connected
         is_active, active_usage = self.cc.is_port_active(self.port)
         if is_active:
-            print(f"ERROR: Port {self.port} is already in use by {active_usage}")
+            message = f"ERROR: Port {self.port} is already in use by {active_usage}"
+            print(message)
+            guih.alert_user("Port already in use", message, "error")
             self.status = False
             self.gui_refresh()
             return False

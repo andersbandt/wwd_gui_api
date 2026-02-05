@@ -30,6 +30,7 @@
         "family": "Arial",
         "size": 12,
         "size_s": 9,
+        "size_prompt": 10,
         "style": "bold"
     },
     "pad": {

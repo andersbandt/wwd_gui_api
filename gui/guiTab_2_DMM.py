@@ -5,7 +5,6 @@
 @brief    control multimeter test equipment
 """
 
-
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
@@ -22,7 +21,6 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: add a setting in master.ini to configure what sample speed is on connection
 
 class TabDMM(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
@@ -269,6 +267,7 @@ class TabDMM(guic.ThemedFrame):
             self.prompt.print(f"Got id: {self.dmm_id}")
             self.cc.set_dmm(self.dmm)
 
+            # TODO: Claude should add this as an option in master.ini
             self.cc.dmm.set_sample_speed("fast")
 
             self.gui_refresh("call")

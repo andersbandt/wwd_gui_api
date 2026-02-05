@@ -1,3 +1,5 @@
+# TODO: ask claude to go around and add these to every file (can I do it on my main Linux PC to get actual dates?)
+
 """
 @file     main.py
 @author   Anders Bandt

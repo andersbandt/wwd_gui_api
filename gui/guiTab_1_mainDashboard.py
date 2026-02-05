@@ -50,10 +50,6 @@ def open_file_cross_platform(file_path):
         return False
 
 
-# TODO ATE: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
-#   actually seems like I can connect but there is no status update
-
-
 class TabMainDashboard(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)
@@ -73,16 +69,10 @@ class TabMainDashboard(guic.ThemedFrame):
 
 
 
-        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
-        self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
-
 
 
         # add some variables for AutoConn frame
         self.fr_main_status.status = self.cc.relay.status
-        # TODO: this canvas should definitely not be set here
-        self.canvas1 = tk.Canvas(self.fr_main_status, width=50, height=50)
 
         # setup prompt
         self.prompt = guic.Prompt(self,
@@ -90,7 +80,7 @@ class TabMainDashboard(guic.ThemedFrame):
                                    "Main",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+
 
         # initialize tab content
         self.initTabContent()
@@ -100,7 +90,13 @@ class TabMainDashboard(guic.ThemedFrame):
         self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
+
+        # place everything on the grid
+        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
+        self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
         self.fr_port.grid(row=1, column=1, padx=30, pady=12)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # refresh the relay state
         self.gui_refresh("auto")
@@ -129,7 +125,6 @@ class TabMainDashboard(guic.ThemedFrame):
         # Create and place individual relay control buttons
         for i in range(self.cc.relay.num_relays):
             name = self.cc.relay.get_relay_mapping(i + 1)
-            # TODO: phase out this usage off ttk.Button (if you think it's worth it, it might not be)
             btn = ttk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i + 1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=5)
             self.relay_btns.append(btn)
@@ -147,11 +142,7 @@ class TabMainDashboard(guic.ThemedFrame):
     def init_fr_control(self):
         fr_m = self.fr_control
 
-        # TODO: have the style of this reference theme settings
-        self.label_control = tk.Label(fr_m,
-                                      text="Focus this frame and type something",
-                                      bg="lightgrey",
-                                      font=("Arial", 14))
+        self.label_control = ttk.Label(fr_m, style="TPinkLabel.TLabel")
 
         btn1 = tk.Button(fr_m, text=f"BUTTON 1",fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"],
                          command=lambda: self.send_command("a"))

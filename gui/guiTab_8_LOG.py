@@ -1,5 +1,10 @@
+"""
+@file     guiTab_8_LOG.py
+@author   Anders Bandt
+@date     January 2026
+@brief    handles logging, live plotting, stimulus
+"""
 
-# TODO: ask claude to enforce file header formatting for tabs only
 
 # import needed GUI modules
 import tkinter as tk
@@ -24,9 +29,6 @@ from common import plotter
 from common import path_helper
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
-
-# TODO: while I have my nice UART evm I should play with serial logging more
-#   can it detect the proper number of named serial parameters first time? Just add names?
 
 
 class TabLog(guic.ThemedFrame):
@@ -565,7 +567,6 @@ class TabLog(guic.ThemedFrame):
         self.lbl_data_directory.config(text=self.data_dir)
 
     def set_record_speed(self):
-        # TODO: this function needs to know if we want serial data to base our timing off that value (record samples at each UART output)
         # changes the recording speed based on recording speed GUI element
         def parse_time_to_seconds(time_str):
             """Convert a time string to seconds.

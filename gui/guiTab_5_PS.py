@@ -109,6 +109,12 @@ class TabPS(guic.ThemedFrame):
         )
         self.ate_drop[0].grid(row=0, column=2, padx=15)
 
+        # Load and set previous model if available
+        previous_model = self.cc.get_used_model("PS_PyVISA")
+        if previous_model and previous_model in self.registry:
+            self.ate_drop[1].set(previous_model)
+            print(f"Restored previous PS model: {previous_model}")
+
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
         self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
@@ -443,6 +449,10 @@ class TabPS(guic.ThemedFrame):
             self.cc.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
+
+            # Save the selected model for next time
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "PS_PyVISA")
 
             # gui_refresh
             self.gui_refresh_channel_state()

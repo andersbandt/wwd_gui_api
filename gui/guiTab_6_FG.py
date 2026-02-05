@@ -44,6 +44,7 @@ class TabFG(guic.ThemedFrame):
         self.waveform = "?"
         self.duty_cycle = "?"
         self.amplitude = "?"
+        self.offset = "?"
 
         # set up recording / data information
         self.recName = False
@@ -94,6 +95,12 @@ class TabFG(guic.ThemedFrame):
         )
         self.ate_drop[0].grid(row=0, column=2, padx=15)
 
+        # Load and set previous model if available
+        previous_model = self.cc.get_used_model("FG_PyVISA")
+        if previous_model and previous_model in self.registry:
+            self.ate_drop[1].set(previous_model)
+            print(f"Restored previous FG model: {previous_model}")
+
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
         self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
@@ -111,25 +118,33 @@ class TabFG(guic.ThemedFrame):
         self.labelWaveform = ttk.Label(self.fr_info, width=15, text='Waveform', style="TLabel", anchor='w')
         self.labelFrequency = ttk.Label(self.fr_info, width=15, text='Frequency (Hz)', style="TLabel", anchor='w')
         self.labelDutyCycle = ttk.Label(self.fr_info, width=15, text='Duty Cycle (%)', style="TLabel", anchor='w')
+        self.labelAmplitude = ttk.Label(self.fr_info, width=15, text='Amplitude (V)', style="TLabel", anchor='w')
+        self.labelOffset = ttk.Label(self.fr_info, width=15, text='Offset (V)', style="TLabel", anchor='w')
 
         # Position the parameter labels
         self.labelWaveform.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelFrequency.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelDutyCycle.grid(row=5, column=0, sticky='W', padx=5, pady=2)
+        self.labelAmplitude.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+        self.labelOffset.grid(row=7, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for parameters
         self.valueWaveform = tk.Label(self.fr_info, width=15, text='', relief='sunken', anchor='w')
         self.valueFrequency = tk.Label(self.fr_info, width=15, text='', relief='sunken', anchor='w')
         self.valueDutyCycle = tk.Label(self.fr_info, width=15, text='', relief='sunken', anchor='w')
+        self.valueAmplitude = tk.Label(self.fr_info, width=15, text='', relief='sunken', anchor='w')
+        self.valueOffset = tk.Label(self.fr_info, width=15, text='', relief='sunken', anchor='w')
 
         # Position the value labels
         self.valueWaveform.grid(row=3, column=1, sticky='E', padx=5, pady=2)
         self.valueFrequency.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueDutyCycle.grid(row=5, column=1, sticky='E', padx=5, pady=2)
+        self.valueAmplitude.grid(row=6, column=1, sticky='E', padx=5, pady=2)
+        self.valueOffset.grid(row=7, column=1, sticky='E', padx=5, pady=2)
 
         # ADD A REFRESH BUTTON
         self.btn_update = tk.Button(self.fr_info, text='UPDATE FG', command=self.update_FG)
-        self.btn_update.grid(row=6, column=2, pady=5, padx=3, sticky='W')
+        self.btn_update.grid(row=8, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -167,15 +182,37 @@ class TabFG(guic.ThemedFrame):
         self.duty_entry.grid(row=2, column=1, padx=10, pady=10)
         self.duty_set_btn.grid(row=2, column=2, padx=10, pady=10)
 
+        # AMPLITUDE CONTROL
+        self.amplitude_label = ttk.Label(fr_m, text="Amplitude (V)", style="TLabel")
+        self.amplitude_entry = tk.Entry(fr_m)
+        self.amplitude_set_btn = tk.Button(fr_m, text="Set Amplitude",
+                                           command=lambda: self.set_amplitude(self.amplitude_entry.get()))
+
+        self.amplitude_label.grid(row=3, column=0, padx=10, pady=10)
+        self.amplitude_entry.grid(row=3, column=1, padx=10, pady=10)
+        self.amplitude_set_btn.grid(row=3, column=2, padx=10, pady=10)
+
+        # OFFSET CONTROL
+        self.offset_label = ttk.Label(fr_m, text="Offset (V)", style="TLabel")
+        self.offset_entry = tk.Entry(fr_m)
+        self.offset_set_btn = tk.Button(fr_m, text="Set Offset",
+                                        command=lambda: self.set_offset(self.offset_entry.get()))
+
+        self.offset_label.grid(row=4, column=0, padx=10, pady=10)
+        self.offset_entry.grid(row=4, column=1, padx=10, pady=10)
+        self.offset_set_btn.grid(row=4, column=2, padx=10, pady=10)
+
         # OUTPUT TOGGLE
         self.output_toggle_btn = tk.Button(fr_m, text="Toggle Output", command=self.toggle_output)
-        self.output_toggle_btn.grid(row=3, column=1, padx=10, pady=10)
+        self.output_toggle_btn.grid(row=5, column=1, padx=10, pady=10)
 
     def gui_refresh_info(self):
         if self.fr_port.status:
             self.valueWaveform.config(text='{:8s}'.format(str(self.waveform)))
             self.valueFrequency.config(text='{:8s}'.format(str(self.frequency)))
             self.valueDutyCycle.config(text='{:8s}'.format(str(self.duty_cycle)))
+            self.valueAmplitude.config(text='{:8s}'.format(str(self.amplitude)))
+            self.valueOffset.config(text='{:8s}'.format(str(self.offset)))
 
     def gui_refresh(self, event):
         if event == "auto":
@@ -202,6 +239,22 @@ class TabFG(guic.ThemedFrame):
                     )
                 except ValueError:
                     self.duty_cycle = "N/A"
+
+                # Try to get amplitude if available
+                try:
+                    self.amplitude = self.cc.fg.query(
+                        self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_amplitude")
+                    )
+                except ValueError:
+                    self.amplitude = "N/A"
+
+                # Try to get offset if available
+                try:
+                    self.offset = self.cc.fg.query(
+                        self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_offset")
+                    )
+                except ValueError:
+                    self.offset = "N/A"
 
                 self.gui_refresh_info()
             except COMMUNICATION_ERRORS as e:
@@ -277,6 +330,36 @@ class TabFG(guic.ThemedFrame):
         else:
             guih.alert_user("Can't set duty cycle", "No FG connection!", "error")
 
+    def set_amplitude(self, amplitude_str):
+        if self.cc.get_fg_status():
+            try:
+                amplitude = float(amplitude_str)
+                self.cc.fg.set_amplitude(amplitude)
+                self.amplitude = amplitude
+                self.prompt.print(f"Set amplitude to {amplitude} V")
+                self.gui_refresh_info()
+            except ValueError:
+                guih.alert_user("Invalid Input", "Amplitude must be a number", "error")
+            except Exception as e:
+                guih.alert_user("Can't set amplitude", str(e), "error")
+        else:
+            guih.alert_user("Can't set amplitude", "No FG connection!", "error")
+
+    def set_offset(self, offset_str):
+        if self.cc.get_fg_status():
+            try:
+                offset = float(offset_str)
+                self.cc.fg.set_offset(offset)
+                self.offset = offset
+                self.prompt.print(f"Set offset to {offset} V")
+                self.gui_refresh_info()
+            except ValueError:
+                guih.alert_user("Invalid Input", "Offset must be a number", "error")
+            except Exception as e:
+                guih.alert_user("Can't set offset", str(e), "error")
+        else:
+            guih.alert_user("Can't set offset", "No FG connection!", "error")
+
     #################################
     #### SERIAL (COM)  ##############
     #################################
@@ -313,6 +396,10 @@ class TabFG(guic.ThemedFrame):
                 self.cc.fg.write("OUTPut OFF")
             except Exception:
                 pass  # Some FGs may not support this command
+
+            # Save the selected model for next time
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "FG_PyVISA")
 
             return True
         else:  # BAD ID received

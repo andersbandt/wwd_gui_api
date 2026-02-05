@@ -12,6 +12,7 @@ import tkinter.messagebox as tkmb
 
 # import needed packages
 import time
+import configparser
 from datetime import datetime
 
 # import user defined modules
@@ -45,6 +46,9 @@ class TabDMM(guic.ThemedFrame):
         self.dmm_Fu2 = ''
         self.dmm_Meas2 = ''
 
+        # Load DMM configuration
+        self.default_sample_speed = self.load_dmm_config()
+
         # set up prompt
         self.prompt = guic.Prompt(self,
                                   self.theme_config,
@@ -76,6 +80,24 @@ class TabDMM(guic.ThemedFrame):
         self.fr_port.grid(row=0, column=2, padx=30, pady=12)
         self.prompt.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky='W')
 
+    def load_dmm_config(self):
+        """Load DMM configuration from master.ini"""
+        config = configparser.ConfigParser()
+        config.read("config/master.ini")
+
+        # Get sample speed with default fallback
+        sample_speed = "fast"  # Default value
+        if "DMM" in config:
+            sample_speed = config["DMM"].get("sample_speed", "fast").strip()
+
+        # Validate the value
+        valid_speeds = ["slow", "medium", "fast"]
+        if sample_speed not in valid_speeds:
+            print(f"Invalid DMM sample_speed '{sample_speed}' in config. Using 'fast'.")
+            sample_speed = "fast"
+
+        print(f"DMM default sample speed: {sample_speed}")
+        return sample_speed
 
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")
@@ -95,6 +117,12 @@ class TabDMM(guic.ThemedFrame):
             sorted(self.registry.keys())
         )
         self.ate_drop[0].grid(row=0, column=2, padx=15)
+
+        # Load and set previous model if available
+        previous_model = self.cc.get_used_model("DMM_Serial")
+        if previous_model and previous_model in self.registry:
+            self.ate_drop[1].set(previous_model)
+            print(f"Restored previous DMM model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -168,6 +196,8 @@ class TabDMM(guic.ThemedFrame):
                                                    ["slow", "medium", "fast"],
                                                    callback_func=self.dmm_set_sample)
 
+        # Set the default sample speed from config
+        self.sample_drop[1].set(self.default_sample_speed)
 
         self.mode_drop[0].grid(row=1 ,column=1, pady=self.theme_config["size"]["ypad_s"])
         self.range_drop[0].grid(row=2, column=1, pady=self.theme_config["size"]["ypad_s"])
@@ -267,8 +297,13 @@ class TabDMM(guic.ThemedFrame):
             self.prompt.print(f"Got id: {self.dmm_id}")
             self.cc.set_dmm(self.dmm)
 
-            # TODO: Claude should add this as an option in master.ini
-            self.cc.dmm.set_sample_speed("fast")
+            # Set sample speed from config
+            self.cc.dmm.set_sample_speed(self.default_sample_speed)
+            self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
+
+            # Save the selected model for next time
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "DMM_Serial")
 
             self.gui_refresh("call")
             self.labelTimeConnectedValue.config(

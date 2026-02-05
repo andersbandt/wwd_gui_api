@@ -90,6 +90,12 @@ class TabATE(guic.ThemedFrame):
             sorted(self.registry.keys())
         )
 
+        # Load and set previous model if available
+        previous_model = self.cc.get_used_model("Generic_ATE")
+        if previous_model and previous_model in self.registry:
+            self.ate_drop[1].set(previous_model)
+            print(f"Restored previous ATE model: {previous_model}")
+
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
         self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
@@ -391,6 +397,10 @@ class TabATE(guic.ThemedFrame):
                 text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
             )
             self.fr_port.set_status(True)
+
+            # Save the selected model for next time
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "Generic_ATE")
 
             # gui refresh
             self.gui_refresh("call")

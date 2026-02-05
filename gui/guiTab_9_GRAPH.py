@@ -5,7 +5,6 @@
 @brief    handles plotting from saved .csv files
 """
 
-
 # import needed packages
 import pandas as pd
 import os
@@ -26,13 +25,13 @@ from common import plotter
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
+# NOTE: File name labeler currently uses full filename. Future enhancement: add support for
+#       index/range/slice notation to extract specific parts of underscore-delimited filenames.
+#       The file_labeler text field is present but currently not used for this purpose.
 
-
-# TODO: give user the option between scatter and line plot ?
-
-# TODO: also the file name labeler is only displaying "AREC" right now
-
-# TODO: I don't think with my current implementation you can do both types of labeling (filename and data label). Check if that would be possible
+# NOTE: Both labeling types can be used together. When both checkboxes are enabled:
+#       - Color represents the data label value (consistent across files)
+#       - Line style represents the file (up to 4 distinct styles)
 
 
 # Define named tuple for file data
@@ -41,7 +40,7 @@ FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
 
 def focus_next_widget(event):
     event.widget.tk_focusNext().focus()
-    return("break")
+    return "break"
 
 
 class TabGraph(guic.ThemedFrame):
@@ -67,7 +66,7 @@ class TabGraph(guic.ThemedFrame):
         # set up prompt
         self.prompt = guic.Prompt(self,
                                   self.theme_config,
-                                   "Data Logger Output",
+                                  "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
 
@@ -101,24 +100,33 @@ class TabGraph(guic.ThemedFrame):
         tk.Label(self.fr_setup, text="Preset:").grid(row=0, column=0, padx=5, pady=2, sticky='e')
 
         self.preset_combo = ttk.Combobox(self.fr_setup, width=18, state='readonly')
-        self.preset_combo.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.preset_combo.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                               pady=self.theme_config["pad"]["ypad_s"])
         self.preset_combo.bind('<<ComboboxSelected>>', self.on_preset_select)
 
         btn_save_preset = tk.Button(self.fr_setup, text="Save",
-                                     command=self.save_preset,
-                                     bg=self.theme_config["success"],
-                                     fg=self.theme_config["fg_dark"],
-                                     height=1, width=8)
-        btn_save_preset.grid(row=1, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+                                    command=self.save_preset,
+                                    bg=self.theme_config["success"],
+                                    fg=self.theme_config["fg_dark"],
+                                    height=1, width=8)
+        btn_save_preset.grid(row=1, column=0, padx=self.theme_config["pad"]["xpad_s"],
+                             pady=self.theme_config["pad"]["ypad_s"])
 
         btn_load_preset = tk.Button(self.fr_setup, text="Load",
-                                     command=self.load_preset,
-                                     bg=self.theme_config["light_2"],
-                                     fg=self.theme_config["fg_dark"],
-                                     height=1, width=8)
-        btn_load_preset.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='w')
+                                    command=self.load_preset,
+                                    bg=self.theme_config["light_2"],
+                                    fg=self.theme_config["fg_dark"],
+                                    height=1, width=8)
+        btn_load_preset.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                             pady=self.theme_config["pad"]["ypad_s"], sticky='w')
 
-        # TODO: Claude should add a button to clear all graphing fields
+        btn_clear_all = tk.Button(self.fr_setup, text="Clear All",
+                                  command=self.clear_all_fields,
+                                  bg=self.theme_config["warning"],
+                                  fg=self.theme_config["fg_dark"],
+                                  height=1, width=8)
+        btn_clear_all.grid(row=1, column=2, padx=self.theme_config["pad"]["xpad_s"],
+                           pady=self.theme_config["pad"]["ypad_s"], sticky='w')
 
         # graph labeling
         tk.Label(self.fr_setup, text="Title").grid(row=2, column=0, padx=5, pady=2)
@@ -128,6 +136,7 @@ class TabGraph(guic.ThemedFrame):
         tk.Label(self.fr_setup, text="Y-scale").grid(row=6, column=0, padx=5, pady=2)
         tk.Label(self.fr_setup, text="X-variable").grid(row=7, column=0, padx=5, pady=2)
         tk.Label(self.fr_setup, text="Y-variable").grid(row=8, column=0, padx=5, pady=2)
+        tk.Label(self.fr_setup, text="Plot style").grid(row=9, column=0, padx=5, pady=2)
 
         self.title = tk.Text(self.fr_setup, height=2, width=20)
         self.x_label = tk.Text(self.fr_setup, height=1, width=20)
@@ -136,6 +145,7 @@ class TabGraph(guic.ThemedFrame):
         self.y_scale = tk.Spinbox(self.fr_setup, from_=1, to=10e9)
         self.x_var = tk.Text(self.fr_setup, height=1, width=20)
         self.y_var = tk.Text(self.fr_setup, height=1, width=20)
+        self.plot_style_drop = guih.generate_drop_down(self.fr_setup, ["Line", "Scatter", "Line + Scatter"])
 
         self.title.bind("<Tab>", focus_next_widget)
         self.x_label.bind("<Tab>", focus_next_widget)
@@ -146,13 +156,25 @@ class TabGraph(guic.ThemedFrame):
         self.y_var.bind("<Tab>", focus_next_widget)
 
         # Widgets
-        self.title.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.x_label.grid(row=3, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.y_label.grid(row=4, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.x_scale.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.y_scale.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.x_var.grid(row=7, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.y_var.grid(row=8, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.title.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                        pady=self.theme_config["pad"]["ypad_s"])
+        self.x_label.grid(row=3, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                          pady=self.theme_config["pad"]["ypad_s"])
+        self.y_label.grid(row=4, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                          pady=self.theme_config["pad"]["ypad_s"])
+        self.x_scale.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                          pady=self.theme_config["pad"]["ypad_s"])
+        self.y_scale.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                          pady=self.theme_config["pad"]["ypad_s"])
+        self.x_var.grid(row=7, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                        pady=self.theme_config["pad"]["ypad_s"])
+        self.y_var.grid(row=8, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                        pady=self.theme_config["pad"]["ypad_s"])
+        self.plot_style_drop[0].grid(row=9, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                                     pady=self.theme_config["pad"]["ypad_s"])
+
+        # Set default plot style
+        self.plot_style_drop[1].set("Line + Scatter")
 
         # add check box and text field to label graphs by string in filename
         self.var_use_file_labeler = tk.IntVar()
@@ -160,10 +182,14 @@ class TabGraph(guic.ThemedFrame):
                         text="Use Filename Labeler",
                         variable=self.var_use_file_labeler,
                         onvalue=1,
-                        offvalue=0).grid(row=10, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        # TODO: what is this text box actually doing?
+                        offvalue=0).grid(row=10, column=0, padx=self.theme_config["pad"]["xpad_s"],
+                                         pady=self.theme_config["pad"]["ypad_s"])
+        # NOTE: Currently uses full filename stem when checkbox is enabled.
+        #       This text field is reserved for future enhancement to specify which parts
+        #       of the filename to use (e.g., index, range, or slice notation).
         self.file_labeler = tk.Text(self.fr_setup, height=1, width=20)
-        self.file_labeler.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.file_labeler.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                               pady=self.theme_config["pad"]["ypad_s"])
 
         # add check box and text field to label graphs by column name
         self.var_use_data_labeler = tk.IntVar()
@@ -171,25 +197,42 @@ class TabGraph(guic.ThemedFrame):
                         text="Use Data (header) Labeler",
                         variable=self.var_use_data_labeler,
                         onvalue=1,
-                        offvalue=0).grid(row=11, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+                        offvalue=0).grid(row=11, column=0, padx=self.theme_config["pad"]["xpad_s"],
+                                         pady=self.theme_config["pad"]["ypad_s"])
         self.data_labeler = tk.Text(self.fr_setup, height=1, width=20)
-        self.data_labeler.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.data_labeler.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                               pady=self.theme_config["pad"]["ypad_s"])
+
+        # add checkbox for color normalization
+        self.var_normalize_colors = tk.IntVar()
+        ttk.Checkbutton(self.fr_setup,
+                        text="Normalize colors by data value",
+                        variable=self.var_normalize_colors,
+                        onvalue=1,
+                        offvalue=0).grid(row=12, column=0, columnspan=2,
+                                         padx=self.theme_config["pad"]["xpad_s"],
+                                         pady=self.theme_config["pad"]["ypad_s"],
+                                         sticky='w')
 
     def init_fr_files(self):
         fr_m = self.fr_files
 
         # add directory search
-        self.lbl_data_directory = tk.Label(fr_m, text=self.data_dir, fg=self.theme_config["fg_light"], bg=self.theme_config["bg_light"])
+        self.lbl_data_directory = tk.Label(fr_m, text=self.data_dir, fg=self.theme_config["fg_light"],
+                                           bg=self.theme_config["bg_light"])
         self.lbl_data_directory.grid(row=0, column=0)
         btn_set_directory = tk.Button(fr_m, text="Set directory",
-                                 command=lambda: self.set_directory(),
-                                 bg=self.theme_config["light_1"], fg=self.theme_config["fg_dark"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_set_directory.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-
+                                      command=lambda: self.set_directory(),
+                                      bg=self.theme_config["light_1"], fg=self.theme_config["fg_dark"],
+                                      height=self.theme_config["size"]["h_button"],
+                                      width=self.theme_config["size"]["w_button"])
+        btn_set_directory.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                               pady=self.theme_config["pad"]["ypad_s"])
 
         # Create Listbox with multi-select support and scrollbar
         listbox_frame = tk.Frame(self.fr_files)
-        listbox_frame.grid(row=1, column=0, rowspan=4, padx=self.theme_config["pad"]["xpad_m"], pady=self.theme_config["pad"]["ypad_m"])
+        listbox_frame.grid(row=1, column=0, rowspan=4, padx=self.theme_config["pad"]["xpad_m"],
+                           pady=self.theme_config["pad"]["ypad_m"])
 
         scrollbar = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
         self.file_listbox = tk.Listbox(
@@ -216,22 +259,29 @@ class TabGraph(guic.ThemedFrame):
                         text="Use Filename Filter",
                         variable=self.var_use_file_regex,
                         onvalue=1,
-                        offvalue=0).grid(row=9, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-        self.file_filter = tk.Text(self.fr_setup, height=1, width=20)
-        self.file_filter.grid(row=7, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+                        offvalue=0).grid(row=9, column=0, padx=self.theme_config["pad"]["xpad_s"],
+                                         pady=self.theme_config["pad"]["ypad_s"])
+        self.file_filter = tk.Text(fr_m, height=1, width=20)
+        self.file_filter.grid(row=9, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                              pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button to REFRESH FILES
         btn_refresh_files = tk.Button(fr_m, text="Refresh Files",
-                                 command=lambda: self.refresh_files(),
-                                 bg=self.theme_config["light_2"], fg=self.theme_config["fg_dark"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_refresh_files.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
-
+                                      command=lambda: self.refresh_files(),
+                                      bg=self.theme_config["light_2"], fg=self.theme_config["fg_dark"],
+                                      height=self.theme_config["size"]["h_button"],
+                                      width=self.theme_config["size"]["w_button"])
+        btn_refresh_files.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                               pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button PRINT FIELDS
         btn_disp_fields = tk.Button(fr_m, text="Print fields",
-                                 command=self.disp_fields,
-                                 bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_disp_fields.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+                                    command=self.disp_fields,
+                                    bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"],
+                                    height=self.theme_config["size"]["h_button"],
+                                    width=self.theme_config["size"]["w_button"])
+        btn_disp_fields.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"],
+                             pady=self.theme_config["pad"]["ypad_s"])
 
         # analyze button
         open_button = tk.Button(fr_m,
@@ -365,7 +415,20 @@ class TabGraph(guic.ThemedFrame):
             return False
 
         # Determine labeling mode and configuration
-        if self.var_use_file_labeler.get():
+        if self.var_use_file_labeler.get() and self.var_use_data_labeler.get():
+            # Both checkboxes checked - use combined mode
+            labeling_mode = 'both'
+            try:
+                file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
+            except ValueError:
+                file_label_idx = 0
+            data_label_var = self.data_labeler.get("1.0", "end").strip("\n")
+            label_config = {
+                'file_label_idx': file_label_idx,
+                'data_label_var': data_label_var,
+                'normalize_colors': self.var_normalize_colors.get()
+            }
+        elif self.var_use_file_labeler.get():
             labeling_mode = 'filename'
             try:
                 file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
@@ -375,10 +438,16 @@ class TabGraph(guic.ThemedFrame):
         elif self.var_use_data_labeler.get():
             labeling_mode = 'data'
             data_label_var = self.data_labeler.get("1.0", "end").strip("\n")
-            label_config = {'data_label_var': data_label_var}
+            label_config = {
+                'data_label_var': data_label_var,
+                'normalize_colors': self.var_normalize_colors.get()
+            }
         else:
             labeling_mode = 'none'
             label_config = {}
+
+        # Get plot style
+        plot_style = self.plot_style_drop[1].get()
 
         # Call abstracted plotting function
         try:
@@ -393,6 +462,7 @@ class TabGraph(guic.ThemedFrame):
                 ylabel=self.y_label.get("1.0", "end").strip("\n"),
                 labeling_mode=labeling_mode,
                 label_config=label_config,
+                plot_style=plot_style,
                 figsize=(10, 6),
                 marker='o',
                 markersize=3,
@@ -440,7 +510,8 @@ class TabGraph(guic.ThemedFrame):
                     std_val = df[col].std()
                     min_val = df[col].min()
                     max_val = df[col].max()
-                    self.prompt.print(f"  {col}: mean={mean_val:.4f}, std={std_val:.4f}, min={min_val:.4f}, max={max_val:.4f}")
+                    self.prompt.print(
+                        f"  {col}: mean={mean_val:.4f}, std={std_val:.4f}, min={min_val:.4f}, max={max_val:.4f}")
 
         self.prompt.print("\nAnalysis complete!")
         return True
@@ -489,12 +560,14 @@ class TabGraph(guic.ThemedFrame):
             "y_scale": self.y_scale.get(),
             "x_var": self.x_var.get("1.0", "end").strip("\n"),
             "y_var": self.y_var.get("1.0", "end").strip("\n"),
+            "plot_style": self.plot_style_drop[1].get(),
             "use_file_regex": self.var_use_file_regex.get(),
             "file_filter": self.file_filter.get("1.0", "end").strip("\n"),
             "use_file_labeler": self.var_use_file_labeler.get(),
             "file_labeler": self.file_labeler.get("1.0", "end").strip("\n"),
             "use_data_labeler": self.var_use_data_labeler.get(),
             "data_labeler": self.data_labeler.get("1.0", "end").strip("\n"),
+            "normalize_colors": self.var_normalize_colors.get(),
             # Future use - data source configuration
             # "data_dir": self.data_dir
         }
@@ -556,10 +629,14 @@ class TabGraph(guic.ThemedFrame):
             self.y_scale.delete(0, "end")
             self.y_scale.insert(0, preset_data.get("y_scale", "1"))
 
+            # Set plot style dropdown
+            self.plot_style_drop[1].set(preset_data.get("plot_style", "Line + Scatter"))
+
             # Set checkbox values
             self.var_use_file_regex.set(preset_data.get("use_file_regex", 0))
             self.var_use_file_labeler.set(preset_data.get("use_file_labeler", 0))
             self.var_use_data_labeler.set(preset_data.get("use_data_labeler", 0))
+            self.var_normalize_colors.set(preset_data.get("normalize_colors", 0))
 
             # Future: data_dir loading
             # if "data_dir" in preset_data:
@@ -578,7 +655,34 @@ class TabGraph(guic.ThemedFrame):
             guih.alert_user("Load Error", f"Failed to load preset: {str(e)}", "error")
             self.prompt.print(f"Error loading preset: {str(e)}", "error")
 
+    def clear_all_fields(self):
+        """Clear all graph parameter fields and reset to defaults"""
+        # Clear all text widgets
+        self.title.delete("1.0", "end")
+        self.x_label.delete("1.0", "end")
+        self.y_label.delete("1.0", "end")
+        self.x_var.delete("1.0", "end")
+        self.y_var.delete("1.0", "end")
+        self.file_filter.delete("1.0", "end")
+        self.file_labeler.delete("1.0", "end")
+        self.data_labeler.delete("1.0", "end")
 
+        # Reset spinbox values to 1
+        self.x_scale.delete(0, "end")
+        self.x_scale.insert(0, "1")
+        self.y_scale.delete(0, "end")
+        self.y_scale.insert(0, "1")
 
+        # Reset plot style to default
+        self.plot_style_drop[1].set("Line + Scatter")
 
+        # Uncheck all checkboxes
+        self.var_use_file_regex.set(0)
+        self.var_use_file_labeler.set(0)
+        self.var_use_data_labeler.set(0)
+        self.var_normalize_colors.set(0)
 
+        # Clear preset selection
+        self.preset_combo.set('')
+
+        self.prompt.print("All fields cleared")

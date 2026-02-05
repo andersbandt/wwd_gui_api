@@ -107,6 +107,72 @@ class ClassController:
 
         return True
 
+    def set_used_model(self, model, usage):
+        """
+        Save the equipment model used by a specific tab/usage to XML config.
+        If the usage already has a model, it will be updated.
+
+        Args:
+            model: The equipment model name (e.g., "SPD3303X", "XDM1041")
+            usage: The name of the connection (e.g., "DMM_Serial", "PS_PyVISA")
+        """
+        # Load or create XML tree
+        try:
+            tree = ET.parse("config/ports_used.xml")
+            root = tree.getroot()
+        except (FileNotFoundError, ET.ParseError):
+            root = ET.Element("PortsUsed")
+            tree = ET.ElementTree(root)
+
+        # Find or create the usage element
+        usage_element = root.find(usage)
+        if usage_element is None:
+            # Create new element for this usage if it doesn't exist
+            usage_element = ET.SubElement(root, usage)
+            usage_element.text = ""
+
+        # Update or create the model attribute
+        old_model = usage_element.get("model")
+        usage_element.set("model", str(model))
+
+        if old_model != model:
+            if old_model:
+                print(f"Updated {usage} model: {old_model} -> {model}")
+            else:
+                print(f"Set {usage} model: {model}")
+
+        # Pretty-print the XML with indentation
+        ET.indent(root, space="    ", level=0)
+
+        # Write back to the XML file
+        with open("config/ports_used.xml", "wb") as xml_file:
+            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
+
+        return True
+
+    def get_used_model(self, usage):
+        """
+        Retrieve the previously used equipment model for a specific tab/usage.
+
+        Args:
+            usage: The name of the connection (e.g., "DMM_Serial", "PS_PyVISA")
+
+        Returns:
+            str: The model name if found, None otherwise
+        """
+        try:
+            tree = ET.parse("config/ports_used.xml")
+            root = tree.getroot()
+        except (FileNotFoundError, ET.ParseError):
+            return None
+
+        usage_element = root.find(usage)
+        if usage_element is not None:
+            model = usage_element.get("model")
+            return model
+
+        return None
+
     def add_active_connection(self, port, usage):
         """
         Register a port as actively connected.

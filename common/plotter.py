@@ -2,6 +2,8 @@
 # import plotter modules
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+from matplotlib import cm
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Output, Input
@@ -17,6 +19,9 @@ from queue import Queue, Empty
 # consistent color palette for multi-series / multi-subplot plots
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+
+# Line styles for distinguishing multiple files in combined labeling mode
+LINE_STYLES = ['-', '--', '-.', ':']  # solid, dashed, dash-dot, dotted
 
 
 #################################
@@ -200,6 +205,7 @@ def plot_multi_file_data(file_data_list,
     title=None, xlabel=None, ylabel=None,
     labeling_mode='none',
     label_config=None,
+    plot_style='Line + Scatter',
     figsize=(10, 6),
     marker='o',
     markersize=3,
@@ -217,13 +223,18 @@ def plot_multi_file_data(file_data_list,
         title: Plot title
         xlabel: X-axis label
         ylabel: Y-axis label
-        labeling_mode: 'none', 'filename', or 'data'
+        labeling_mode: 'none', 'filename', 'data', or 'both'
         label_config: Dict with labeling configuration:
                      - For 'filename' mode: {'file_label_idx': int}
-                     - For 'data' mode: {'data_label_var': str}
+                     - For 'data' mode: {'data_label_var': str, 'normalize_colors': bool}
+                     - For 'both' mode: {'file_label_idx': int, 'data_label_var': str, 'normalize_colors': bool}
+                       (color by data label, line style by file)
+                     - 'normalize_colors': If True, maps numeric data values to a gradient colormap
+                       (coolwarm: blue=low, red=high). If False, uses discrete colors from palette.
+        plot_style: 'Line', 'Scatter', or 'Line + Scatter' (default: 'Line + Scatter')
         figsize: Figure size tuple (width, height)
-        marker: Marker style for plot
-        markersize: Size of markers
+        marker: Marker style for plot (used when plot_style includes scatter)
+        markersize: Size of markers (used when plot_style includes scatter)
         show_grid: Whether to show grid
 
     Returns:
@@ -235,6 +246,17 @@ def plot_multi_file_data(file_data_list,
     """
     if label_config is None:
         label_config = {}
+
+    # Determine plot parameters based on style
+    if plot_style == 'Line':
+        plot_marker = None
+        linestyle = '-'
+    elif plot_style == 'Scatter':
+        plot_marker = marker
+        linestyle = 'None'
+    else:  # 'Line + Scatter' or default
+        plot_marker = marker
+        linestyle = '-'
 
     # Set up plot
     fig, ax = plt.subplots(figsize=figsize)
@@ -249,7 +271,62 @@ def plot_multi_file_data(file_data_list,
 
     color_idx = 0
 
+    # Preprocessing for 'data' and 'both' modes: color assignment
+    data_value_to_color = {}
+    colormap = None
+    normalizer = None
+    normalize_colors = label_config.get('normalize_colors', False)
+
+    if labeling_mode in ['data', 'both']:
+        data_label_var = label_config.get('data_label_var')
+        if not data_label_var:
+            raise ValueError(f"data_label_var must be specified for '{labeling_mode}' labeling mode")
+
+        # Collect all unique data values across all files
+        all_data_values = set()
+        for file_data in file_data_list:
+            if hasattr(file_data, 'df'):
+                df = file_data.df
+            else:
+                df = file_data[3]
+
+            if data_label_var in df.columns:
+                all_data_values.update(df[data_label_var].dropna().unique())
+
+        # Sort data values
+        sorted_data_values = sorted(all_data_values)
+
+        if normalize_colors:
+            # Use color normalization with a gradient colormap
+            try:
+                # Convert to numeric values for normalization
+                numeric_values = [float(v) for v in sorted_data_values]
+                min_val = min(numeric_values)
+                max_val = max(numeric_values)
+
+                # Create normalizer and colormap
+                normalizer = Normalize(vmin=min_val, vmax=max_val)
+                colormap = cm.get_cmap('coolwarm')  # Blue (cold) to Red (hot)
+
+                # Map each data value to a normalized color
+                for data_val in sorted_data_values:
+                    normalized = normalizer(float(data_val))
+                    color_rgba = colormap(normalized)
+                    data_value_to_color[data_val] = color_rgba
+
+            except (ValueError, TypeError):
+                # If values aren't numeric, fall back to discrete colors
+                print("Warning: Data values are not numeric. Using discrete colors instead.")
+                normalize_colors = False
+                for idx, data_val in enumerate(sorted_data_values):
+                    data_value_to_color[data_val] = idx % len(COLORS)
+        else:
+            # Use discrete colors from palette
+            for idx, data_val in enumerate(sorted_data_values):
+                data_value_to_color[data_val] = idx % len(COLORS)
+
     # Iterate through files and plot
+    file_idx = 0
     for file_data in file_data_list:
         # Unpack file data (works with namedtuple or regular tuple)
         if hasattr(file_data, 'filename'):
@@ -273,14 +350,21 @@ def plot_multi_file_data(file_data_list,
         # Apply labeling strategy
         if labeling_mode == 'filename':
             # Label by filename parts
+            # NOTE: Currently uses full filename stem. Future enhancement could add support for:
+            #       - Single index: file_label_idx to extract parts[idx]
+            #       - Range notation: "3-5" to extract parts[3:5]
+            #       - Multiple indices: "0,3,4" to extract selected parts
+            #       - Slice notation: "3:" to extract parts[3:]
             try:
                 file_label_idx = label_config.get('file_label_idx', 0)
-                label = file_parts[file_label_idx]
+                # Use full filename stem (without .csv extension)
+                from pathlib import Path
+                label = Path(filename).stem
             except (ValueError, IndexError, TypeError):
                 label = filename
             ax.plot(x_data * x_scale, y_data * y_scale,
                    label=label, color=COLORS[color_idx % len(COLORS)],
-                   marker=marker, markersize=markersize)
+                   marker=plot_marker, markersize=markersize, linestyle=linestyle)
             color_idx += 1
 
         elif labeling_mode == 'data':
@@ -294,20 +378,67 @@ def plot_multi_file_data(file_data_list,
             for label_val in sorted(df[data_label_var].dropna().unique()):
                 df_tmp = df[df[data_label_var] == label_val]
                 label = f"{data_label_var}={label_val}"
+
+                # Get color for this data value
+                if normalize_colors:
+                    color = data_value_to_color.get(label_val)
+                else:
+                    color_idx_for_value = data_value_to_color.get(label_val, 0)
+                    color = COLORS[color_idx_for_value]
+
                 ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
-                       label=label, color=COLORS[color_idx % len(COLORS)],
-                       marker=marker, markersize=markersize)
-                color_idx += 1
+                       label=label, color=color,
+                       marker=plot_marker, markersize=markersize, linestyle=linestyle)
+
+        elif labeling_mode == 'both':
+            # Label by both filename and data column
+            # Color by data label, line style by file
+            data_label_var = label_config.get('data_label_var')
+            if data_label_var not in df.columns:
+                raise KeyError(f"Label column '{data_label_var}' not found in {filename}")
+
+            # Get line style for this file
+            file_linestyle = LINE_STYLES[file_idx % len(LINE_STYLES)]
+
+            # Get filename label
+            try:
+                file_label_idx = label_config.get('file_label_idx', 0)
+                from pathlib import Path
+                file_label = Path(filename).stem
+            except (ValueError, IndexError, TypeError):
+                file_label = filename
+
+            # Plot each data value with consistent color but file-specific line style
+            for label_val in sorted(df[data_label_var].dropna().unique()):
+                df_tmp = df[df[data_label_var] == label_val]
+                label = f"{file_label} - {data_label_var}={label_val}"
+
+                # Get color for this data value (consistent across files)
+                if normalize_colors:
+                    color = data_value_to_color.get(label_val)
+                else:
+                    color_idx_for_value = data_value_to_color.get(label_val, 0)
+                    color = COLORS[color_idx_for_value]
+
+                ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
+                       label=label,
+                       color=color,
+                       marker=plot_marker,
+                       markersize=markersize,
+                       linestyle=file_linestyle)
 
         else:
             # No label
             ax.plot(x_data * x_scale, y_data * y_scale,
                    color=COLORS[color_idx % len(COLORS)],
-                   marker=marker, markersize=markersize)
+                   marker=plot_marker, markersize=markersize, linestyle=linestyle)
             color_idx += 1
 
+        # Increment file index for line style assignment
+        file_idx += 1
+
     # Show legend if any labels were added
-    if labeling_mode in ['filename', 'data']:
+    if labeling_mode in ['filename', 'data', 'both']:
         ax.legend()
 
     plt.tight_layout()

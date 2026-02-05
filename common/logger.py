@@ -97,6 +97,7 @@ class RecordConfig:
     use_dmm: bool = False
     use_ps: bool = False
     use_fg: bool = False
+    # TODO: rename below back to ps_channel because I'm an idiot
     channel: int = 1  # will be set to 2 if user confirms and PS supports it
     serial_params: str = None
     make_graph: bool = False

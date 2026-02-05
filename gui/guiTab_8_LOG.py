@@ -154,7 +154,8 @@ class TabLog(guic.ThemedFrame):
         ttk.Checkbutton(self.fr_setup,
                         text="Use PS",
                         variable=self.var_use_ps,
-                        onvalue=1, offvalue=0).grid(row=3, column=2)
+                        onvalue=1, offvalue=0,
+                        command=self.toggle_use_ps).grid(row=3, column=2)
 
         self.var_use_fg = tk.IntVar()
         ttk.Checkbutton(self.fr_setup,
@@ -177,22 +178,32 @@ class TabLog(guic.ThemedFrame):
         # speed recording options
         options = ['1s', '2s', '5s', '10s', '30s', '60s', '5m', '10m', '30m', '1h', '0.5s']
         self.optRecSpd, self.RecSpdVal = guih.generate_drop_down(self.fr_setup, options)
-        self.optRecSpd.grid(row=5, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.optRecSpd.grid(row=6, column=0, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
+        # add PS channel setup
+        self.lbl_rec_ps_channel = (ttk.Label(self.fr_setup, text="PS Channel:", style="TSpunkLabel.TLabel"))
+        self.lbl_rec_ps_channel.grid(row=5, column=1, sticky='e', padx=5, pady=2)
+        self.rec_ps_channel_drop = guih.generate_drop_down(
+            self.fr_setup,
+            [1, 2]
+        )
+        self.rec_ps_channel_drop[0].grid(row=5, column=2, padx=5, pady=2)
+        self.toggle_use_ps()
 
         # set up button START recording
         btn_start_entry = tk.Button(self.fr_setup, text="Start Record",
                                  command=lambda: self.start_record(),
                                  bg=self.theme_config["success"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_start_entry.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        btn_start_entry.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # set up button STOP recording
         btn_stop_entry = tk.Button(self.fr_setup, text="Stop Record",
                                 command=lambda: self.stop_record(),
                                 bg=self.theme_config["error"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
-        btn_stop_entry.grid(row=5, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        btn_stop_entry.grid(row=6, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         self.labelRNums = ttk.Label(self.fr_setup, text='', width=12, relief='sunken')
-        self.labelRNums.grid(row=5, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
+        self.labelRNums.grid(row=6, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
 
         # add check button to graph data
         self.var_graph_data = tk.IntVar()
@@ -201,7 +212,7 @@ class TabLog(guic.ThemedFrame):
                         variable=self.var_graph_data,
                         onvalue=1,
                         offvalue=0,
-                        command=self.toggle_graph_options).grid(row=6, column=2)
+                        command=self.toggle_graph_options).grid(row=7, column=2)
 
         # graph sub-options (only visible when Graph is checked)
         self.var_3d_plot = tk.IntVar()
@@ -210,7 +221,7 @@ class TabLog(guic.ThemedFrame):
                         variable=self.var_3d_plot,
                         onvalue=1,
                         offvalue=0)
-        self.chk_3d_plot.grid(row=7, column=2)
+        self.chk_3d_plot.grid(row=8, column=2)
         self.chk_3d_plot.grid_remove()
 
         self.var_subplots = tk.IntVar(value=1)
@@ -228,7 +239,7 @@ class TabLog(guic.ThemedFrame):
                         text="Save data",
                         variable=self.var_save_data,
                         onvalue=1,
-                        offvalue=0).grid(row=6, column=3)
+                        offvalue=0).grid(row=7, column=3)
 
         # live plot checkbox
         self.var_live_plot = tk.IntVar()
@@ -236,7 +247,7 @@ class TabLog(guic.ThemedFrame):
                         text="Live Plot",
                         variable=self.var_live_plot,
                         onvalue=1,
-                        offvalue=0).grid(row=6, column=1)
+                        offvalue=0).grid(row=7, column=1)
 
     def init_fr_stimulus(self):
         """Initialize stimulus sweep configuration UI"""
@@ -332,6 +343,7 @@ class TabLog(guic.ThemedFrame):
         self.lbl_stim2_type.grid(row=3, column=2, sticky='w', padx=5, pady=2)
         self.stimulus2_type_drop = guih.generate_drop_down(
             self.fr_stimulus,
+            # TODO: shouldn't these options be referenced in logger.py in a similiar way to my record columns?
             ["PS Voltage", "FG Frequency", "FG Duty Cycle"]
         )
         self.stimulus2_type_drop[0].grid(row=3, column=3, padx=5, pady=2)
@@ -438,8 +450,15 @@ class TabLog(guic.ThemedFrame):
             self.lbl_use_ser.grid_remove()
             self.serial_log_params.grid_remove()
 
+    def toggle_use_ps(self):
+        if self.var_use_ps.get():
+            self.lbl_rec_ps_channel.grid()
+            self.rec_ps_channel_drop[0].grid()
+        else:
+            self.lbl_rec_ps_channel.grid_remove()
+            self.rec_ps_channel_drop[0].grid_remove()
+
     def toggle_stimulus(self):
-        """Show/hide stimulus configuration based on checkbox"""
         if self.var_use_stimulus.get():
             # Show all stimulus configuration widgets
             for widget in self.fr_stimulus.winfo_children():
@@ -688,8 +707,7 @@ class TabLog(guic.ThemedFrame):
             self.var_use_dmm.get(),
             self.var_use_ps.get(),
             self.var_use_fg.get(),
-            1, # TODO: this is a hardcode, need to add a GUI element for this
-            # TODO: do I also want to add a channel selector for FG ?
+            self.rec_ps_channel_drop[1].get(),
             self.serial_log_params.get("1.0", "end").strip(),
             self.var_graph_data.get()
         )
@@ -867,7 +885,6 @@ class TabLog(guic.ThemedFrame):
             except COMMUNICATION_ERRORS as e:
                 self.record_status = False
                 guih.alert_user("Communication Error", str(e), "error")
-
 
         # Function Generator data if requested
         if self.record_config.use_fg:

@@ -784,9 +784,65 @@ class TabLog(guic.ThemedFrame):
             self.stop_record()
             raise e
 
-    # TODO: finish implementing this
     def thread_record_serial(self):
-        pass
+        """Serial-triggered data collection: collects test equipment data each time serial line is received"""
+        while self.record_status:
+            try:
+                # Wait for serial data (blocks until \n is received)
+                serial_data = self.cc.ser.read_line()
+
+                # Build timestamp
+                row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
+
+                # Add the serial data we just received
+                if self.record_config.use_ser:
+                    row[logger.COL_SERIAL] = serial_data
+
+                # Collect DMM data if requested
+                if self.record_config.use_dmm:
+                    row[logger.COL_DMM_MEAS1] = self.cc.dmm.read_value()
+
+                # Collect Power Supply data if requested
+                if self.record_config.use_ps:
+                    try:
+                        row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
+                        row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
+                        row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
+                        if self.record_config.channels == 2:
+                            row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
+                            row[logger.COL_PS_VMEAS2] = self.cc.ps.get_voltage(2)
+                            row[logger.COL_PS_IMEAS2] = self.cc.ps.get_current(2)
+                    except COMMUNICATION_ERRORS as e:
+                        self.record_status = False
+                        guih.alert_user("Communication Error", str(e), "error")
+                        break
+
+                # Collect Function Generator data if requested
+                if self.record_config.use_fg:
+                    try:
+                        row[logger.COL_FG_FREQ] = self.cc.fg.query(
+                            self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
+                        )
+                        row[logger.COL_FG_WAVEFORM] = self.cc.fg.query(
+                            self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
+                        )
+                    except Exception:
+                        row[logger.COL_FG_FREQ] = "ERROR"
+                        row[logger.COL_FG_WAVEFORM] = "ERROR"
+
+                # Save row (locally and to sinks)
+                self.recorded_data.append(row)
+                self._save_data_row(row)
+
+                # Update record counter and UI
+                self.recCnt += 1
+                self.labelRNums.config(text=f'#{self.recCnt:7d}')
+
+            except Exception as e:
+                self.prompt.print(f"Error in serial-triggered recording: {e}")
+                self.record_status = False
+                guih.alert_user("Serial Recording Error", str(e), "error")
+                break
 
     def _thread_record_single_stimulus(self):
         """Single parameter stimulus sweep"""

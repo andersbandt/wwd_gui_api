@@ -148,7 +148,15 @@ class TabATE(guic.ThemedFrame):
 
         # Title
         title_label = ttk.Label(fr_m, text='Instrument Accuracy Testing', style="TPinkLabel.TLabel", width=30)
-        title_label.grid(row=0, column=0, columnspan=4, pady=5)
+        title_label.grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Info button
+        info_button = tk.Button(fr_m, text="ℹ Info",
+                                command=self.show_accuracy_info,
+                                bg=self.theme_config["light_2"],
+                                fg=self.theme_config["fg_dark"],
+                                height=1, width=6)
+        info_button.grid(row=0, column=3, padx=5, pady=5)
 
         # Description
         desc_label = ttk.Label(fr_m, text='Sweep PS voltage with DMM', style="TLabel")
@@ -194,6 +202,90 @@ class TabATE(guic.ThemedFrame):
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
+
+    def show_accuracy_info(self):
+        """Display information about power supply accuracy testing"""
+        # Create popup window
+        info_window = tk.Toplevel(self)
+        info_window.title("Power Supply Accuracy Information")
+        info_window.geometry("600x500")
+        info_window.configure(bg=self.theme_config["bg_light"])
+
+        # Title
+        title_label = ttk.Label(info_window,
+                                text="Understanding Power Supply Accuracy",
+                                style="TPinkLabel.TLabel",
+                                font=(self.theme_config["font"]["family"], 14, "bold"))
+        title_label.pack(pady=10)
+
+        # Create frame for text with scrollbar
+        text_frame = tk.Frame(info_window, bg=self.theme_config["bg_light"])
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Scrollbar
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Text widget
+        text_widget = tk.Text(text_frame,
+                              wrap=tk.WORD,
+                              yscrollcommand=scrollbar.set,
+                              bg=self.theme_config["light_4"],
+                              fg=self.theme_config["fg_light"],
+                              font=(self.theme_config["font"]["family"], 10),
+                              padx=10,
+                              pady=10)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text_widget.yview)
+
+        # Informational text content
+        info_text = """Power Supply Accuracy Testing
+
+Overview:
+This tool allows you to characterize the accuracy of a power supply by sweeping through voltage setpoints and measuring the actual output with a precision digital multimeter (DMM).
+
+How It Works:
+1. The test sweeps the power supply from start voltage to stop voltage in discrete steps
+2. At each setpoint, the system waits for the specified settling time
+3. The DMM measures the actual output voltage
+4. Results are plotted and saved for analysis
+
+Key Parameters:
+
+Start/Stop Voltage:
+Define the voltage range to test. Starting at 0V can cause issues on some power supplies, so 0.1V (100mV) is recommended as a minimum.
+
+Number of Steps:
+How many voltage points to test between start and stop. More steps provide better characterization but take longer.
+
+Settling Time:
+Time to wait at each voltage setpoint before taking a measurement. This allows the power supply output to stabilize and transients to settle. Typical values: 0.5-2 seconds.
+
+PS Channel:
+Which power supply channel to test (1 or 2 for dual-channel supplies).
+
+Understanding Results:
+- Linear deviation: How well the measured voltage tracks the setpoint
+- Accuracy: Absolute difference between setpoint and measured value
+- Linearity error: Deviation from ideal 1:1 relationship
+- Repeatability: Consistency across multiple runs
+
+TODO: Add more detailed information about interpreting results, expected accuracy specifications, and troubleshooting common issues.
+"""
+
+        # Insert text and make read-only
+        text_widget.insert("1.0", info_text)
+        text_widget.config(state=tk.DISABLED)
+
+        # Close button
+        close_button = tk.Button(info_window,
+                                 text="Close",
+                                 command=info_window.destroy,
+                                 bg=self.theme_config["light_2"],
+                                 fg=self.theme_config["fg_dark"],
+                                 height=1,
+                                 width=10)
+        close_button.pack(pady=10)
 
     def ate_command(self, command_str):
         if self.ate is not None:
@@ -303,8 +395,6 @@ class TabATE(guic.ThemedFrame):
             self.cc.ps.output_off(ps_channel)
 
             # Calculate statistics
-            # TODO: give some proper thought to what accuracy really means and reporting values
-            #   honestly maybe include a cool user explanation you can call with a button
             errors_array = np.array(errors)
             set_array = np.array(set_voltages)
             measured_array = np.array(measured_voltages)
@@ -354,15 +444,14 @@ class TabATE(guic.ThemedFrame):
             self.prompt.print("Accuracy test complete!")
             self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
 
-            # Plot results
-            plotter.plot_trendline(
+            # Plot results with residuals
+            plotter.plot_accuracy_with_residuals(
                 set_array,
                 measured_array,
-                x_label="Set voltage (V)",
-                y_label="Measured (V)",
-                title="PS vs. DMM accuracy")
-
-            # TODO: on top of this plot might be better to plot the residuals
+                errors_array,
+                x_label="Set Voltage (V)",
+                y_label="Measured Voltage (V)",
+                title="Power Supply Accuracy Analysis")
 
 
         except COMMUNICATION_ERRORS as e:

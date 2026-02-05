@@ -175,7 +175,7 @@ class MainApplication(ThemedApp):
 ###########################################################
 
 # main function
-def main(autoconnect):
+def main(autoconnect, force_compact=False):
     print("Executing main function of gui_driver.py")
 
     # tag:HARDCODE
@@ -197,12 +197,15 @@ def main(autoconnect):
     h = min(desired_h, max(300, hs - margin_h))
 
     # dynamic sizing check
-    if (w < 0.8*desired_w) or (h < 0.8*desired_h):
-        compact=True
-        print("Using compact sizing")
+    if force_compact:
+        compact = True
+        print("Using compact sizing (forced by command-line argument)")
+    elif (w < 0.8*desired_w) or (h < 0.8*desired_h):
+        compact = True
+        print("Using compact sizing (auto-detected from screen size)")
     else:
         print("Using standard window size")
-        compact=False
+        compact = False
 
     # Center placement
     # x = (ws / 2) - (w / 4) # NOTE: I think this was when I wanted to be like 3/4 of the way right?

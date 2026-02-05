@@ -61,7 +61,6 @@ class TabFG(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        # TODO: GUI (this should probably get the same pack treatment I did in the logging tab)
         self.fr_info.grid(row=0, column=0)
         self.fr_control.grid(row=1, column=0)
         self.prompt.grid(row=1, column=1)

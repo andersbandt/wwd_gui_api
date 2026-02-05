@@ -64,6 +64,8 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
 
 
 # TODO: (GUI) Claude should audit all the frame spacing and make sure they reference theme_config
+# TODO: (GUI) if not in compact mode make it so prompt goes to the bottom row? and columnspan=4
+# TODO: (GUI) (this should probably get the same pack treatment I did in the logging tab)
 
 
 ##########################################
@@ -87,6 +89,9 @@ class ThemedApp:
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
 
+        # Save original font size for notebook tabs (before any scaling)
+        self.tab_font_size = self.theme_config["font"]["size"]
+
         if compact:
             # Scale padding and prompt sizes to 75%
             self.theme_config = scale_theme(
@@ -99,7 +104,8 @@ class ThemedApp:
                 "font.size_prompt"
             )
 
-            # TODO: Claude should have the notebook tabs unaffected by this resizing
+            # Scale general font size to 60% for labels, buttons, etc.
+            # NOTE: Notebook tabs are exempt - they use self.tab_font_size
             self.theme_config = scale_theme(
                 self.theme_config, 0.60,
                 "font.size"
@@ -119,7 +125,7 @@ class ThemedApp:
                              background=self.theme_config["tab_background"],
                              foreground=self.theme_config["tab_foreground"],
                              font=(self.theme_config["font"]["family"],
-                                   self.theme_config["font"]["size"],
+                                   self.tab_font_size,  # Use original unscaled font size
                                    self.theme_config["font"]["style"]),
                              padding=(self.theme_config["pad"]["horizontal"],
                                       self.theme_config["pad"]["vertical"]))

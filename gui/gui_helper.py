@@ -14,7 +14,20 @@ from tkinter import messagebox
 ####      GUI OBJECT GENERATION FUNCTIONS           ##########################
 ##############################################################################
 
-def generate_drop_down(frame, options, callback_func=None):
+def generate_drop_down(frame, options, callback_func=None, theme_config=None):
+    """
+    Generate a dropdown menu with optional theming.
+
+    Args:
+        frame: Parent frame for the dropdown
+        options: List of options to display
+        callback_func: Optional callback function when selection changes
+        theme_config: Optional theme configuration dict. If provided, uses theme colors/fonts.
+                     If None, uses default hardcoded values for backwards compatibility.
+
+    Returns:
+        Tuple of (dropdown_widget, string_var)
+    """
     clicked_opt = StringVar()  # datatype of menu text_data
     try:
         clicked_opt.set(options[0])  # initial menu text_data (CAUSES ISSUES IF NO COM PORTS AVAILABLE)
@@ -29,8 +42,21 @@ def generate_drop_down(frame, options, callback_func=None):
         clicked_opt.trace("w", callback)
 
     drop = OptionMenu(frame, clicked_opt, *options)  # create drop down menu of years
-    # TODO: (GUI) is it possible to add dynamic font sizing here?
-    drop.config(width=15, font=('Arial', 8), bg="#2B2B2B", fg='#F8F8F2')
+
+    # Apply theming if provided, otherwise use defaults
+    if theme_config is not None:
+        drop.config(
+            width=15,
+            font=(theme_config["font"]["family"],
+                  theme_config["font"]["size"],
+                  theme_config["font"]["style"]),
+            bg=theme_config["light_3"],
+            fg=theme_config["fg_light"]
+        )
+    else:
+        # Backwards compatibility: use hardcoded defaults
+        drop.config(width=15, font=('Arial', 8), bg="#2B2B2B", fg='#F8F8F2')
+
     return drop, clicked_opt
 
 

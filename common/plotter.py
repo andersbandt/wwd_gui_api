@@ -198,6 +198,70 @@ def plot_trendline(setpoints, measured,
     plt.show()
 
 
+def plot_accuracy_with_residuals(setpoints, measured, errors,
+                                  x_label="Set Value",
+                                  y_label="Measured Value",
+                                  title="Accuracy Analysis"):
+    """
+    Accuracy plot with residuals subplot:
+    - Top plot: Measured vs. setpoints with 1:1 ideal line
+    - Bottom plot: Residuals (errors) vs. setpoints with zero line
+
+    Args:
+        setpoints: Array of setpoint values
+        measured: Array of measured values
+        errors: Array of errors (measured - setpoint)
+        x_label: Label for x-axis (setpoints)
+        y_label: Label for y-axis (measured values)
+        title: Overall plot title
+    """
+    setpoints = np.array(setpoints)
+    measured = np.array(measured)
+    errors = np.array(errors)
+
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+
+    # Top plot: Accuracy (measured vs setpoint)
+    ax1.plot(setpoints, measured, 'o-', label='Measured', color='#1f77b4', markersize=6)
+
+    # Ideal 1:1 reference line
+    lo = min(setpoints.min(), measured.min())
+    hi = max(setpoints.max(), measured.max())
+    ax1.plot([lo, hi], [lo, hi], 'k--', label='Ideal 1:1', linewidth=1.5)
+
+    ax1.set_ylabel(y_label)
+    ax1.set_title(title)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+
+    # Bottom plot: Residuals
+    ax2.plot(setpoints, errors, 'o-', label='Error', color='#ff7f0e', markersize=6)
+    ax2.axhline(y=0, color='k', linestyle='--', linewidth=1.5, label='Zero Error')
+
+    # Add error statistics as text
+    mean_error = np.mean(errors)
+    std_error = np.std(errors)
+    max_error = np.max(np.abs(errors))
+
+    stats_text = f'Mean: {mean_error:.6f}\nStd: {std_error:.6f}\nMax: {max_error:.6f}'
+    ax2.text(0.02, 0.98, stats_text,
+             transform=ax2.transAxes,
+             verticalalignment='top',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
+             fontsize=9)
+
+    ax2.set_xlabel(x_label)
+    ax2.set_ylabel('Error (Measured - Set)')
+    ax2.set_title('Residuals')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+    return fig, (ax1, ax2)
+
+
 
 def plot_multi_file_data(file_data_list,
     x_var, y_var,
@@ -499,15 +563,33 @@ def start_live_plot(
     app = Dash(__name__)
     app.title = title
 
+    # NOTE: Other histogram display options to consider:
+    #   - Side-by-side: make_subplots(rows=n_ch, cols=2) for time series + histogram
+    #   - Separate tab: Add dcc.Tabs with separate graphs
+    #   - Both views: Show histogram below time series in additional subplots
     app.layout = html.Div([
             html.H2(title),
+            dcc.RadioItems(
+                id="plot-mode",
+                options=[
+                    {"label": "Time Series", "value": "timeseries"},
+                    {"label": "Histogram", "value": "histogram"}
+                ],
+                value="timeseries",
+                inline=True,
+                style={"marginBottom": "10px"}
+            ),
             dcc.Graph(id="graph"),
             dcc.Interval(id="tick", interval=refresh_ms, n_intervals=0),
         ]
     )
 
-    @app.callback(Output("graph", "figure"), Input("tick", "n_intervals"))
-    def update_graph(_):
+    @app.callback(
+        Output("graph", "figure"),
+        Input("tick", "n_intervals"),
+        Input("plot-mode", "value")
+    )
+    def update_graph(_, plot_mode):
         _ingest_from_bus()
 
         n_ch = len(channels)
@@ -523,22 +605,38 @@ def start_live_plot(
             vertical_spacing=0.08,
         )
 
-        x = list(time_buf)
-        for i, ch in enumerate(channels):
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=list(bufs[ch]),
-                    mode="lines",
-                    name=ch,
-                    line=dict(color=COLORS[i % len(COLORS)], width=2),
-                ),
-                row=i + 1, col=1
-            )
-            fig.update_yaxes(title_text=ch, row=i + 1, col=1)
+        if plot_mode == "histogram":
+            # Histogram mode: show distribution of buffered data
+            for i, ch in enumerate(channels):
+                fig.add_trace(
+                    go.Histogram(
+                        x=list(bufs[ch]),
+                        nbinsx=50,
+                        name=ch,
+                        marker=dict(color=COLORS[i % len(COLORS)]),
+                    ),
+                    row=i + 1, col=1
+                )
+                fig.update_yaxes(title_text="Count", row=i + 1, col=1)
+                fig.update_xaxes(title_text=ch, row=i + 1, col=1)
+        else:
+            # Time series mode: show data over time
+            x = list(time_buf)
+            for i, ch in enumerate(channels):
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=list(bufs[ch]),
+                        mode="lines",
+                        name=ch,
+                        line=dict(color=COLORS[i % len(COLORS)], width=2),
+                    ),
+                    row=i + 1, col=1
+                )
+                fig.update_yaxes(title_text=ch, row=i + 1, col=1)
 
-        # only label the bottom x-axis
-        fig.update_xaxes(title_text=x_label, row=n_ch, col=1)
+            # only label the bottom x-axis
+            fig.update_xaxes(title_text=x_label, row=n_ch, col=1)
 
         fig.update_layout(
             template="plotly_white",

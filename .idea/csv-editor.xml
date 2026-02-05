@@ -10,28 +10,7 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\data\AREC_20260204135916_1mH_freq_duty_sweep_PVLOAD.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\data\AREC_20260204140250_1mH_freq_duty_sweep_PVLOAD.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\data\AREC_20260204140324_1mH_freq_duty_sweep_PVLOAD.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\data\AREC_20260204141125_470uH_freq_duty_sweep_PVLOAD.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

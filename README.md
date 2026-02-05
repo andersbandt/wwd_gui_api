@@ -1,7 +1,6 @@
-# WWD GUI API
+# PyVISA EE Test Equipment Control and Automation
 
-
-> **Free, open-source lab automation and test equipment control for engineers who can't afford LabVIEW**
+> **Free, open-source lab automation and test equipment control for electrical engineers. Useful for a wide variety of lab tasks.**
 
 A Python-based GUI application for controlling test equipment, automating data collection, and analyzing measurements. Built for embedded systems engineers, electronics hobbyists, and anyone who needs to automate their lab without spending thousands on commercial software.
 
@@ -14,10 +13,9 @@ A Python-based GUI application for controlling test equipment, automating data c
 ## Why This Exists
 
 **The Problem:**
-- LabVIEW costs $3,000-5,000+ and has a steep learning curve
-- MATLAB + toolboxes cost $2,000+ per year
-- Python scripts work but are fragmented and lack integration
-- You just want to control your power supply and log some data
+- I originally designed this application to assist in debugging an embedded wearable device I was designing
+- I wanted a single application where I could flash my program code, control power states, and toggle USB relays
+- Python scripts worked but are fragmented and lack integration, they also quickly become project specific
 
 **The Solution:**
 WWD GUI API gives you professional lab automation capabilities for **free**:
@@ -32,47 +30,76 @@ WWD GUI API gives you professional lab automation capabilities for **free**:
 
 ## ✨ Key Features
 
-### 🔌 **Multi-Instrument Control**
+### **Multi-Instrument Control**
+
+This is the list of currently supported equipment. I actually maintain a separate repository for the instrument specific control stuff
+
+You can check out my [EEequipment repo](https://github.com/andersbandt/EEequipment/tree/master), or click the subrepository link in the files above.
+
+Below is a list of currently supported standard test equipment.
+
 - **Power Supplies**: Siglent SPD3303X, HP E3640A
 - **Digital Multimeters**: OWON XDM1041, Fluke 8842A, HP 3478A
 - **Function Generators**: Agilent 33120A
+
+Adding new equipment should be very straightforward. Each piece of test equipment will have a `config.ini` file.
+
+For example check out a snippet of the config file for the SPD3303X power supply
+
+```ini
+[pyvisa]
+timeout = 1000
+write_termination = \n
+read_termination = \n
+
+[command]
+set_voltage = CH{channel}:VOLTage {value}
+set_current = CH{channel}:CURRent {value}
+get_set_voltage = CH{channel}:VOLTage?
+get_set_current = CH{channel}:CURRent?
+```
+You simply can copy one of the already created templates and replace the actual commands with whatever your programming manual has listed.
+
+There is also some capability for control of non-standard test equipment
+
 - **Debug Probes**: TI XDS110 JTAG/SWD
 - **USB Devices**: Serial ports, relay controllers
-- **Extensible**: Easy to add new equipment via plugin architecture
 
-### 📊 **Automated Data Logging**
+The USB relay controller is a specific cheap model readily available on Aliexpress.
+
+
+
+### **Automated Data Logging**
 - Synchronized multi-instrument data collection
-- CSV export with configurable headers
+- CSV export
 - Customizable sampling rates
 - Serial data parsing and logging
 - Timestamped recordings
 
-### 🔄 **Stimulus Sweep Testing**
-- **Single parameter sweeps**: Voltage, frequency, duty cycle
-- **Dual parameter sweeps**: Nested loops for multi-variable testing
+### **Stimulus Sweep Testing**
+- Can sweep voltage, frequency, duty cycle
+- Can do nested loops as well (max 2 parameters supported right now)
 - Linear and logarithmic sweep modes
 - Configurable settling times
 - Automatic data collection at each step
 
-### 📈 **Data Analysis & Visualization**
-- Real-time plotting from CSV files
-- Multiple labeling modes (filename, data column, none)
-- Scale factors with scientific notation support (1e-3, etc.)
-- **Preset system**: Save/load graph configurations
-- Multi-file overlay plotting
+### **Data Analysis & Visualization**
+- Real-time plotting with Plotly (opens in web browser)
+- Advanced labeling features (by filename, data column, etc.)
+- Save/load graph configurations
 
-### 🔧 **ATE (Automated Test Equipment)**
-- **Instrument accuracy testing**: Sweep PS and measure with DMM
-- Statistical analysis (mean error, std dev, max error, % FS)
-- Benchmark tools for equipment performance
+### **ATE (Automated Test Equipment)**
 - Generic command/query interface
+- **Instrument testing**: Sweep PS and measure with DMM
+  - Reports accuracy statistics (mean error, std dev, max error, % FS)
+- Benchmark tools for equipment performance (mainly sample rate right now)
 
-### 🎨 **Professional UI**
+### **Semi-Professional UI**
+*The UI could use some work, mainly in regard to formatting and sizing on some tabs*
 - Dark theme with customizable colors
-- Auto-connect to previously used ports
-- Status indicators for all connections
 - Compact mode for smaller displays
 - Cross-platform native look
+
 
 ---
 
@@ -109,12 +136,20 @@ cd wwd_gui_api
 # Install dependencies
 pip install -r requirements.txt
 
-# Install system packages (Linux)
-sudo apt-get install python3-tk
-
 # Run the application
 python main.py
 ```
+
+Please note that for Linux machines you will have to run this command to install Tkinter
+
+```bash
+# Install system packages (Linux)
+sudo apt-get install python3-tk
+```
+
+### VISA backend
+In order to use `pyvisa` you will need to configure a backend for the VISA interface. You can read good instructions [here](https://pyvisa.readthedocs.io/en/latest/introduction/configuring.html) on installing this. 
+
 
 ### First Run
 
@@ -189,32 +224,6 @@ python main.py
 
 ---
 
-## 🔌 Supported Equipment
-
-### Power Supplies
-- ✅ Siglent SPD3303X (PyVISA)
-- ✅ HP E3640A (PyVISA)
-
-### Digital Multimeters
-- ✅ OWON XDM1041 (Serial)
-- ✅ Fluke 8842A (PyVISA)
-- ✅ HP 3478A (PyVISA)
-
-### Function Generators
-- ✅ Agilent 33120A (PyVISA)
-
-### Debug Probes
-- ✅ TI XDS110 JTAG/SWD
-
-### USB Devices
-- ✅ Generic serial ports (pyserial)
-- ✅ USB relay controllers (pyusb)
-
-### Want to add your equipment?
-Check the equipment submodule README or submit an issue!
-
----
-
 ## 🏗️ Architecture
 
 ```
@@ -273,28 +282,19 @@ wwd_gui_api/
 - [x] Instrument accuracy testing
 - [x] Cross-platform support
 
-### v1.1 - Equipment Expansion
-- [ ] Rigol equipment support (DS1054Z oscilloscope, DP832 PS)
-- [ ] Keysight/Agilent SCPI instruments
-- [ ] Fluke 8846A 6.5-digit DMM
-- [ ] BK Precision equipment
-- [ ] Plugin architecture for community drivers
 
-### v1.2 - Analysis Tools
-- [ ] FFT analysis tools
-- [ ] Statistical analysis dashboard
+### v1.1 - Analysis Tools
+- [ ] Improved plotting / graphing from CSV
 - [ ] Automated report generation (PDF)
-- [ ] Data export formats (Excel, JSON, HDF5)
+- [ ] Oscilloscope integration
+
 
 ### v1.3 - Advanced Features
 - [ ] Scripting/macro system
-- [ ] Remote control via API
-- [ ] Multi-user collaboration
-- [ ] Cloud data storage (optional)
+- [ ] FFT analysis tools
+
 
 ### v2.0 - Professional Features
-- [ ] Oscilloscope integration
-- [ ] Network analyzer support
 - [ ] Automated calibration procedures
 - [ ] Test sequence builder (LabVIEW-style)
 
@@ -302,7 +302,7 @@ wwd_gui_api/
 
 ## 🤝 Contributing
 
-We welcome contributions! Whether you're:
+I welcome contributions. I consider just installing and testing the application a contribution!
 - 🔧 Adding support for new equipment
 - 🐛 Fixing bugs
 - 📝 Improving documentation
@@ -331,24 +331,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Equipment Drivers**: Built on PyVISA and pyserial ecosystems
-- **UI Framework**: Tkinter for cross-platform GUI
-- **Data Analysis**: NumPy, Pandas, Matplotlib
-- **Inspiration**: The need for affordable lab automation tools
-
----
-
-## 🌟 Star History
-
-If you find this project useful, please consider giving it a star on GitHub! It helps others discover the project.
-
----
 
 ## 🎓 For Educators
 
-This software is **free for educational use**. We encourage:
+This software is **free for educational use**. I encourage:
 - Using it in lab courses
 - Teaching automation concepts
 - Student projects and research
@@ -364,7 +350,7 @@ If you use this software in your research, please cite:
   author = {Anders Bandt},
   title = {WWD GUI API: Open-Source Lab Automation Software},
   year = {2025},
-  url = {https://github.com/yourusername/wwd_gui_api}
+  url = {https://github.com/andersbandt/wwd_gui_api}
 }
 ```
 
@@ -389,5 +375,3 @@ We believe:
 ---
 
 **Made with ❤️ by engineers, for engineers**
-
-*Because everyone deserves professional lab automation tools, not just those who can afford LabVIEW.*

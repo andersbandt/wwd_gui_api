@@ -62,8 +62,6 @@ class SerialProcessor(SerialGeneral):
         # Previously used collections.deque(maxlen=200) but it wasn't fully thread-safe
         self.r_buf = queue.Queue(maxsize=200)  # Thread-safe read buffer
 
-
-
     def init_data(self, data_mode, parameters):
         print("SerialProcessor data initialization")
         if data_mode == "data":
@@ -168,7 +166,11 @@ class SerialProcessor(SerialGeneral):
         if self.procStatus:
             self.procStatus = False
             self.close()
-            logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
+            # TODO: this below append fails if we selected print to screen mode. Hacking it now with TypeError catch
+            try:
+                logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
+            except TypeError:
+                pass
             return self.num_lines
         else:
             return 0

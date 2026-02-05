@@ -188,6 +188,7 @@ class ThemedApp:
                                    self.theme_config["h1"]["style"]))
 
 
+# TODO: am I even using this? I feel like I'm still making tk.Frame instances in each tab
 class ThemedFrame(tk.Frame):
     def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
@@ -199,6 +200,10 @@ class ThemedFrame(tk.Frame):
         self.configure(bg=bg)
 
 
+# TODO: ok I actually do want to add a toggle switch for timestamps
+# TODO: not super important, but with serial logging the lines get formatted weird
+#   Same line stuff gets printed on two different lines with two timestamps
+#   unsure how it would look with timestamps disabled
 class Prompt(ThemedFrame):
     def __init__(self, master, theme_config, title, height, width):
         super().__init__(master, theme_config, height=height, width=width)
@@ -276,8 +281,8 @@ class ConnFrame(ThemedFrame):
         self.init_base_fr()
 
     def init_base_fr(self):
-        label = ttk.Label(self, text=self.name, style="TPinkLabel.TLabel")
-        label.grid(row=0, column=0, pady=15, padx=10)
+        label = ttk.Label(self, text=self.name, style="TSpunkLabel.TLabel")
+        label.grid(row=0, column=1, pady=2)
 
     def connect(self):
         self.status = self.connect_cmd()
@@ -332,21 +337,21 @@ class SerialConnFrame(ConnFrame):
             list(self.port_func_options.keys()),
             callback_func=self.set_port_func
         )
-        self.port_func_drop[0].grid(row=0, column=1, padx=3, pady=10)
-
-        # add Button for refreshing port list
-        refresh_button = tk.Button(self, text="Refresh Ports",
-                                   command=self.refresh_ports,
-                                   fg=self.theme_config["fg_light"], bg=self.theme_config["light_1"])
-        refresh_button.grid(row=1, column=2, pady=1)
+        self.port_func_drop[0].grid(row=1, column=1, padx=3, pady=1)
 
         # initialize port list dropdown
         self.com_drop = guih.generate_drop_down(
             self,
             serial_api.get_ports(method=self.port_func)
         )
-        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
+        self.com_drop[0].grid(row=2, column=1, columnspan=1, padx=3, pady=1)
         self.refresh_ports(first_run=True)
+
+        # add Button for refreshing port list
+        refresh_button = tk.Button(self, text="Refresh Ports",
+                                   command=self.refresh_ports,
+                                   fg=self.theme_config["fg_light"], bg=self.theme_config["light_1"])
+        refresh_button.grid(row=2, column=2, pady=1)
 
         # add Buttons for Connect / Disconnect
         btn_connect_serial = tk.Button(self, text="Connect to COM", command=self.connect,
@@ -358,10 +363,10 @@ class SerialConnFrame(ConnFrame):
                                        fg=self.theme_config["error"], bg=self.theme_config["dark_3"],
                                     font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_s"], "bold"),
                                           height=1, width=15)
-        btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
+        btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=1)
 
         # place CONNECT button and STATUS indicator
-        self.status_oval.grid(row=5, column=2, padx=15, pady=3)
+        self.status_oval.grid(row=3, column=2, rowspan=2, padx=15, pady=3)
 
     def connect(self, set_used_port=True):
         # Get the selected port

@@ -97,8 +97,7 @@ class RecordConfig:
     use_dmm: bool = False
     use_ps: bool = False
     use_fg: bool = False
-    # TODO: rename below back to ps_channel because I'm an idiot
-    channel: int = 1  # will be set to 2 if user confirms and PS supports it
+    ps_channel: int = 1
     serial_params: str = None
     make_graph: bool = False
 
@@ -112,7 +111,7 @@ class RecordConfig:
             "Use DMM": self.use_dmm,
             "Use Power Supply (PS)": self.use_ps,
             "Use Function Generator (FG)": self.use_fg,
-            "Channel": self.channel,
+            "Channel": self.ps_channel,
             "Serial Params": self.serial_params or "(not set)",
         }
 
@@ -133,12 +132,12 @@ class RecordConfig:
         print(self.pretty())
 
 
-def create_record_config(use_ser, use_dmm, use_ps, use_fg, channel, serial_params, make_graph):
+def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channel, serial_params, make_graph):
     config = RecordConfig(use_ser=use_ser,
                           use_dmm=use_dmm,
                           use_ps=use_ps,
                           use_fg=use_fg,
-                          channel=channel,
+                          ps_channel=ps_channel,
                           serial_params=serial_params,
                           make_graph=make_graph)
     return config

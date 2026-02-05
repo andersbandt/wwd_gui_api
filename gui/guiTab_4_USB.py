@@ -32,31 +32,17 @@ class TabUSB(guic.ThemedFrame):
         # serial Object (SerialProcessor)
         self.ser_obj = None
 
-        # print welcome text_data
-        l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel",
-                       font=("Arial", 16))
-        l1.grid(row=0, column=0, columnspan=2)
-
+        # init frames within tab
+        self.fr_state = tk.Frame(self, bg=self.theme_config["light_4"])
         self.prompt = guic.Prompt(self,
                                   self.theme_config,
                                    "Debug serial",
-                                  height=self.theme_config["size"]["h_prompt"],
+                                  height=self.theme_config["size"]["h_prompt"]*2.75,
                                   width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-
-        # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close())
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
-        # init state frame
-        self.fr_state = tk.Frame(self, bg="#00bcd4")
-        self.fr_state.grid(row=1, column=1, padx=30, pady=12)
-        self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
-        self.test_drop = None  # fr_state
-        self.output_mode_drop = None  # fr_state - output mode selector
-        self.output_file_name = None  # fr_state
 
         # initialize threads (actual init is in thread_print) or something
         self.t1 = None
@@ -66,22 +52,37 @@ class TabUSB(guic.ThemedFrame):
         # initialize tab content
         self.initTabContent()
 
+        # place everything in grid
+        self.fr_port.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_state.grid(row=2, column=0, padx=30, pady=12)
+        self.prompt.grid(row=1, column=1, rowspan=2, padx=30, pady=12, sticky="N")
+
+
     def initTabContent(self):
         print("Initializing tab 4 (USB) content")
+
+        # add tab header information
+        l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel", font=("Arial", 16))
+        l1.grid(row=0, column=0, columnspan=2)
+
         self.init_fr_state()
 
     def init_fr_state(self):
         # TARGET - BUTTON/STATUS
         btn_act_test = Button(self.fr_state, text="Activate test mode",
                               command=self.activate_test_mode,
-                              bg="green", fg="white", height=2, width=15)
+                              fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+                              height=2, width=15)
         btn_act_test.grid(row=1, column=2, padx=15, pady=22)
-        self.canvas2.grid(row=1, column=3, padx=15, pady=22)
+
+        self.test_status_circ = guic.ColorCircle(self.fr_state, 50, 50, self.theme_config["bg_dark"])
+        self.test_status_circ.grid(row=1, column=3, padx=15, pady=22)
 
         # TOGGLE
         btn_toggle_target = Button(self.fr_state, text="Set test type",
                                    command=self.set_test_type,
-                                   bg="orange", fg="black", height=2, width=15)
+                                   fg=self.theme_config["fg_dark"], bg=self.theme_config["light_6"],
+                                   height=2, width=15)
         btn_toggle_target.grid(row=2, column=2, padx=15, pady=22)
         self.test_drop = guih.generate_drop_down(
             self.fr_state,
@@ -125,16 +126,17 @@ class TabUSB(guic.ThemedFrame):
 
     def activate_test_mode(self):
         command = "DAGA"  # tag:HARDCODE
-        my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
         self.prompt.print(f"INFO: issuing command {command} ...")
-        if self.ser_obj.serStatus:
-            # send the TEST MODE command for ACTIVATION
-            self.ser_obj.send_data(command)
-            self.prompt.print(f"INFO: issued command!\n")
-            self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+        if self.ser_obj is not None:
+            if self.ser_obj.serStatus:
+                # send the TEST MODE command for ACTIVATION
+                self.ser_obj.send_data(command)
+                self.prompt.print(f"Issued command!\n")
+                self.test_status_circ.set_color(self.theme_config["success"])
         else:
-            self.prompt.print("ERROR: can't issue command, no serial connection\n")
-            self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            self.prompt.print("ERROR: can't issue command, no serial connection\n", print_type="error")
+            self.test_status_circ.set_color(self.theme_config["error"])
+            self.test_status_circ.set_color(self.theme_config["error"])
 
     def set_test_type(self):
         test_type_command = self.test_drop[1].get()
@@ -275,7 +277,6 @@ class TabUSB(guic.ThemedFrame):
             self.prompt.print(f"Port closed: {num_lines} lines wrote\n")
             self.ser_obj = None
         self.fr_port.set_status(False)
-
 
     def start_process(self, data_subfolder, file_ext, parameters):
         self.t3.stop()

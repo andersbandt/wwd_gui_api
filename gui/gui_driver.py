@@ -13,6 +13,7 @@ import os
 import time
 import configparser
 
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
@@ -237,9 +238,16 @@ def main(autoconnect, force_compact=False):
     # disconnect all active connections in `class_controller.py`
     if app.controller.ps is not None:
         print("Disconnect from power supply (and turning outputs off)")
-        app.controller.ps.output_off(1)
-        app.controller.ps.output_off(2)
-        app.controller.ps.disconnect()
+        try:
+            app.controller.ps.output_off(1)
+            app.controller.ps.output_off(2)
+        except COMMUNICATION_ERRORS:
+            print("Failed to turn off power supply due to IO error")
+        try:
+            app.controller.ps.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            print("Failed to disconnect from power supply due to IO error (see below line)")
+            print(e)
 
     if app.controller.dmm is not None:
         print("Disconnect from DMM")

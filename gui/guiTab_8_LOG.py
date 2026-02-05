@@ -30,6 +30,16 @@ from common import path_helper
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
+# TODO: I think I would like an option to clear the Plotly graph.
+
+# TODO: if you change the RecordConfig (like by adding instruments, the live plot will not get updated properly)
+
+
+# TODO: here is where it would be cool to add math equation support ....
+#   example: convert a shunt measurement to power with a resistor constant
+#   example: calibration (although I would prefer that's inline)
+
+
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -325,7 +335,6 @@ class TabLog(guic.ThemedFrame):
         self.stim_settling_entry.insert(0, "0.5")
 
         # Equipment channel
-        # TODO: actually make sure this is implemented (will require me to properly implement channel handling in EE equipment too!)
         ttk.Label(self.fr_stimulus, text="Channel:", style="TSpunkLabel.TLabel").grid(row=9, column=0, sticky='w', padx=5, pady=2)
         self.stim_ps_channel_drop = guih.generate_drop_down(
             self.fr_stimulus,
@@ -808,7 +817,7 @@ class TabLog(guic.ThemedFrame):
                         row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
                         row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
                         row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-                        if self.record_config.channels == 2:
+                        if self.record_config.ps_channel == 2:
                             row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
                             row[logger.COL_PS_VMEAS2] = self.cc.ps.get_voltage(2)
                             row[logger.COL_PS_IMEAS2] = self.cc.ps.get_current(2)
@@ -921,20 +930,10 @@ class TabLog(guic.ThemedFrame):
         # Power Supply data if requested
         if self.record_config.use_ps:
             try:
-                time.sleep(5)
-                print("getting Vset1")
                 row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
-                time.sleep(5)
-                print("getting Vmeas1")
-                # TODO: some issue with E3640A where if in stimulus mode it turns off the output very briefly for measurement here
-                #   I think the issue is at this line where output goes off
-                #   is the format getting weird? Idk
                 row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
-                time.sleep(5)
-                print("getting Imeas1")
                 row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-                time.sleep(5)
-                if self.record_config.channels == 2:
+                if self.record_config.ps_channel == 2:
                     row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
                     row[logger.COL_PS_VMEAS2] = self.cc.ps.get_set_voltage(2)
                     row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
@@ -971,14 +970,14 @@ class TabLog(guic.ThemedFrame):
         if loop_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
             self.cc.ps.set_voltage(value, channel=loop_config.channel)
 
-        elif stim_type == logger.StimulusType.FG_FREQUENCY:
+        elif loop_config.stimulus_type == logger.StimulusType.FG_FREQUENCY:
             self.cc.fg.set_frequency(value)
 
-        elif stim_type == logger.StimulusType.FG_DUTY_CYCLE:
+        elif loop_config.stimulus_type == logger.StimulusType.FG_DUTY_CYCLE:
             self.cc.fg.set_duty(value)
 
         else:
-            raise ValueError(f"Unknown stimulus type: {stim_type}")
+            raise ValueError(f"Unknown stimulus type: {loop_config.stimulus_type}")
 
     def _save_data_row(self, row):
         if self.var_save_data.get() and self.csvh:

@@ -514,6 +514,9 @@ def plot_multi_file_data(file_data_list,
 ### PLOTLY LIVE PLOTTING    #######
 ###################################
 
+# TODO: in histogram mode it doesn't make sense for them to share the same x-axis
+
+
 def start_live_plot(
         data_bus: Queue,
         x_key: str,

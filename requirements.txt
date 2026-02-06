@@ -13,6 +13,7 @@ PyVISA
 pyvisa-py
 sv_ttk
 libusb
+dash
 
 
 #added by anders

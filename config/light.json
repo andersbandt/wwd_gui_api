@@ -1,0 +1,63 @@
+{
+    "light_1": "#E3F2FD",
+    "light_2": "#BBDEFB",
+    "light_3": "#90CAF9",
+    "light_4": "#64B5F6",
+    "light_5": "#42A5F5",
+    "dark_1": "#1976D2",
+    "dark_2": "#1565C0",
+    "dark_3": "#0D47A1",
+    "bg_dark": "#F5F5F5",
+    "bg_light": "#FFFFFF",
+    "fg_light": "#212121",
+    "fg_dark": "#757575",
+    "error": "#D32F2F",
+    "success": "#388E3C",
+    "warning": "#F57C00",
+    "selected_background": "#E3F2FD",
+    "selected_foreground": "#1565C0",
+    "tab_background": "#FAFAFA",
+    "tab_foreground": "#616161",
+    "selected_tab_background": "#2196F3",
+    "selected_tab_foreground": "#FFFFFF",
+    "h1": {
+        "family": "Helvetica",
+        "size": 16,
+        "style": "bold"
+    },
+    "font": {
+        "family": "Arial",
+        "size": 12,
+        "style": "bold"
+    },
+    "pad": {
+        "horizontal": 10,
+        "vertical": 5,
+        "xpad_s": 2,
+        "ypad_s": 5,
+        "xpad_m": 4,
+        "ypad_m": 7,
+        "xpad_l": 5,
+        "ypad_l": 10
+    },
+    "button": {
+        "background": "#2196F3",
+        "foreground": "#FFFFFF",
+        "active_background": "#1976D2",
+        "active_foreground": "#FFFFFF"
+    },
+    "label": {
+        "background": "#F5F5F5",
+        "foreground": "#424242"
+    },
+    "size": {
+      "h_button": 2,
+      "w_button": 20,
+      "ypad_s": 2,
+      "ypad_m": 5,
+      "ypad_l": 10,
+      "xpad": 5,
+      "w_prompt": 110,
+      "h_prompt": 14
+    }
+}

@@ -1,3 +1,5 @@
+# TODO: ask claude to go around and add these to every file (can I do it on my main Linux PC to get actual dates?)
+
 """
 @file     main.py
 @author   Anders Bandt
@@ -7,18 +9,15 @@
 
 # needed modules
 import argparse
-import logging
+
 
 # import user created modules
 from gui import gui_driver
 
 
-# NOTE: mainly added this because XDM1041 EEequipment code includes it?
-print("Setting up basic logging config in main()")
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-# )
+# TODO: add back those notes about tkinter installation on Linux and what not to README.md
+# TODO: give the README a solid review
+
 
 
 def main():
@@ -27,22 +26,24 @@ def main():
 
     # Add command-line arguments
     parser.add_argument('-a', '--auto-connect', action='store_true', help='Enable auto-connect mode')
-    parser.add_argument('-o', '--disable-auto', action='store_true', help='Enable other behavior')
+    parser.add_argument('-c', '--compact', action='store_true', help='Force compact mode (overrides automatic screen size detection)')
 
     # Parse the arguments
     args = parser.parse_args()
 
     # Use the arguments to determine behavior
-    autoconnect = True
+    autoconnect = False
     if args.auto_connect:
         print("Auto-connect enabled.")
         autoconnect = True
-    if args.disable_auto:
-        print("Auto-connect disabled")
-        autoconnect = False
+
+    force_compact = False
+    if args.compact:
+        print("Compact mode forced.")
+        force_compact = True
 
     # Call the main function of your GUI driver
-    gui_driver.main(autoconnect)
+    gui_driver.main(autoconnect, force_compact)
 
     # quit if we reach this point
     print("calling quit()")

@@ -10,48 +10,26 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
 
-# import uGUI modules
+# import user GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
-from gui.guiTab_parent import ThemedFrame
+
+# import user created modules
+from common import plotter
 
 # import needed packages
 from datetime import datetime
 import time
-import pyvisa.errors
-
-
-import EEequipment
-from EEequipment.TestEquipment import TestEquipment
-import inspect, pkgutil, importlib
-
-
-
-ALLOWED_BASES = (TestEquipment,)  # add DMMBase, PowerSupplyBase, etc., if available
-
-def get_instruments():
-    """Return {display_name: class_obj} by walking subpackages and filtering."""
-    reg = {}
-    base_pkg = EEequipment.__name__
-    for m in pkgutil.walk_packages(EEequipment.__path__, prefix=f"{base_pkg}."):
-        modname = m.name
-        try:
-            module = importlib.import_module(modname)
-        except Exception:
-            continue
-        for name, obj in inspect.getmembers(module, inspect.isclass):
-            if obj.__module__ != modname:
-                continue
-            if any(obj is base or issubclass(obj, base) for base in ALLOWED_BASES) and obj not in ALLOWED_BASES:
-                display = name  # or f"{modname}.{name}" for uniqueness
-                reg[display] = obj
-    return reg
+from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+from common import logger
+import numpy as np
 
 
 
-class TabATE(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+class TabATE(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.basefilepath = basefilepath
@@ -60,23 +38,31 @@ class TabATE(ThemedFrame):
         self.fr_port = None
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_accuracy = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up serial / PS variables
         self.ate = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self, "ATE Output", height=18, width=140)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "ATE Output",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt_s"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
         # initialize tab content
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, pady=15, padx=15)
-        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.fr_info.grid(row=0, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_control.grid(row=1, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_accuracy.grid(row=2, column=0, padx=2, pady=self.theme_config["pad"]["ypad_s"])
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"])
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
+                                            self.theme_config,
                                             self.cc,
                                             "Generic_ATE",
                                             self.port_init,
@@ -85,24 +71,30 @@ class TabATE(ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+        self.fr_port.grid(row=0, column=1, rowspan=2, padx=15, pady=self.theme_config["pad"]["ypad_s"])
 
     def initTabContent(self):
         print("Initializing tab 7 (ATE) content")
         self.init_fr_info()
         self.init_fr_control()
+        self.init_fr_accuracy()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
-        self.labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
-
+        self.labelInfo.grid(row=0, column=0, columnspan=2)
 
         # add equipment selector dropdown
-        self.registry = get_instruments()
+        self.registry = equipment_manager.get_instruments("all")
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
         )
+
+        # Load and set previous model if available
+        previous_model = self.cc.get_used_model("Generic_ATE")
+        if previous_model and previous_model in self.registry:
+            self.ate_drop[1].set(previous_model)
+            print(f"Restored previous ATE model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -115,11 +107,11 @@ class TabATE(ThemedFrame):
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
         # Position the device information labels
-        self.ate_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
-        self.labelID.grid(row=2, column=0, sticky='W', padx=5, pady=2)
-        self.labelIDValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
-        self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=2)
-        self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=2)
+        self.ate_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=1)
+        self.labelID.grid(row=2, column=0, sticky='W', padx=5, pady=1)
+        self.labelIDValue.grid(row=2, column=1, sticky='W', padx=5, pady=1)
+        self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=1)
+        self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=1)
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -130,16 +122,16 @@ class TabATE(ThemedFrame):
         # GENERAL CONTROLS
         self.cmd_label = ttk.Label(fr_m, text="Command", style="TLabel")
         self.cmd_entry = tk.Entry(fr_m)
-        self.cmd_button = ttk.Button(fr_m, text="Send", style="TButton",
+        self.cmd_button = tk.Button(fr_m, text="Send",
                                       command=lambda: self.ate_command(self.cmd_entry.get())
                                       )
-        self.qry_button = ttk.Button(fr_m, text="Query", style="TButton",
+        self.qry_button = tk.Button(fr_m, text="Query",
                                       command=lambda: self.ate_query(self.cmd_entry.get())
                                       )
 
 
         # MISC CONTROL
-        self.benchmark = ttk.Button(fr_m, text="Benchmark", style="TButton",
+        self.benchmark = tk.Button(fr_m, text="Benchmark",
                                       command=lambda: self.ate_benchmark()
                                       )
 
@@ -150,21 +142,161 @@ class TabATE(ThemedFrame):
         self.qry_button.grid(row=1, column=3, padx=10, pady=10)
         self.benchmark.grid(row=2, column=0, padx=10, pady=10)
 
+    def init_fr_accuracy(self):
+        """Initialize the instrument accuracy testing frame"""
+        fr_m = self.fr_accuracy
+
+        # Title
+        title_label = ttk.Label(fr_m, text='Instrument Accuracy Testing', style="TPinkLabel.TLabel", width=30)
+        title_label.grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Info button
+        info_button = tk.Button(fr_m, text="ℹ Info",
+                                command=self.show_accuracy_info,
+                                bg=self.theme_config["light_2"],
+                                fg=self.theme_config["fg_dark"],
+                                height=1, width=6)
+        info_button.grid(row=0, column=3, padx=5, pady=5)
+
+        # Description
+        desc_label = ttk.Label(fr_m, text='Sweep PS voltage with DMM', style="TLabel")
+        desc_label.grid(row=1, column=0, columnspan=4, pady=2)
+
+        # Sweep configuration
+        ttk.Label(fr_m, text="Start Voltage (V):", style="TLabel").grid(row=2, column=0, sticky='e', padx=5, pady=5)
+        self.acc_start_entry = tk.Entry(fr_m, width=10)
+        self.acc_start_entry.insert(0, "0.1") # NOTE: starting at 0V causes issues on most power supplies. Start at 100mV instead
+        self.acc_start_entry.grid(row=2, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(fr_m, text="Stop Voltage (V):", style="TLabel").grid(row=3, column=0, sticky='e', padx=5, pady=5)
+        self.acc_stop_entry = tk.Entry(fr_m, width=10)
+        self.acc_stop_entry.insert(0, "5")
+        self.acc_stop_entry.grid(row=3, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(fr_m, text="Number of Steps:", style="TLabel").grid(row=4, column=0, sticky='e', padx=5, pady=5)
+        self.acc_steps_entry = tk.Entry(fr_m, width=10)
+        self.acc_steps_entry.insert(0, "11")
+        self.acc_steps_entry.grid(row=4, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(fr_m, text="Settling Time (s):", style="TLabel").grid(row=5, column=0, sticky='e', padx=5, pady=5)
+        self.acc_settling_entry = tk.Entry(fr_m, width=10)
+        self.acc_settling_entry.insert(0, "1.5")
+        self.acc_settling_entry.grid(row=5, column=1, sticky='w', padx=5, pady=5)
+
+        ttk.Label(fr_m, text="PS Channel:", style="TLabel").grid(row=6, column=0, sticky='e', padx=5, pady=5)
+        self.acc_channel_entry = tk.Entry(fr_m, width=10)
+        self.acc_channel_entry.insert(0, "1")
+        self.acc_channel_entry.grid(row=6, column=1, sticky='w', padx=5, pady=5)
+
+        # Run button
+        self.acc_run_button = tk.Button(fr_m, text="Run Accuracy Test",
+                                         command=self.run_accuracy_test,
+                                         bg=self.theme_config["success"],
+                                         fg=self.theme_config["fg_dark"],
+                                         height=2, width=20)
+        self.acc_run_button.grid(row=2, column=2, rowspan=3, padx=20, pady=10)
+
+    def gui_refresh(self, event):
+        self.fr_port.refresh_ports()
+
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
     ##############################################################################
 
+    def show_accuracy_info(self):
+        """Display information about power supply accuracy testing"""
+        # Create popup window
+        info_window = tk.Toplevel(self)
+        info_window.title("Power Supply Accuracy Information")
+        info_window.geometry("600x500")
+        info_window.configure(bg=self.theme_config["bg_light"])
+
+        # Title
+        title_label = ttk.Label(info_window,
+                                text="Understanding Power Supply Accuracy",
+                                style="TPinkLabel.TLabel",
+                                font=(self.theme_config["font"]["family"], 14, "bold"))
+        title_label.pack(pady=10)
+
+        # Create frame for text with scrollbar
+        text_frame = tk.Frame(info_window, bg=self.theme_config["bg_light"])
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Scrollbar
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Text widget
+        text_widget = tk.Text(text_frame,
+                              wrap=tk.WORD,
+                              yscrollcommand=scrollbar.set,
+                              bg=self.theme_config["light_4"],
+                              fg=self.theme_config["fg_light"],
+                              font=(self.theme_config["font"]["family"], 10),
+                              padx=10,
+                              pady=10)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text_widget.yview)
+
+        # Informational text content
+        info_text = """Power Supply Accuracy Testing
+
+Overview:
+This tool allows you to characterize the accuracy of a power supply by sweeping through voltage setpoints and measuring the actual output with a precision digital multimeter (DMM).
+
+How It Works:
+1. The test sweeps the power supply from start voltage to stop voltage in discrete steps
+2. At each setpoint, the system waits for the specified settling time
+3. The DMM measures the actual output voltage
+4. Results are plotted and saved for analysis
+
+Key Parameters:
+
+Start/Stop Voltage:
+Define the voltage range to test. Starting at 0V can cause issues on some power supplies, so 0.1V (100mV) is recommended as a minimum.
+
+Number of Steps:
+How many voltage points to test between start and stop. More steps provide better characterization but take longer.
+
+Settling Time:
+Time to wait at each voltage setpoint before taking a measurement. This allows the power supply output to stabilize and transients to settle. Typical values: 0.5-2 seconds.
+
+PS Channel:
+Which power supply channel to test (1 or 2 for dual-channel supplies).
+
+Understanding Results:
+- Linear deviation: How well the measured voltage tracks the setpoint
+- Accuracy: Absolute difference between setpoint and measured value
+- Linearity error: Deviation from ideal 1:1 relationship
+- Repeatability: Consistency across multiple runs
+
+TODO: Add more detailed information about interpreting results, expected accuracy specifications, and troubleshooting common issues.
+"""
+
+        # Insert text and make read-only
+        text_widget.insert("1.0", info_text)
+        text_widget.config(state=tk.DISABLED)
+
+        # Close button
+        close_button = tk.Button(info_window,
+                                 text="Close",
+                                 command=info_window.destroy,
+                                 bg=self.theme_config["light_2"],
+                                 fg=self.theme_config["fg_dark"],
+                                 height=1,
+                                 width=10)
+        close_button.pack(pady=10)
+
     def ate_command(self, command_str):
         if self.ate is not None:
-            self.ate.send_cmd(command_str)
+            self.ate.write(command_str)
 
     def ate_query(self, command_str):
         if self.ate is not None:
+            self.prompt.print("Sending command: " + command_str)
             res = self.ate.query(command_str)
             self.prompt.print(f"Got response: {res}")
 
-
-    # TODO: might need a drop down on the benchark method choice... some equipment test_conn doesn't work?
     def ate_benchmark(self):
         if self.ate is not None:
             self.prompt.print("Running benchmark with the `test_conn` function")
@@ -174,6 +306,160 @@ class TabATE(ThemedFrame):
             self.prompt.print(bench_result["string"])
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")
 
+    def run_accuracy_test(self):
+        """Run instrument accuracy test by sweeping PS and measuring with DMM"""
+        # Check that PS and DMM are connected
+        if self.cc.ps is None:
+            guih.alert_user("PS Not Connected", "Please connect a power supply before running accuracy test", "error")
+            return
+
+        if self.cc.dmm is None:
+            guih.alert_user("DMM Not Connected", "Please connect a DMM before running accuracy test", "error")
+            return
+
+        # Parse configuration from GUI
+        try:
+            start_voltage = float(self.acc_start_entry.get())
+            stop_voltage = float(self.acc_stop_entry.get())
+            num_steps = int(self.acc_steps_entry.get())
+            settling_time = float(self.acc_settling_entry.get())
+            ps_channel = int(self.acc_channel_entry.get())
+        except ValueError as e:
+            guih.alert_user("Invalid Input", f"Please enter valid numeric values: {str(e)}", "error")
+            return
+
+        # Validate inputs
+        if num_steps < 2:
+            guih.alert_user("Invalid Input", "Number of steps must be at least 2", "error")
+            return
+
+        if start_voltage == stop_voltage:
+            guih.alert_user("Invalid Input", "Start and stop voltages cannot be the same", "error")
+            return
+
+        self.prompt.print("Starting instrument accuracy test...")
+        self.prompt.print(f"Sweep: {start_voltage}V to {stop_voltage}V in {num_steps} steps")
+
+        # Create stimulus configuration using logger's StimulusConfig
+        stimulus_config = logger.StimulusConfig(
+            enabled=True,
+            stimulus_type=logger.StimulusType.PS_VOLTAGE,
+            sweep_mode=logger.SweepMode.LINEAR,
+            step_mode=logger.StepMode.NUM_STEPS,
+            start_value=start_voltage,
+            stop_value=stop_voltage,
+            step_value=num_steps,
+            settling_time=settling_time,
+            channel=ps_channel
+        )
+
+        # Validate configuration
+        valid, error_msg = stimulus_config.validate()
+        if not valid:
+            guih.alert_user("Configuration Error", error_msg, "error")
+            return
+
+        # Create stimulus generator
+        stimulus_gen = logger.StimulusGenerator(stimulus_config)
+
+        # Storage for measurements
+        set_voltages = []
+        measured_voltages = []
+        errors = []
+
+        # Perform sweep
+        try:
+            self.cc.ps.output_on(ps_channel)
+            for step_num, voltage in enumerate(stimulus_gen, 1):
+                # Set PS voltage
+                self.cc.ps.set_voltage(voltage, channel=ps_channel)
+
+                # Wait for settling
+                time.sleep(settling_time)
+
+                # Read DMM measurement
+                dmm_reading = self.cc.dmm.read_value()
+
+                # Calculate error
+                error = dmm_reading - voltage
+
+                # Store data
+                set_voltages.append(voltage)
+                measured_voltages.append(dmm_reading)
+                errors.append(error)
+
+                # Update progress
+                self.prompt.print(f"Step {step_num}/{num_steps}: Set={voltage:.4f}V, Measured={dmm_reading:.4f}V, Error={error:.4f}V")
+
+            # end test
+            self.cc.ps.output_off(ps_channel)
+
+            # Calculate statistics
+            errors_array = np.array(errors)
+            set_array = np.array(set_voltages)
+            measured_array = np.array(measured_voltages)
+
+            mean_error = np.mean(errors_array)
+            std_error = np.std(errors_array)
+            max_error = np.max(np.abs(errors_array))
+            rms_error = np.sqrt(np.mean(errors_array**2))
+
+            # Calculate percent errors
+            # Avoid division by zero by using full scale (stop - start)
+            full_scale = abs(stop_voltage - start_voltage)
+            if full_scale > 0:
+                mean_error_pct = (abs(mean_error) / full_scale) * 100
+                max_error_pct = (max_error / full_scale) * 100
+            else:
+                mean_error_pct = 0
+                max_error_pct = 0
+
+            # Format results
+            results = []
+            results.append("=" * 80)
+            results.append("INSTRUMENT ACCURACY TEST RESULTS")
+            results.append("=" * 80)
+            results.append(f"\nTest Configuration:")
+            results.append(f"  Voltage Range: {start_voltage}V to {stop_voltage}V")
+            results.append(f"  Number of Steps: {num_steps}")
+            results.append(f"  Settling Time: {settling_time}s")
+            results.append(f"  PS Channel: {ps_channel}")
+            results.append(f"\nStatistics:")
+            results.append(f"  Mean Error:          {mean_error:>10.6f} V  ({mean_error_pct:>6.3f}% of full scale)")
+            results.append(f"  Std Deviation:       {std_error:>10.6f} V")
+            results.append(f"  RMS Error:           {rms_error:>10.6f} V")
+            results.append(f"  Max Absolute Error:  {max_error:>10.6f} V  ({max_error_pct:>6.3f}% of full scale)")
+            results.append(f"\nDetailed Measurements:")
+            results.append(f"{'Step':<6} {'Set (V)':<12} {'Measured (V)':<12} {'Error (V)':<12} {'Error (%FS)':<12}")
+            results.append("-" * 80)
+
+            for i in range(len(set_voltages)):
+                error_pct = (abs(errors[i]) / full_scale) * 100 if full_scale > 0 else 0
+                results.append(f"{i+1:<6} {set_voltages[i]:<12.6f} {measured_voltages[i]:<12.6f} {errors[i]:<12.6f} {error_pct:<12.3f}")
+
+            results.append("=" * 80)
+
+            # Display results
+            self.prompt.print("\n".join(results), "normal")
+            self.prompt.print("Accuracy test complete!")
+            self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
+
+            # Plot results with residuals
+            plotter.plot_accuracy_with_residuals(
+                set_array,
+                measured_array,
+                errors_array,
+                x_label="Set Voltage (V)",
+                y_label="Measured Voltage (V)",
+                title="Power Supply Accuracy Analysis")
+
+
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Communication Error", f"Error communicating with equipment: {str(e)}", "error")
+            self.prompt.print(f"Error during accuracy test: {str(e)}", "error")
+        except Exception as e:
+            guih.alert_user("Test Error", f"An error occurred during testing: {str(e)}", "error")
+            self.prompt.print(f"Error during accuracy test: {str(e)}", "error")
 
     #################################
     #### SERIAL (COM)  ##############
@@ -186,14 +472,12 @@ class TabATE(ThemedFrame):
         self.ate = ate_temp(self.fr_port.get_port())
 
         try:
+            import usb
             self.id = self.ate.test_conn()
-        except AttributeError as e:
+        except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't connect to VISA", e, "warning")
             self.fr_port.set_status(False)
             return False
-        except pyvisa.errors.VisaIOError as e:
-            guih.alert_user("Can't connect to VISA", e, "error")
-            self.fr_port.set_status(False)
 
         if self.id:  # CONNECTION SUCCESS
             self.prompt.print(f"Connected to ATE with id: {self.id}")
@@ -203,11 +487,15 @@ class TabATE(ThemedFrame):
             )
             self.fr_port.set_status(True)
 
+            # Save the selected model for next time
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "Generic_ATE")
+
             # gui refresh
-            # self.gui_refresh()
+            self.gui_refresh("call")
             return True
         else:  # BAD ID received
-            self.ps = None
+            self.ate = None
             self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at does not respond or is not correct config")
             return False

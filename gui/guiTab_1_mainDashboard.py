@@ -10,24 +10,49 @@ import tkinter as tk
 from tkinter import ttk
 import serial
 import os
+import platform
+import subprocess
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
-from common.SerialReader import SerialReader
+from common.serial_helper import SerialProcessor
 
 # import GUI modules
 from gui import gui_class as guic
 from gui import gui_helper as guih
-from gui.guiTab_parent import ThemedFrame
 
 
-# TODO ATE: I don't think this connects properly AFTER program startup (program is started up, USB connected, try to connect?)
-#   actually seems like I can connect but there is no status update
+def open_file_cross_platform(file_path):
+    """
+    Opens a file with the default application in a cross-platform way.
+    Works on Windows, Linux, and macOS.
+
+    Args:
+        file_path: Path to the file to open
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(file_path)
+        elif system == "Darwin":  # macOS
+            subprocess.run(["open", file_path], check=True)
+        else:  # Linux and other Unix-like systems
+            subprocess.run(["xdg-open", file_path], check=True)
+        return True
+    except Exception as e:
+        print(f"Error opening file: {e}")
+        return False
 
 
-class tabMainDashboard(ThemedFrame):
-    def __init__(self, master, class_controller, basefilepath, theme_file, autoconnect):
-        super().__init__(master, theme_file)
+class TabMainDashboard(guic.ThemedFrame):
+    def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
+        super().__init__(master, theme_config)
         self.master = master
         self.cc = class_controller
         self.grid(row=0, column=0)
@@ -37,30 +62,41 @@ class tabMainDashboard(ThemedFrame):
         self.relay_btns = []
 
         # init frames within tab
-        self.fr_main_status = guic.AutoConnFrame(self, "Relay", self.relay_autoconnect, None)
-        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_main_status.status = self.cc.relay.status
-        self.fr_control = tk.Frame(self, bg="#00bcd4")
-        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
+        self.fr_control = tk.Frame(self, bg=self.theme_config["dark_1"])
         self.fr_relay_control = tk.Frame(self, bg=self.theme_config["light_3"])
-        self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
 
-        # add some other GUI variables
-        self.canvas1 = tk.Canvas(self.fr_main_status, width=50, height=50)
+        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None)
+
+
+
+
+
+        # add some variables for AutoConn frame
+        self.fr_main_status.status = self.cc.relay.status
 
         # setup prompt
-        self.prompt1 = guic.Prompt(self, "Debug serial", height=14, width=140)
-        self.prompt1.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt = guic.Prompt(self,
+                                  self.theme_config,
+                                   "Main",
+                                  height=self.theme_config["size"]["h_prompt"],
+                                  width=self.theme_config["size"]["w_prompt"])
+
 
         # initialize tab content
         self.initTabContent()
 
         # init serial port
         self.ser_obj = None
-        self.fr_port = guic.SerialConnFrame(self, self.cc, "ATE_serial", self.port_init, self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close)
         if autoconnect:
             self.fr_port.connect_previous_port()
+
+        # place everything on the grid
+        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
+        self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
         self.fr_port.grid(row=1, column=1, padx=30, pady=12)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
 
         # refresh the relay state
         self.gui_refresh("auto")
@@ -82,7 +118,7 @@ class tabMainDashboard(ThemedFrame):
         fr_m = self.fr_relay_control
 
         # add button for GUI refresh of relay states
-        btn2 = tk.Button(fr_m, text=f"Refresh states", bg=self.theme_config["dark_2"],
+        btn2 = tk.Button(fr_m, text=f"Refresh states", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_2"],
                          command=lambda: self.gui_refresh("call"))
         btn2.grid(row=0, column=1, padx=10, pady=12)
 
@@ -94,25 +130,25 @@ class tabMainDashboard(ThemedFrame):
             self.relay_btns.append(btn)
 
         # add some text with user information
-        note = tk.Label(fr_m,text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
+        note = tk.Label(fr_m, text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
-        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", bg=self.theme_config["dark_3"],
+        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
                          command=lambda: self.open_config_ini())
-        btn3.grid(row=6, column=1, padx=10, pady=5)
+        btn3.grid(row=6, column=0, padx=10, pady=5)
+        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
+                         command=lambda: self.open_master_ini())
+        btn4.grid(row=6, column=2, padx=10, pady=5)
 
     def init_fr_control(self):
         fr_m = self.fr_control
 
-        self.label_control = tk.Label(fr_m,
-                                      text="Focus this frame and type something",
-                                      bg="lightgrey",
-                                      font=("Arial", 14))
+        self.label_control = ttk.Label(fr_m, style="TPinkLabel.TLabel")
 
-        btn1 = tk.Button(fr_m, text=f"Button 1", bg=self.theme_config["dark_1"],
+        btn1 = tk.Button(fr_m, text=f"BUTTON 1",fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"],
                          command=lambda: self.send_command("a"))
-        btn2 = tk.Button(fr_m, text=f"Button 2", bg=self.theme_config["dark_2"],
+        btn2 = tk.Button(fr_m, text=f"BUTTON 2",fg=self.theme_config["fg_dark"],  bg=self.theme_config["light_2"],
                          command=lambda: self.send_command("b"))
-        btn3 = tk.Button(fr_m, text=f"Both buttons", bg=self.theme_config["dark_3"],
+        btn3 = tk.Button(fr_m, text=f"BOTH BUTTON",fg=self.theme_config["fg_dark"],  bg=self.theme_config["light_3"],
                          command=lambda: self.send_command("c"))
 
         self.label_control.grid(row=0, column=0, columnspan=3, pady=10, padx=10)
@@ -145,10 +181,11 @@ class tabMainDashboard(ThemedFrame):
                     btn.config(style="TButtonOff.TButton")
         else:
             if event == "call":
-                self.prompt1.print("Can't refresh relay state with disconnected relay", "error")
+                self.prompt.print("Can't refresh relay state with disconnected relay", "error")
                 guih.alert_user("Can't refresh relay!", "Relay is not connected", "error")
 
         # update serial status
+        self.fr_port.refresh_ports()
         if self.ser_obj is not None:
             if self.ser_obj.serStatus is False:
                 self.ser_obj.stop_process()
@@ -162,7 +199,7 @@ class tabMainDashboard(ThemedFrame):
             usbrelay_controller.USBRelayController(usb_dev)
         )
         if usb_dev is not None:
-            self.prompt1.print("Autoconnect success")
+            self.prompt.print("Autoconnect success")
             self.fr_main_status.set_status(True)
             self.init_fr_main_status()
         else:
@@ -186,21 +223,24 @@ class tabMainDashboard(ThemedFrame):
                 try:
                     self.ser_obj.send_data(command)
                 except serial.serialutil.SerialException:
-                    self.prompt1.print("ERROR: self.ser_obj is defined but status is FALSE", "error")
+                    self.prompt.print("ERROR: self.ser_obj is defined but status is FALSE", "error")
                     guih.alert_user("Can't send serial data", "Really can't send any shit. Probably I/O error?", "error")
-                self.prompt1.print(f"INFO: issued command {command} ...")
+                self.prompt.print(f"INFO: issued command {command} ...")
             else:
-                self.prompt1.print(f"ERROR: self.ser_obj exists but serStatus is false", "error")
+                self.prompt.print(f"ERROR: self.ser_obj exists but serStatus is false", "error")
 
         except AttributeError:
-            self.prompt1.print("ERROR: probably self.ser_obj is None", "error")
+            self.prompt.print("ERROR: probably self.ser_obj is None", "error")
 
     def open_config_ini(self):
-        file_path = os.getcwd() + "/EEequipment/usbrelay/config.ini"  #tag:HARDCODE
-        if os.path.exists(file_path):
-            os.startfile(file_path)  # Opens the file with the default associated application # TODO ATE: might not work on Linux. Module "os" has no attribute `startfile`
-        else:
-            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist", "error")
+        file_path = os.path.join(os.getcwd(), "EEequipment", "usbrelay", "config.ini")
+        if not open_file_cross_platform(file_path):
+            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist or couldn't be opened", "error")
+
+    def open_master_ini(self):
+        file_path = os.path.join(os.getcwd(), "config", "master.ini")
+        if not open_file_cross_platform(file_path):
+            guih.alert_user("Can't edit config file", f"{file_path} doesn't exist or couldn't be opened", "error")
 
     ##############################################################################
     ####      GUI KEYSTROKE / FOCUS FUNCTIONS        #############################
@@ -231,20 +271,19 @@ class tabMainDashboard(ThemedFrame):
     def port_init(self):
         port = self.fr_port.get_port()
 
-        self.prompt1.print(f"Init with port: {port}")
+        self.prompt.print(f"Init with port: {port}")
         try:
-            self.ser_obj = SerialReader(port,
-                                        9600)
+            self.ser_obj = SerialProcessor(port,9600)
         except serial.serialutil.SerialException as e:
-            self.prompt1.print(f"Can't init with port: {e}", "error")
+            self.prompt.print(f"Can't init with port: {e}", "error")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
-        self.prompt1.print("Init successful!\n")
+        self.prompt.print("Init successful!\n")
         return True
 
     def port_close(self):
-        self.prompt1.print("Serial close!")
+        self.prompt.print("Serial close!")
         try:
             self.ser_obj.stop_process()
         except AttributeError:

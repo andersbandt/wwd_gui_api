@@ -106,16 +106,31 @@ The USB relay controller is a specific cheap model readily available on Aliexpre
 ## 📸 Screenshots
 
 ### Main Dashboard
-*Multi-instrument status and control*
+*Main dashboard has USB relay (4 buttons, first one is green)*
+
+*There is also an Arduino control thing I had (the buttons frame)*
+
+![Main dash screenshot](/docs/tab_maindash_ss.png)
+
+
+### DMM Tab
+*Basic control of a DMM here*
+*The power supply and function generator tabs look similar*
+
+![DMM screenshot](/docs/tab_dmm_ss.png)
+
 
 ### Logger Tab
 *Synchronized data collection with stimulus sweeps*
+*Also can do live plotting, plot after sweep*
+
+![Logger screenshot](/docs/tab_log_ss.png)
+
 
 ### Graphing Tab
 *Multi-file plotting with presets*
 
-### ATE Tab
-*Instrument accuracy testing and analysis*
+![Graph screenshot](/docs/tab_graph_ss.png)
 
 ---
 

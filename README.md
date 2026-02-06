@@ -81,6 +81,9 @@ WWD GUI API gives you professional lab automation capabilities for **free**:
 ### Main Dashboard
 *Multi-instrument status and control*
 
+![Main dash screenshot | /docs/tab_maindash_ss.png]
+
+
 ### Logger Tab
 *Synchronized data collection with stimulus sweeps*
 

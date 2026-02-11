@@ -28,6 +28,9 @@ from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
 
+# TODO: record current channel select doesn't reference TestEquipment parameter
+
+
 
 class TabPS(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
@@ -463,12 +466,10 @@ class TabPS(guic.ThemedFrame):
             return False
 
     def port_close(self):
-        self.prompt.print(f"Closing PYVISA resource!")
-        # TODO make sure all disconnect statements have some error handling around disconnect (or figure out how to handle it better)
+        self.prompt.print(f"Closing PS resource!")
         try:
             self.cc.ps.disconnect()
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't disconnect PS", e, "warning")
         self.fr_port.set_status(False)
         self.cc.set_ps(None)
-        self.prompt.print(f"Connection is closed.")

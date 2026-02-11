@@ -36,37 +36,6 @@ This is the list of currently supported equipment. I actually maintain a separat
 
 You can check out my [EEequipment repo](https://github.com/andersbandt/EEequipment/tree/master), or click the subrepository link in the files above.
 
-Below is a list of currently supported standard test equipment.
-
-- **Power Supplies**: Siglent SPD3303X, HP E3640A
-- **Digital Multimeters**: OWON XDM1041, Fluke 8842A, HP 3478A
-- **Function Generators**: Agilent 33120A
-
-Adding new equipment should be very straightforward. Each piece of test equipment will have a `config.ini` file.
-
-For example check out a snippet of the config file for the SPD3303X power supply
-
-```ini
-[pyvisa]
-timeout = 1000
-write_termination = \n
-read_termination = \n
-
-[command]
-set_voltage = CH{channel}:VOLTage {value}
-set_current = CH{channel}:CURRent {value}
-get_set_voltage = CH{channel}:VOLTage?
-get_set_current = CH{channel}:CURRent?
-```
-You simply can copy one of the already created templates and replace the actual commands with whatever your programming manual has listed.
-
-There is also some capability for control of non-standard test equipment
-
-- **Debug Probes**: TI XDS110 JTAG/SWD
-- **USB Devices**: Serial ports, relay controllers
-
-The USB relay controller is a specific cheap model readily available on Aliexpress.
-
 
 
 ### **Automated Data Logging**

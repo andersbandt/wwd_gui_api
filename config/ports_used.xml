@@ -5,5 +5,5 @@
     <DMM_Serial model="HP3478A">GPIB0::23::INSTR</DMM_Serial>
     <PS_PyVISA model="E3640A">GPIB0::5::INSTR</PS_PyVISA>
     <FG_PyVISA>GPIB0::10::INSTR</FG_PyVISA>
-    <Generic_ATE />
+    <Generic_ATE model="Agilent33120A">USB0::0x0957::0x17A0::MY53110117::INSTR</Generic_ATE>
 </PortsUsed>

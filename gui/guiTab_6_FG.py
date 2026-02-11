@@ -408,8 +408,10 @@ class TabFG(guic.ThemedFrame):
             return False
 
     def port_close(self):
-        self.prompt.print(f"Closing PYVISA resource!")
-        self.cc.fg.disconnect()
+        self.prompt.print(f"Closing FG resource!")
+        try:
+            self.cc.fg.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't disconnect FG", e, "warning")
         self.fr_port.set_status(False)
         self.cc.set_fg(None)
-        self.prompt.print(f"Connection is closed.")

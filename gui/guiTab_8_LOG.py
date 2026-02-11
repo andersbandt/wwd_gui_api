@@ -40,6 +40,15 @@ from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 #   example: calibration (although I would prefer that's inline)
 
 
+# TODO: add Oscilloscope support here
+#   would like to add support for being able to select what measurements they want
+#   to start would like 1-frequency, 2-duty cycle, minimum, maximum
+#   this also gets complicated with channel support (maybe want some measurements on some channels and some measurements on another)
+#   honestly I think I need to pop up a whole separate window to add to the record config
+#   or to avoid the GUI could have the user have a .ini file where they hardcode what the config they want the scope to use is
+
+
+
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -822,8 +831,9 @@ class TabLog(guic.ThemedFrame):
                             row[logger.COL_PS_VMEAS2] = self.cc.ps.get_voltage(2)
                             row[logger.COL_PS_IMEAS2] = self.cc.ps.get_current(2)
                     except COMMUNICATION_ERRORS as e:
-                        self.record_status = False
-                        guih.alert_user("Communication Error", str(e), "error")
+                        # TODO: evaluate shutting off record here
+                        # self.record_status = False
+                        guih.alert_user("Logger: PS comm error", str(e), "error")
                         break
 
                 # Collect Function Generator data if requested
@@ -1071,7 +1081,9 @@ class TabLog(guic.ThemedFrame):
         if self._dash_thread is not None and self._dash_thread.is_alive():
             return  # Dash already running, reuse existing bus
 
-        self.bus = Queue(maxsize=50_000)
+        # TODO: make this GUI selectable? With some insight into how
+        # self.bus = Queue(maxsize=50_000)
+        self.bus = Queue(maxsize=5_000)
 
         # Determine x-axis: stimulus value if in stimulus mode, otherwise time
         if self.stimulus_config and self.stimulus_config.enabled:

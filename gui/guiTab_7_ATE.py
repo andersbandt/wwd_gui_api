@@ -294,7 +294,11 @@ TODO: Add more detailed information about interpreting results, expected accurac
     def ate_query(self, command_str):
         if self.ate is not None:
             self.prompt.print("Sending command: " + command_str)
-            res = self.ate.query(command_str)
+            try:
+                res = self.ate.query(command_str)
+            except COMMUNICATION_ERRORS as e:
+                self.prompt.print("Communication error: " + str(e), "error")
+                return
             self.prompt.print(f"Got response: {res}")
 
     def ate_benchmark(self):

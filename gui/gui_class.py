@@ -188,7 +188,8 @@ class ThemedApp:
                                    self.theme_config["h1"]["style"]))
 
 
-# TODO: am I even using this? I feel like I'm still making tk.Frame instances in each tab
+# NOTE: this thing is mainly used for the tabs and the stuff in `gui_class.py`
+#   it's not currently used for many of of the sub-Frames in tabs
 class ThemedFrame(tk.Frame):
     def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
@@ -200,7 +201,6 @@ class ThemedFrame(tk.Frame):
         self.configure(bg=bg)
 
 
-# TODO: ok I actually do want to add a toggle switch for timestamps
 # TODO: not super important, but with serial logging the lines get formatted weird
 #   Same line stuff gets printed on two different lines with two timestamps
 #   unsure how it would look with timestamps disabled
@@ -210,10 +210,21 @@ class Prompt(ThemedFrame):
         self.height = height
         self.width = width
         self.set_bg(self.theme_config["light_4"])
+        self.show_timestamps = True
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
-        clear_button = tk.Button(self, text="Clear console", command=self.clear, fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"])
+
+        # clear button
+        clear_button = tk.Button(self, text="Clear console", command=self.clear,
+                                 bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"])
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
+
+        # toggle timestamps button
+        self.toggle_timestamp_btn = tk.Button(self,
+                                               text="Timestamps: ON",
+                                               command=self.toggle_timestamp,
+                                 bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"])
+        self.toggle_timestamp_btn.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
 
         # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
@@ -228,11 +239,16 @@ class Prompt(ThemedFrame):
         self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
 
     # gui_print: prints a message on a Tkinter frame
-    def print(self, message, print_type=None, timestamp=True):
-        prefix = ">>> "
-        if timestamp:
+    def print(self, message, print_type=None, timestamp=None):
+        # function arg override
+        if timestamp is not None:
+            self.toggle_timestamp(state=timestamp)
+
+        if self.show_timestamps:
             time_str = datetime.now().strftime("%H:%M:%S")
             prefix = f"[{time_str}]>>> "
+        else:
+            prefix = ">>> "
 
         message = prefix + message + "\n"
         if print_type == "error":
@@ -242,6 +258,15 @@ class Prompt(ThemedFrame):
 
         self.prompt.see("end")  # Auto-scroll to the end
         return True
+
+    def toggle_timestamp(self, state=None):
+        if state is not None:
+            self.show_timestamps = state
+        else:
+            self.show_timestamps = not self.show_timestamps
+        state = "ON" if self.show_timestamps else "OFF"
+        self.toggle_timestamp_btn.config(text=f"Timestamps: {state}")
+
 
     def clear(self):
         self.prompt.delete("1.0", "end")  # basically line index from
@@ -406,6 +431,7 @@ class SerialConnFrame(ConnFrame):
         self.port_func = self.port_func_options[selected_label]
         self.refresh_ports(first_run=True)
 
+    # TODO: is it possible to add a timeout to this method?
     def refresh_ports(self, first_run=False):
         menu = self.com_drop[0]["menu"]
         menu.delete(0, "end")

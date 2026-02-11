@@ -22,6 +22,10 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+# TODO: this thing might have to get rid of self.dmm in favor of self.cc.dmm (ask Claude)
+
+
+
 
 class TabDMM(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
@@ -245,6 +249,7 @@ class TabDMM(guic.ThemedFrame):
         elif unit == "V":
             self.meas1_scale = 1
 
+    # TODO: do I want to consider having some error handling for if a command is not found?
     def dmm_set_mode(self):
         if self.dmm is not None:
             mode = self.mode_drop[1].get()
@@ -314,12 +319,11 @@ class TabDMM(guic.ThemedFrame):
             return True
 
     def port_close(self):
-        # NOTE: added this Exception because we might call this after app is destroyed
+        self.prompt.print(f"Closing DMM resource!")
         try:
-            self.prompt.print(f"Serial close!")
-        except tk.TclError:
-            pass
-
-        self.dmm.disconnect()
+            self.dmm.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't disconnect PS", e, "warning")
         self.fr_port.set_status(False)
+        self.cc.set_dmm(None)
 

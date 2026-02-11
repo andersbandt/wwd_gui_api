@@ -55,7 +55,11 @@ class TabUSB(guic.ThemedFrame):
         # place everything in grid
         self.fr_port.grid(row=1, column=0, padx=30, pady=12)
         self.fr_state.grid(row=2, column=0, padx=30, pady=12)
-        self.prompt.grid(row=1, column=1, rowspan=2, padx=30, pady=12, sticky="N")
+        self.prompt.grid(row=1, column=1, rowspan=2, padx=30, pady=12, sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
 
 
     def initTabContent(self):

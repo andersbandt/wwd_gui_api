@@ -90,7 +90,11 @@ class TabPS(guic.ThemedFrame):
         self.fr_port.grid(row=0, column=2, padx=15, pady=15)
         self.fr_control.grid(row=1, column=0, pady=15, padx=15)
         self.fr_status.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=1, column=2, padx=30, pady=12, sticky="W")
+        self.prompt.grid(row=1, column=2, padx=30, pady=12, sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(1, weight=1)
 
 
     def initTabContent(self):

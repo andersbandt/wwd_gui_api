@@ -63,7 +63,11 @@ class TabFG(guic.ThemedFrame):
         # place everything in grid
         self.fr_info.grid(row=0, column=0)
         self.fr_control.grid(row=1, column=0)
-        self.prompt.grid(row=1, column=1)
+        self.prompt.grid(row=1, column=1, sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,

@@ -58,7 +58,11 @@ class TabATE(guic.ThemedFrame):
         self.fr_info.grid(row=0, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
         self.fr_control.grid(row=1, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
         self.fr_accuracy.grid(row=2, column=0, padx=2, pady=self.theme_config["pad"]["ypad_s"])
-        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"])
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"], sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,

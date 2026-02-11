@@ -29,6 +29,7 @@ from gui import guiTab_6_FG
 from gui import guiTab_7_ATE
 from gui import guiTab_8_LOG
 from gui import guiTab_9_GRAPH
+from gui import guiTab_10_OSC
 
 
 def parse_autoconnect_config():
@@ -47,7 +48,7 @@ def parse_autoconnect_config():
 
     # read in parameters from the config file
     autoconn_vars = []
-    for i in range(1, 10): #tag:HARDCODE
+    for i in range(1, 11): #tag:HARDCODE
         tmp = config["AUTOCONNECT"][f"tab_{i}"]
         if tmp.strip().upper() == "YES":
             autoconn_vars.append(True)
@@ -123,7 +124,7 @@ class MainApplication(ThemedApp):
         if self.autoconnect:
             autoconnect = parse_autoconnect_config()
         else:
-            autoconnect = [False for i in range(10)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
+            autoconnect = [False for i in range(11)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
 
 
         # create Tab objects
@@ -136,10 +137,11 @@ class MainApplication(ThemedApp):
         self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
         self.tab8 = guiTab_8_LOG.TabLog(self.nb, self.controller, self.basefilepath, self.theme_config)
         self.tab9 = guiTab_9_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab10 = guiTab_10_OSC.TabOSC(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[9])
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "FG Control", "ATE", "Logger", "GRAPH"]
-        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8, self.tab9]
+        self.tab_names = ["MAIN", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "FG Control", "ATE", "Logger", "GRAPH", "OSC Control"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8, self.tab9, self.tab10]
 
         # Add tabs dynamically using a loop
         for tab, name in zip(tabs, self.tab_names):
@@ -169,6 +171,8 @@ class MainApplication(ThemedApp):
             guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
         elif selected_tab == self.tab_names[7]:
             guiTab_8_LOG.TabLog.gui_refresh(self.tab8, "auto")
+        elif selected_tab == self.tab_names[9]:
+            guiTab_10_OSC.TabOSC.gui_refresh(self.tab10, "auto")
 
 
 ###########################################################
@@ -256,6 +260,13 @@ def main(autoconnect, force_compact=False):
     if app.controller.fg is not None:
         print("Disconnect from FG")
         app.controller.fg.disconnect()
+
+    if app.controller.osc is not None:
+        print("Disconnect from OSC")
+        try:
+            app.controller.osc.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            print(f"Failed to disconnect from OSC: {e}")
 
     if app.controller.relay is not None:
         app.controller.relay.open_all()

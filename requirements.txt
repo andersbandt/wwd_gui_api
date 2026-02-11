@@ -14,6 +14,7 @@ pyvisa-py
 sv_ttk
 libusb
 dash
+simpleeval
 
 
 #added by anders

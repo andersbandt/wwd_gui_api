@@ -42,7 +42,11 @@ class tabXDS110(guic.ThemedFrame):
                                    "XDS110 Comms",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12, sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(10, weight=1)
 
         # init frames within tab
         self.fr_xds110 = tk.Frame(self, bg=self.theme_config["light_4"])

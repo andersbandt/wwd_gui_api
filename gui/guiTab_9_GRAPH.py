@@ -76,7 +76,12 @@ class TabGraph(guic.ThemedFrame):
         # place everything in grid
         self.fr_setup.grid(row=1, column=0, pady=15, padx=15)
         self.fr_files.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=2, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt.grid(row=2, column=0, columnspan=4, padx=30, pady=12, sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # refresh initial file last
         self.refresh_files()

@@ -514,8 +514,6 @@ def plot_multi_file_data(file_data_list,
 ### PLOTLY LIVE PLOTTING    #######
 ###################################
 
-# TODO: Claude should examine in histogram mode it doesn't make sense for them to share the same x-axis
-
 
 def start_live_plot(
         data_bus: Queue,
@@ -572,16 +570,20 @@ def start_live_plot(
     #   - Both views: Show histogram below time series in additional subplots
     app.layout = html.Div([
             html.H2(title),
-            dcc.RadioItems(
-                id="plot-mode",
-                options=[
-                    {"label": "Time Series", "value": "timeseries"},
-                    {"label": "Histogram", "value": "histogram"}
-                ],
-                value="timeseries",
-                inline=True,
-                style={"marginBottom": "10px"}
-            ),
+            html.Div([
+                dcc.RadioItems(
+                    id="plot-mode",
+                    options=[
+                        {"label": "Time Series", "value": "timeseries"},
+                        {"label": "Histogram", "value": "histogram"}
+                    ],
+                    value="timeseries",
+                    inline=True,
+                    style={"display": "inline-block", "marginRight": "20px"}
+                ),
+                html.Button("Clear Data", id="btn-clear", n_clicks=0,
+                            style={"display": "inline-block"}),
+            ], style={"marginBottom": "10px"}),
             dcc.Graph(id="graph"),
             dcc.Interval(id="tick", interval=refresh_ms, n_intervals=0),
         ]
@@ -590,26 +592,35 @@ def start_live_plot(
     @app.callback(
         Output("graph", "figure"),
         Input("tick", "n_intervals"),
-        Input("plot-mode", "value")
+        Input("plot-mode", "value"),
+        Input("btn-clear", "n_clicks"),
     )
-    def update_graph(_, plot_mode):
+    def update_graph(_, plot_mode, n_clicks):
+        # Handle clear button via Dash callback context
+        from dash import ctx
+        if ctx.triggered_id == "btn-clear":
+            time_buf.clear()
+            for ch in channels:
+                bufs[ch].clear()
+
         _ingest_from_bus()
 
         n_ch = len(channels)
+        share_x = (plot_mode != "histogram")
 
         if not time_buf:
-            fig = make_subplots(rows=n_ch, cols=1, shared_xaxes=True)
+            fig = make_subplots(rows=n_ch, cols=1, shared_xaxes=share_x)
             fig.update_layout(template="plotly_white")
             return fig
 
         fig = make_subplots(
             rows=n_ch, cols=1,
-            shared_xaxes=True,
+            shared_xaxes=share_x,
             vertical_spacing=0.08,
         )
 
         if plot_mode == "histogram":
-            # Histogram mode: show distribution of buffered data
+            # Histogram mode: each subplot has its own x-axis (independent ranges)
             for i, ch in enumerate(channels):
                 fig.add_trace(
                     go.Histogram(
@@ -623,7 +634,7 @@ def start_live_plot(
                 fig.update_yaxes(title_text="Count", row=i + 1, col=1)
                 fig.update_xaxes(title_text=ch, row=i + 1, col=1)
         else:
-            # Time series mode: show data over time
+            # Time series mode: shared x-axis, show data over time
             x = list(time_buf)
             for i, ch in enumerate(channels):
                 fig.add_trace(

@@ -16,6 +16,7 @@ from tkinter import scrolledtext
 
 import json
 import threading
+import concurrent.futures
 import copy
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -431,13 +432,18 @@ class SerialConnFrame(ConnFrame):
         self.port_func = self.port_func_options[selected_label]
         self.refresh_ports(first_run=True)
 
-    # TODO: is it possible to add a timeout to this method?
-    def refresh_ports(self, first_run=False):
+    def refresh_ports(self, first_run=False, timeout=5):
         menu = self.com_drop[0]["menu"]
         menu.delete(0, "end")
 
-        # update port list
-        ports = serial_api.get_ports(method=self.port_func)
+        # update port list (with timeout to prevent GUI freeze)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(serial_api.get_ports, method=self.port_func)
+            try:
+                ports = future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                ports = []
+                print(f"WARNING: Port scan timed out after {timeout}s")
 
         # add each port name to the drop-down menu
         for string in ports:

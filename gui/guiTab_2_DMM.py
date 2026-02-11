@@ -22,7 +22,6 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: this thing might have to get rid of self.dmm in favor of self.cc.dmm (ask Claude)
 
 
 
@@ -39,8 +38,7 @@ class TabDMM(guic.ThemedFrame):
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
 
-        # set up serial / DMM variables
-        self.dmm = None
+        # set up DMM variables
         self.dmm_id = None
         self.dmm_Auto = ''
         self.dmm_Range = ''
@@ -82,7 +80,11 @@ class TabDMM(guic.ThemedFrame):
         self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
         self.fr_control.grid(row=0, column=1, pady=10, padx=10)
         self.fr_port.grid(row=0, column=2, padx=30, pady=12)
-        self.prompt.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky='W')
+        self.prompt.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky='NSEW')
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
 
     def load_dmm_config(self):
         """Load DMM configuration from master.ini"""
@@ -211,12 +213,12 @@ class TabDMM(guic.ThemedFrame):
         if not self.fr_port.status:
             return
 
-        self.dmm_Meas1 = self.dmm.read_value()
+        self.dmm_Meas1 = self.cc.dmm.read_value()
         self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
 
         if kind == "full":
-            self.dmm_Range = self.dmm.get_range()
-            self.dmm_Fu1 = self.dmm.get_mode()
+            self.dmm_Range = self.cc.dmm.get_range()
+            self.dmm_Fu1 = self.cc.dmm.get_mode()
 
         # update Label
         if self.fr_port.status:
@@ -251,22 +253,22 @@ class TabDMM(guic.ThemedFrame):
 
     # TODO: do I want to consider having some error handling for if a command is not found?
     def dmm_set_mode(self):
-        if self.dmm is not None:
+        if self.cc.dmm is not None:
             mode = self.mode_drop[1].get()
             self.prompt.print(f"Setting DMM mode to {mode}")
-            self.dmm.set_mode(mode)
+            self.cc.dmm.set_mode(mode)
 
     def dmm_set_range(self):
-        if self.dmm is not None:
+        if self.cc.dmm is not None:
             dmm_range = self.range_drop[1].get()
             self.prompt.print(f"Setting DMM range to {dmm_range}")
-            self.dmm.set_range(dmm_range)
+            self.cc.dmm.set_range(dmm_range)
 
     def dmm_set_sample(self):
-        if self.dmm is not None:
+        if self.cc.dmm is not None:
             sample_speed = self.sample_drop[1].get()
             self.prompt.print(f"Setting DMM sample speed to {sample_speed}")
-            self.dmm.set_sample_speed(sample_speed)
+            self.cc.dmm.set_sample_speed(sample_speed)
 
 
     #################################
@@ -278,12 +280,12 @@ class TabDMM(guic.ThemedFrame):
         port = self.fr_port.get_port()
 
         ate_temp = self.registry[self.ate_drop[1].get()]
-        self.dmm = ate_temp(self.fr_port.get_port())
+        dmm = ate_temp(self.fr_port.get_port())
 
         time.sleep(1)
 
         try:
-            self.dmm_id = self.dmm.test_conn()
+            self.dmm_id = dmm.test_conn()
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't connect to DMM", e, "warning")
             self.fr_port.set_status(False)
@@ -292,7 +294,6 @@ class TabDMM(guic.ThemedFrame):
         # BAD ID received
         if self.dmm_id == '' or self.dmm_id is None:
             self.prompt.print("Connection failed")
-            self.dmm = None
             self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
             return False
@@ -300,7 +301,7 @@ class TabDMM(guic.ThemedFrame):
         else:
             self.prompt.print("Connected to DMM")
             self.prompt.print(f"Got id: {self.dmm_id}")
-            self.cc.set_dmm(self.dmm)
+            self.cc.set_dmm(dmm)
 
             # Set sample speed from config
             self.cc.dmm.set_sample_speed(self.default_sample_speed)
@@ -321,7 +322,7 @@ class TabDMM(guic.ThemedFrame):
     def port_close(self):
         self.prompt.print(f"Closing DMM resource!")
         try:
-            self.dmm.disconnect()
+            self.cc.dmm.disconnect()
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't disconnect PS", e, "warning")
         self.fr_port.set_status(False)

@@ -9,6 +9,7 @@ class ClassController:
         self.ps = None
         self.relay = None
         self.fg = None
+        self.osc = None
 
         # Recording status flag - set by logging tab to prevent gui_refresh during active recording
         self.recording = False
@@ -30,6 +31,9 @@ class ClassController:
 
     def set_fg(self, fg):
         self.fg = fg
+
+    def set_osc(self, osc):
+        self.osc = osc
 
     def get_ser_status(self):
         if self.ser is None:
@@ -60,6 +64,12 @@ class ClassController:
             return False
         else:
             return self.fg.status
+
+    def get_osc_status(self):
+        if self.osc is None:
+            return False
+        else:
+            return self.osc.status
 
     def set_used_port(self, port, usage):
         """

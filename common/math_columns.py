@@ -1,8 +1,4 @@
-"""
-@file     math_columns.py
-@author   Anders Bandt
-@date     February 2026
-@brief    User-defined computed columns for the data logger.
+"""User-defined computed columns for the data logger.
 
 Provides a safe expression evaluator (via simpleeval) so users can define
 math columns like "Power_W = PS_Vmeas1 * PS_Imeas1" that are appended to

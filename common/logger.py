@@ -1,9 +1,4 @@
-"""
-@file     logger.py
-@author   Anders Bandt
-@date     April 2024
-@brief    handle logging of application to output files
-"""
+"""Data logging configuration and CSV/text file output."""
 
 # import needed modules
 from common import csv_helper as csvh

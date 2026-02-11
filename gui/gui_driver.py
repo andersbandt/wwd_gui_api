@@ -1,9 +1,4 @@
-"""
-@file     gui_driver.opy
-@author   Anders Bandt
-@date     April 2024
-@brief    critical GUI code to launch Tkinter notebook
-"""
+"""Creates the Tkinter window and launches the main notebook interface."""
 
 
 # import needed packages

@@ -1,9 +1,4 @@
-"""
-@file     gui_class.py
-@author   Anders Bandt
-@date     July 2024
-@brief    contains Class objects for the Tkinter GUI
-"""
+"""Themed Tkinter GUI component classes and utilities."""
 
 
 
@@ -291,12 +286,13 @@ class ColorCircle(tk.Canvas):
 ##########################################
 
 class ConnFrame(ThemedFrame):
-    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=None):
         super().__init__(master, theme_config)
         self.master = master
         self.name = name
         self.connect_cmd = connect_cmd
         self.disconnect_cmd = disconnect_cmd
+        self.status_cmd = status_cmd
 
         self.port = None
 
@@ -328,7 +324,8 @@ class ConnFrame(ThemedFrame):
             self.status_oval.set_color(self.theme_config["error"])
 
     def gui_refresh(self):
-        # TODO: in order to detect connection status here I need to also pass in a `status_cmd`
+        if self.status_cmd is not None:
+            self.status = self.status_cmd()
         self.set_status(self.status)
 
     def set_color(self, color):
@@ -336,8 +333,8 @@ class ConnFrame(ThemedFrame):
 
 
 class SerialConnFrame(ConnFrame):
-    def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
-        super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd)
+    def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None, status_cmd=None):
+        super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=status_cmd)
         self.cc = class_controller
 
         # set up connection options
@@ -493,9 +490,9 @@ class SerialConnFrame(ConnFrame):
 
 
 class AutoConnFrame(ConnFrame):
-    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=None):
         self.master = master
-        super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd)
+        super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=status_cmd)
 
     def init_fr(self):
         self.status_oval.grid(row=1, column=2, padx=15, pady=22)

@@ -1,4 +1,4 @@
-
+"""Serial port detection and enumeration utilities."""
 
 # import needed modules
 import time

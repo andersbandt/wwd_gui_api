@@ -1,3 +1,4 @@
+"""Analog front-end signal analysis with FFT and spectral tools."""
 
 from datetime import datetime
 import matplotlib.pyplot as plt

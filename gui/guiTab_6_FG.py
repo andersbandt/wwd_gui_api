@@ -1,9 +1,4 @@
-"""
-@file     guiTab_9_FG.py
-@author   Anders Bandt
-@date     January 2025
-@brief    control function generator test equipment
-"""
+"""Function generator control tab."""
 
 # import needed GUI packages
 import tkinter as tk
@@ -76,7 +71,8 @@ class TabFG(guic.ThemedFrame):
                                             "FG_PyVISA",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.cc.get_fg_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)

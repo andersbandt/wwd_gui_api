@@ -1,9 +1,4 @@
-"""
-@file     guiTab_10_OSC.py
-@author   Anders Bandt
-@date     February 2025
-@brief    control oscilloscope test equipment
-"""
+"""Oscilloscope control tab."""
 
 # import needed GUI packages
 import tkinter as tk
@@ -68,7 +63,8 @@ class TabOSC(guic.ThemedFrame):
                                             "OSC_PyVISA",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.cc.get_osc_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
         self.fr_port.grid(row=0, column=1, padx=15, pady=15)

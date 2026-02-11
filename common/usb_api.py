@@ -1,4 +1,4 @@
-
+"""USB device detection and enumeration."""
 
 import usb
 import usb.core

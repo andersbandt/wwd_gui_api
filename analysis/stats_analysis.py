@@ -1,4 +1,4 @@
-
+"""Statistical analysis utilities."""
 
 # import needed modules
 from pprint import pprint

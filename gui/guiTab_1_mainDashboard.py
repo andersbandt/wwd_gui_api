@@ -1,9 +1,4 @@
-"""
-@file     guiTab_1_mainDashboard.py
-@author   Anders Bandt
-@date
-@brief    main dashboard for ATE control
-"""
+"""Main dashboard tab with overview status and system controls."""
 
 # import needed packages
 import tkinter as tk
@@ -65,7 +60,8 @@ class TabMainDashboard(guic.ThemedFrame):
         self.fr_control = tk.Frame(self, bg=self.theme_config["dark_1"])
         self.fr_relay_control = tk.Frame(self, bg=self.theme_config["light_3"])
 
-        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None)
+        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None,
+                                                        status_cmd=lambda: self.cc.get_relay_status())
 
 
 
@@ -87,7 +83,8 @@ class TabMainDashboard(guic.ThemedFrame):
 
         # init serial port
         self.ser_obj = None
-        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close,
+                                                  status_cmd=lambda: self.ser_obj.serStatus if self.ser_obj else False)
         if autoconnect:
             self.fr_port.connect_previous_port()
 
@@ -191,12 +188,7 @@ class TabMainDashboard(guic.ThemedFrame):
 
         # update serial status
         self.fr_port.refresh_ports()
-        if self.ser_obj is not None:
-            if self.ser_obj.serStatus is False:
-                self.ser_obj.stop_process()
-                self.fr_port.set_status(False)
-            else:
-                self.fr_port.set_status(True)
+        self.fr_port.gui_refresh()
 
     def relay_autoconnect(self):
         usb_dev = usbrelay_controller.find()

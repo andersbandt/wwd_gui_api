@@ -1,9 +1,4 @@
-"""
-@file     guiTab_5_USB.py
-@author   Anders Bandt
-@date     March 2024
-@brief    control device through serial (COM) port
-"""
+"""XDS110 JTAG debug probe interface tab."""
 
 # import needed packages
 import time

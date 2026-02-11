@@ -1,9 +1,4 @@
-"""
-@file     guiTab_6_PS.py
-@author   Anders Bandt
-@date     May 2024
-@brief    control power supply test equipment
-"""
+"""Power supply control tab."""
 
 # import needed GUI packages
 import tkinter as tk
@@ -81,7 +76,8 @@ class TabPS(guic.ThemedFrame):
                                             "PS_PyVISA",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.cc.get_ps_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
 

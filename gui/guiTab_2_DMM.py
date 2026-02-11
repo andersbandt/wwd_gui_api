@@ -1,9 +1,4 @@
-"""
-@file     guiTab_3_DMM.py
-@author   Anders Bandt
-@date     May 2024
-@brief    control multimeter test equipment
-"""
+"""Digital multimeter control and data acquisition tab."""
 
 # import needed GUI packages
 import tkinter as tk
@@ -69,7 +64,8 @@ class TabDMM(guic.ThemedFrame):
             "DMM_Serial",
             self.port_init,
             self.port_close,
-            port_func=3
+            port_func=3,
+            status_cmd=lambda: self.cc.get_dmm_status()
         )
         self.fr_port.initialize_fr()
         if autoconnect:

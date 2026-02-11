@@ -1,3 +1,4 @@
+"""Least squares regression analysis."""
 
 # import needed modules
 import numpy as np

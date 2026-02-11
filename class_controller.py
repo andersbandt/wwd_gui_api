@@ -1,3 +1,4 @@
+"""Central controller that holds references to all connected equipment."""
 
 import xml.etree.ElementTree as ET
 

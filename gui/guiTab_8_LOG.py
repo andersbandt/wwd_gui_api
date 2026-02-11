@@ -1,9 +1,4 @@
-"""
-@file     guiTab_8_LOG.py
-@author   Anders Bandt
-@date     January 2026
-@brief    handles logging, live plotting, stimulus
-"""
+"""Data logging, live plotting, and stimulus control tab."""
 
 
 # import needed GUI modules

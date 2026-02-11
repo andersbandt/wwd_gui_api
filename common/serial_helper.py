@@ -1,9 +1,4 @@
-"""
-@file     serial_helper.py
-@author   Anders Bandt
-@date     March 2024
-@brief    Python class for managing data with a serial connection
-"""
+"""Buffered serial reader with logging support."""
 
 # import needed modules
 import serial

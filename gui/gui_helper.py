@@ -1,9 +1,4 @@
-"""
-@file     gui_helper.py
-@author   Anders Bandt
-@date     March 2024
-@brief    A tkinter GUI helper class
-"""
+"""Tkinter GUI helper functions for widget generation."""
 
 # import needed modules
 from tkinter import *

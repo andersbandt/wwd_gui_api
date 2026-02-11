@@ -1,9 +1,4 @@
-"""
-@file     clock_analysis.py
-@author   Anders Bandt
-@date     April 2024
-@brief    perform clocking and time-domain analysis
-"""
+"""Clock and time-domain analysis."""
 
 # import needed modules
 import pandas as pd

@@ -1,9 +1,4 @@
-"""
-@file     guiTab_4_USB.py
-@author   Anders Bandt
-@date     March 2024
-@brief    control device through serial (COM) port
-"""
+"""USB serial communication tab."""
 
 # import needed packages
 import tkinter as tk
@@ -39,7 +34,8 @@ class TabUSB(guic.ThemedFrame):
                                    "Debug serial",
                                   height=self.theme_config["size"]["h_prompt"]*2.75,
                                   width=self.theme_config["size"]["w_prompt"])
-        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close())
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close(),
+                                                  status_cmd=lambda: self.ser_obj.serStatus if self.ser_obj else False)
         if autoconnect:
             self.fr_port.connect_previous_port()
 
@@ -118,10 +114,6 @@ class TabUSB(guic.ThemedFrame):
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
         self.fr_port.gui_refresh()
-
-        if self.ser_obj is not None:
-            if self.ser_obj.serStatus is False:
-                self.port_close()
 
 
     ##############################################################################

@@ -1,9 +1,4 @@
-"""
-@file     path_helper.py
-@author   Anders Bandt
-@date     February 2025
-@brief    Centralized path management for data directories
-"""
+"""Centralized path management for data directories."""
 
 import os
 import configparser

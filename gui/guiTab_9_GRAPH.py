@@ -1,9 +1,4 @@
-"""
-@file     guiTab_9_GRAPH.py
-@author   Anders Bandt
-@date     January 2026
-@brief    handles plotting from saved .csv files
-"""
+"""Graphing tab for plotting saved CSV data."""
 
 # import needed packages
 import pandas as pd

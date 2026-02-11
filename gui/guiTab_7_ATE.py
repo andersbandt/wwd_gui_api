@@ -1,9 +1,4 @@
-"""
-@file     guiTab_7_ATE.py
-@author   Anders Bandt
-@date     November 2024
-@brief    control devices to assist in ATE control
-"""
+"""Automated test equipment sequencing tab."""
 
 # import needed GUI packages
 import tkinter as tk
@@ -71,7 +66,8 @@ class TabATE(guic.ThemedFrame):
                                             "Generic_ATE",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.ate.status if self.ate else False)
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()

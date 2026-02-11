@@ -1,3 +1,4 @@
+"""Real-time and static plotting utilities."""
 
 # import plotter modules
 import numpy as np

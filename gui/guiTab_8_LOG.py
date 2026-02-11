@@ -27,8 +27,6 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
-# TODO: if you change the RecordConfig (like by adding instruments, the live plot will not get updated properly)
-
 
 
 
@@ -53,6 +51,7 @@ class TabLog(guic.ThemedFrame):
         self.stimulus_generator = None
         self.bus = None
         self._dash_thread = None
+        self._live_state = {}
         self.math_config = MathConfig()
         self.math_evaluator = None
         self.math_preset_dir = os.path.join(os.path.dirname(basefilepath), "config", "math_presets")
@@ -1472,10 +1471,7 @@ class TabLog(guic.ThemedFrame):
                 plotter.plot(df[x_var], df[y_var], xlabel=xlabel, ylabel=ylabel, title=f"{title} - {ylabel}")
 
     def _start_live_plot(self):
-        """Start the Dash live plot server if not already running"""
-        if self._dash_thread is not None and self._dash_thread.is_alive():
-            return  # Dash already running, reuse existing bus
-
+        """Start the Dash live plot server, or update its config if already running."""
         try:
             buf_size = int(self.entry_buf_size.get())
         except ValueError:
@@ -1510,6 +1506,13 @@ class TabLog(guic.ThemedFrame):
             self.prompt.print("No channels selected for live plot")
             return
 
+        # If Dash is already running, update shared state with new config
+        if self._dash_thread is not None and self._dash_thread.is_alive():
+            plotter.update_live_plot_state(
+                self._live_state, self.bus, x_key, channels, buf_size, x_label)
+            self.prompt.print("Live plot updated with new configuration")
+            return
+
         self._dash_thread = threading.Thread(
             target=plotter.start_live_plot,
             kwargs=dict(
@@ -1522,6 +1525,7 @@ class TabLog(guic.ThemedFrame):
                 title=title,
                 port=8050,
                 debug=False,
+                state=self._live_state,
             ),
             daemon=True
         )

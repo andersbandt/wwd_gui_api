@@ -4,7 +4,8 @@
       "Bash(ls:*)",
       "Bash(find:*)",
       "Bash(wc:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix live plot hot-swap, USB serial formatting, remove PS live plot; add decoupling notes\n\n- Fix live plot not updating when changing instruments between recording\n  sessions by replacing closure-captured locals with a shared state dict\n  that the Dash callback reads on each tick \\(plotter.py, guiTab_8_LOG.py\\)\n- Fix USB tab multi-line serial data getting a single timestamp by\n  splitting on newlines before display \\(guiTab_4_USB.py\\)\n- Remove live plot current functionality from PS tab since Logger tab\n  covers this use case \\(guiTab_5_PS.py\\)\n- Add GUI/logic decoupling analysis to notes.md with 7 problem categories\n  and prioritized refactoring recommendations\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

@@ -516,6 +516,21 @@ def plot_multi_file_data(file_data_list,
 ###################################
 
 
+def update_live_plot_state(state, data_bus, x_key, channels, buffer_size, x_label):
+    """Update the shared state dict for a running live plot.
+
+    This allows reconfiguring channels, x-axis, and buffers between
+    recording sessions without restarting the Dash server.
+    """
+    state['x_key'] = x_key
+    state['x_label'] = x_label
+    state['channels'] = list(channels)
+    state['data_bus'] = data_bus
+    state['time_buf'] = deque(maxlen=buffer_size)
+    state['bufs'] = {ch: deque(maxlen=buffer_size) for ch in channels}
+    state['buffer_size'] = buffer_size
+
+
 def start_live_plot(
         data_bus: Queue,
         x_key: str,
@@ -527,38 +542,40 @@ def start_live_plot(
         host="127.0.0.1",
         port=8050,
         debug=False,
+        state: dict = None,
 ):
-    # set up buffers
-    time_buf = deque(maxlen=buffer_size)
-    bufs = {ch: deque(maxlen=buffer_size) for ch in channels}
+    # Initialize shared state dict (read by callback on every tick,
+    # can be mutated from outside via update_live_plot_state())
+    if state is None:
+        state = {}
+    update_live_plot_state(state, data_bus, x_key, channels, buffer_size, x_label)
 
-    # Helper to append one sample
-    def _append_sample(sample: Mapping):
-        t = sample.get(x_key)
-        if t is None:
-            return  # ignore malformed packets
-        time_buf.append(t)
-        for ch in channels:
-            v = sample.get(ch)
-            # Append None if missing to create a gap; or repeat last value if preferred
-            bufs[ch].append(None if v is None else float(v))
-
-    # Helper to accept either a single sample or a batch (list/tuple)
+    # Helper to drain samples from the bus into the current buffers
     def _ingest_from_bus():
-        drained = 0
+        bus = state.get('data_bus')
+        if bus is None:
+            return
+        cur_x_key = state['x_key']
+        cur_channels = state['channels']
+        cur_bufs = state['bufs']
+        cur_time_buf = state['time_buf']
+
         while True:
             try:
-                pkt = data_bus.get_nowait()
+                pkt = bus.get_nowait()
             except Empty:
                 break
-            if isinstance(pkt, (list, tuple)):
-                for s in pkt:
-                    if isinstance(s, Mapping):
-                        _append_sample(s)
-            elif isinstance(pkt, Mapping):
-                _append_sample(pkt)
-            drained += 1
-        return drained
+            samples = [pkt] if isinstance(pkt, Mapping) else [s for s in pkt if isinstance(s, Mapping)]
+            for sample in samples:
+                t = sample.get(cur_x_key)
+                if t is None:
+                    continue
+                cur_time_buf.append(t)
+                for ch in cur_channels:
+                    buf = cur_bufs.get(ch)
+                    if buf is not None:
+                        v = sample.get(ch)
+                        buf.append(None if v is None else float(v))
 
 
     # dash app definition
@@ -597,20 +614,28 @@ def start_live_plot(
         Input("btn-clear", "n_clicks"),
     )
     def update_graph(_, plot_mode, n_clicks):
+        # Snapshot current state (may be updated between ticks)
+        cur_channels = state['channels']
+        cur_bufs = state['bufs']
+        cur_time_buf = state['time_buf']
+        cur_x_label = state.get('x_label', x_label)
+
         # Handle clear button via Dash callback context
         from dash import ctx
         if ctx.triggered_id == "btn-clear":
-            time_buf.clear()
-            for ch in channels:
-                bufs[ch].clear()
+            cur_time_buf.clear()
+            for ch in cur_channels:
+                buf = cur_bufs.get(ch)
+                if buf is not None:
+                    buf.clear()
 
         _ingest_from_bus()
 
-        n_ch = len(channels)
+        n_ch = len(cur_channels)
         share_x = (plot_mode != "histogram")
 
-        if not time_buf:
-            fig = make_subplots(rows=n_ch, cols=1, shared_xaxes=share_x)
+        if not cur_time_buf or n_ch == 0:
+            fig = make_subplots(rows=max(n_ch, 1), cols=1, shared_xaxes=share_x)
             fig.update_layout(template="plotly_white")
             return fig
 
@@ -622,10 +647,11 @@ def start_live_plot(
 
         if plot_mode == "histogram":
             # Histogram mode: each subplot has its own x-axis (independent ranges)
-            for i, ch in enumerate(channels):
+            for i, ch in enumerate(cur_channels):
+                buf = cur_bufs.get(ch)
                 fig.add_trace(
                     go.Histogram(
-                        x=list(bufs[ch]),
+                        x=list(buf) if buf else [],
                         nbinsx=50,
                         name=ch,
                         marker=dict(color=COLORS[i % len(COLORS)]),
@@ -636,12 +662,13 @@ def start_live_plot(
                 fig.update_xaxes(title_text=ch, row=i + 1, col=1)
         else:
             # Time series mode: shared x-axis, show data over time
-            x = list(time_buf)
-            for i, ch in enumerate(channels):
+            x = list(cur_time_buf)
+            for i, ch in enumerate(cur_channels):
+                buf = cur_bufs.get(ch)
                 fig.add_trace(
                     go.Scatter(
                         x=x,
-                        y=list(bufs[ch]),
+                        y=list(buf) if buf else [],
                         mode="lines",
                         name=ch,
                         line=dict(color=COLORS[i % len(COLORS)], width=2),
@@ -651,7 +678,7 @@ def start_live_plot(
                 fig.update_yaxes(title_text=ch, row=i + 1, col=1)
 
             # only label the bottom x-axis
-            fig.update_xaxes(title_text=x_label, row=n_ch, col=1)
+            fig.update_xaxes(title_text=cur_x_label, row=n_ch, col=1)
 
         fig.update_layout(
             template="plotly_white",

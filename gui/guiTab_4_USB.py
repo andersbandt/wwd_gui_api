@@ -173,10 +173,14 @@ class TabUSB(guic.ThemedFrame):
 
         Args:
             timestamp: Timestamp string from serial data
-            data: Serial data string
+            data: Serial data string (may contain multiple newline-delimited lines)
         """
-        # Schedule GUI update on main thread (thread-safe)
-        self.after(0, lambda: self.prompt.print(f"{data.strip()}", timestamp=True))
+        # Split multi-line chunks so each line gets its own timestamp
+        lines = data.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if line:
+                self.after(0, lambda l=line: self.prompt.print(l, timestamp=True))
 
     def thread_print_display(self):
         self.t1 = guic.StoppableThread(

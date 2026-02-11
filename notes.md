@@ -124,11 +124,9 @@
 - **Feature**: Option to trigger recording on serial data arrival
 - **Time**: 2 hours
 
-### 14. **Add Connection Status Detection**
-- **Location**: `gui_class.py:281`
-- **Issue**: "need to pass in `status_cmd` to detect connection status"
-- **Feature**: Auto-detect when equipment disconnects
-- **Time**: 1-2 hours
+### 14. ~~**Add Connection Status Detection**~~ (DONE)
+- **Implemented**: `status_cmd` callback added to `ConnFrame`, `SerialConnFrame`, and `AutoConnFrame`
+- All tabs now pass appropriate status callbacks for live health detection
 
 ---
 
@@ -161,6 +159,91 @@
   - Provide template
   - Examples from existing drivers
 - **Time**: 2 hours
+
+---
+
+## **GUI / Logic Decoupling Opportunities**
+
+The tabs currently act as view, controller, and business logic all in one. The `ClassController` is a shared property bag rather than a mediating abstraction. Below are the main coupling categories and concrete recommendations.
+
+### Problem 1: Tabs Directly Call Equipment Driver APIs
+
+Every tab reaches through `self.cc.ps`, `self.cc.dmm`, etc. to call raw driver methods. There is no intermediate service layer.
+
+**Worst offenders:**
+- `guiTab_8_LOG.py` `_collect_data_row` (~line 1311) -- queries DMM, PS, FG, and OSC all in one method
+- `guiTab_7_ATE.py` `run_accuracy_test` (~line 376) -- runs a full PS+DMM measurement sweep loop with numpy stats, all in one button callback
+- `guiTab_6_FG.py` (~line 228-289) -- constructs raw SCPI command strings inline (`"OUTPut OFF"`, manual `registry.get_command()` + `.format()`)
+- `guiTab_3_XDS110.py` `turn_power_on`/`turn_power_off` (~line 378-418) -- multi-equipment power sequencing (PS + relay) in GUI
+- `guiTab_5_PS.py` `port_init` -- equipment instantiation, `test_conn()`, channel setup, all in GUI
+
+**Recommendation:** Introduce per-equipment service classes (e.g. `PSService`, `DMMService`) that wrap the driver and expose high-level operations. Tabs call `self.ps_service.connect(port, model)` instead of manually instantiating a driver and calling `test_conn()`. The `ClassController` should own these services.
+
+### Problem 2: Duplicated `port_init` / `port_close` Pattern
+
+The connect lifecycle (get port, look up equipment class, instantiate, test, store in controller, update GUI, save config) is copy-pasted across 5+ tabs:
+- `guiTab_2_DMM.py:275-316`
+- `guiTab_5_PS.py:364-408`
+- `guiTab_6_FG.py:367-408`
+- `guiTab_7_ATE.py:473-505`
+- `guiTab_10_OSC.py:557-595`
+
+**Recommendation:** Extract the common equipment-connect flow into a base class method or a helper in `gui_class.py`. Each tab only provides the equipment-specific bits (which setter to call on `ClassController`, any post-connect setup).
+
+### Problem 3: Threading Logic in GUI Tabs
+
+Tabs spawn `threading.Thread` directly in button callbacks with no lifecycle management.
+
+**Examples:**
+- `guiTab_3_XDS110.py:75-127` -- 5 separate `threading.Thread(...).start()` calls, one per button
+- `guiTab_4_USB.py:267,292` -- thread creation in `port_init` and `start_process`
+- `guiTab_8_LOG.py:967` -- recording thread; also contains `thread_record_timed` (~line 1131) with busy-wait `time.sleep` loops
+
+**Recommendation:** Use `StoppableThread` (already in `gui_class.py`) consistently, and move long-running work into service-layer methods that accept progress/completion callbacks. The GUI tab should only start/stop the thread and update the UI from callbacks.
+
+### Problem 4: Configuration Parsing Scattered Across Tabs
+
+Multiple tabs read `config/master.ini` or other config files independently.
+
+- `guiTab_2_DMM.py:85-102` -- `load_dmm_config` reads `master.ini`
+- `guiTab_3_XDS110.py:358-376` -- `parse_target_config` reads target `.ini` files
+- `guiTab_4_USB.py:224-251` -- `get_baud_rate` reads `master.ini`
+- `gui_driver.py:30-52` -- `parse_autoconnect_config` reads `master.ini`
+- `gui_class.py:468-481` -- `get_previous_port` reads `ports_used.xml`
+
+**Recommendation:** Create a `ConfigService` that loads and caches all configuration at startup and provides typed access methods. Pass it to tabs in their constructor. Tabs never touch `configparser` or file paths directly.
+
+### Problem 5: Data Transformation / Analysis in Button Callbacks
+
+Statistical analysis and data manipulation are embedded directly in GUI methods.
+
+- `guiTab_7_ATE.py:402-449` -- numpy mean, std, max, RMS calculations in `run_accuracy_test`
+- `guiTab_8_LOG.py:1393-1471` -- `final_plot` determines channels, builds DataFrame, selects plot type
+- `guiTab_8_LOG.py:855-859` -- `_apply_math_columns` evaluates user math expressions
+- `guiTab_9_GRAPH.py:486-516` -- `analyze_files` computes mean/std/min/max on DataFrames
+- `guiTab_2_DMM.py:212`, `guiTab_5_PS.py:298-304` -- unit scaling applied in GUI refresh
+
+**Recommendation:** Move analysis logic into `analysis/` modules or a `DataService`. The GUI callback should call `analysis.compute_accuracy_stats(measurements, reference)` and display the returned result, not run numpy inline.
+
+### Problem 6: Shutdown Logic in GUI Driver
+
+`gui_driver.py:238-268` directly calls `ps.output_off(1)`, `ps.disconnect()`, `relay.open_all()`, etc.
+
+**Recommendation:** Add a `ClassController.shutdown()` method that handles graceful disconnection of all equipment. The GUI driver calls one method.
+
+### Problem 7: Hardcoded Serial Commands in GUI
+
+`guiTab_4_USB.py:124` has `"DAGA"`, and lines 141-149 map test names to codes like `"FR91"`, `"FR01"`, `"FE42"`. These are embedded-target protocol details living in GUI code.
+
+**Recommendation:** Move these to a config file or a command dictionary, following the `CommandRegistry` pattern already used by `EEequipment/`.
+
+### Suggested Refactoring Priority
+
+1. **`ClassController.shutdown()`** -- quick win, low risk, prevents resource leaks
+2. **`ConfigService`** -- consolidate config parsing, removes `configparser` from tabs
+3. **Extract `port_init` pattern** -- biggest DRY win across 5 tabs
+4. **Per-equipment service classes** -- larger refactor, biggest long-term benefit
+5. **Move analysis to `analysis/` modules** -- improves testability
 
 ---
 
@@ -246,7 +329,7 @@ If you only have time for 3 things before open sourcing:
 - [ ] `guiTab_8_LOG.py:816` - E3640A output flickering
 - [ ] `guiTab_9_GRAPH.py:109` - Improve labeling UI clarity
 - [ ] `guiTab_9_GRAPH.py:119` - Make title box dynamic
-- [ ] `gui_class.py:281` - Connection status detection
+- [x] `gui_class.py` - Connection status detection (implemented via `status_cmd` callback)
 
 ### Hardcoded Values to Fix:
 - [ ] `guiTab_3_XDS110.py:66` - Config file path

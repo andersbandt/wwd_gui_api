@@ -9,11 +9,7 @@ import tkinter.messagebox as tkmb
 import time
 from datetime import datetime
 
-
 # import user defined modules
-from common import plotter
-from common import path_helper
-from common.csv_helper import CSVHelper
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
@@ -21,9 +17,6 @@ from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
-
-
-# TODO: record current channel select doesn't reference TestEquipment parameter
 
 
 
@@ -53,10 +46,6 @@ class TabPS(guic.ThemedFrame):
         self.ps_v2r = 0
         self.ps_i1 = 0
         self.ps_i2 = 0
-
-        # set up recording / data information
-        self.recName = False
-        self.data_dir = path_helper.get_full_data_path(subdir="ps_data")
 
         # set up prompt
         self.prompt = guic.Prompt(self,
@@ -210,22 +199,6 @@ class TabPS(guic.ThemedFrame):
             self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
             self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
-        # MISC CONTROL
-        self.channelRecord_drop = guih.generate_drop_down(
-            fr_m,
-            [1, 2],
-        )
-        self.plot_current_btn = tk.Button(fr_m, text="Live Plot current",
-                                           command=lambda: self.plot_current(),
-                                           )
-        self.var_record = tk.IntVar()
-        ttk.Checkbutton(fr_m,
-                        text="Record current",
-                        variable=self.var_record,
-                        onvalue=1,
-                        offvalue=0).grid(row=2, column=1)
-        self.plot_current_btn.grid(row=2, column=3, padx=10, pady=10)
-        self.channelRecord_drop[0].grid(row=2, column=0)
 
     def init_fr_status(self):
         # channel 1 CV/CC mode
@@ -382,37 +355,6 @@ class TabPS(guic.ThemedFrame):
             self.gui_refresh_info()
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
-
-    # plot_current: starts a live plot and (optionally) records data to .csv
-    def plot_current(self):
-        # set up .csv recording
-        recording = self.var_record.get()
-        if recording:
-            self.recName = 'AREC_' + time.strftime('%Y%m%d%H%M%S', time.localtime()) + '.csv'
-            self.csvh = CSVHelper(self.data_dir + self.recName)
-            self.csvh.initialize_file(["Sample", "Time", "Current"])
-
-        self.prompt.print("Starting live current plot ...")
-        currentLivePlot = plotter.LivePlot("Live current plot", "Time (s)", "Current (A)")
-
-        def animate(i):
-            for j in range(0, 10):
-                # Retrieve the current reading and the timestamp
-                reading = self.cc.ps.get_current(int(self.channelRecord_drop[1].get()))
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-
-                currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
-                currentLivePlot.ys.append(reading)
-
-                # add row to data file
-                if recording:
-                    self.csvh.add_row([i,timestamp, reading])
-
-            # Clear and plot again, but avoid clearing the entire plot for better visual
-            currentLivePlot.ax.clear()
-            currentLivePlot.ax.plot(currentLivePlot.xs[-2000:], currentLivePlot.ys[-2000:], label="Current (A)")
-
-        currentLivePlot.show_animation(animate, interval=200)
 
     #################################
     #### SERIAL (COM)  ##############

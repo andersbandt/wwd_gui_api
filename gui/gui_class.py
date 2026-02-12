@@ -1,7 +1,6 @@
 """Themed Tkinter GUI component classes and utilities."""
 
 
-
 # import modules
 import tkinter as tk
 import xml.etree.ElementTree
@@ -59,9 +58,13 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
-# TODO: (GUI) Claude should audit all the frame spacing and make sure they reference theme_config
-# TODO: (GUI) if not in compact mode make it so prompt goes to the bottom row? and columnspan=4
-# TODO: (GUI) (this should probably get the same pack treatment I did in the logging tab)
+# TODO: (GUI updates)
+#   1- audit all the frame padding. Make sure they reference theme_config
+#   2- if not in compact mode make sure the prompt goes to the bottom row with columnspan across the whole thing?
+#   3- evaluate using pack on certain tabs
+
+
+# TODO: should I remove the prompt width and height things now? because I reference the actual frame width and height now ya know?
 
 
 ##########################################
@@ -94,9 +97,9 @@ class ThemedApp:
                 self.theme_config, 0.75,
                 "pad.xpad_s",
                 "pad.ypad_s",
-                "size.w_prompt",
-                "size.h_prompt",
-                #"size.w_prompt_s"
+                # "size.w_prompt",
+                # "size.h_prompt",
+                #"size.w_prompt_s",
                 "font.size_prompt"
             )
 
@@ -104,7 +107,8 @@ class ThemedApp:
             # NOTE: Notebook tabs are exempt - they use self.tab_font_size
             self.theme_config = scale_theme(
                 self.theme_config, 0.60,
-                "font.size"
+                "font.size",
+                "h1.size"
             )
 
             # Scale button height more aggressively to 45%
@@ -137,26 +141,10 @@ class ThemedApp:
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
-        # self.style.configure('TGreenButton.TButton',
-        #                      background=self.theme_config["success"],
-        #                      foreground=self.theme_config["button"]["foreground"],
-        #                      font=(self.theme_config["font"]["family"],
-        #                            self.theme_config["font"]["size"],
-        #                            self.theme_config["font"]["style"]))
-        #
-        # self.style.configure('TYellowButton.TButton',
-        #                      background="#F1FA8C",
-        #                      foreground=self.theme_config["fg_dark"],
-        #                      font=(self.theme_config["font"]["family"],
-        #                            self.theme_config["font"]["size"],
-        #                            self.theme_config["font"]["style"]))
 
         self.style.configure("TButtonOn.TButton", background=self.theme_config["success"])
         self.style.configure("TButtonOff.TButton", background=self.theme_config["error"])
 
-        # self.style.map('TButton',
-        #                background=[('active', self.theme_config["button"]["active_background"])],
-        #                foreground=[('active', self.theme_config["button"]["active_foreground"])])
 
         # Configure label styles
         # generic label
@@ -197,9 +185,9 @@ class ThemedFrame(tk.Frame):
         self.configure(bg=bg)
 
 
-# TODO: not super important, but with serial logging the lines get formatted weird
-#   Same line stuff gets printed on two different lines with two timestamps
-#   unsure how it would look with timestamps disabled
+
+# TODO: with my new column configure and expand stuff how do I get that to reflect in the text box width?
+#   also, how can I make it so it doesn't expand past the window edge and get cut off ever?
 class Prompt(ThemedFrame):
     def __init__(self, master, theme_config, title, height, width):
         super().__init__(master, theme_config, height=height, width=width)
@@ -232,7 +220,13 @@ class Prompt(ThemedFrame):
                                                 borderwidth=10)
         self.prompt.tag_configure("error", foreground=self.theme_config["error"])
         self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
-        self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
+        self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=10, sticky="nsew")
+
+        # make it so ScrolledText will stretch
+        self.grid_rowconfigure(1, weight=1)       # row=1 holds the ScrolledText
+        self.grid_columnconfigure(0, weight=1)    # column=0 should stretch
+        self.grid_columnconfigure(1, weight=1)    # since you used columnspan=2
+
 
     # gui_print: prints a message on a Tkinter frame
     def print(self, message, print_type=None, timestamp=None):

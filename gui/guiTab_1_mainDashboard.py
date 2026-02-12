@@ -93,7 +93,7 @@ class TabMainDashboard(guic.ThemedFrame):
         self.fr_control.grid(row=2, column=1, padx=30, pady=12)
         self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
         self.fr_port.grid(row=1, column=1, padx=30, pady=12)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12, sticky="NSEW")
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12, sticky="nsew")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)

@@ -27,10 +27,6 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
-
-
-
-
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)
@@ -56,34 +52,26 @@ class TabLog(guic.ThemedFrame):
         self.math_evaluator = None
         self.math_preset_dir = os.path.join(os.path.dirname(basefilepath), "config", "math_presets")
 
-        # Create container for all frames to use pack for better spacing control
-        self.fr_top_container = tk.Frame(self, bg=self.theme_config["bg_dark"])
-
-        # create rows in container
-        top_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
-        bottom_row = tk.Frame(self.fr_top_container, bg=self.theme_config["bg_dark"])
-        top_row.pack(fill="x", padx=15, pady=self.theme_config["size"]["ypad_m"])
-        bottom_row.pack(fill="x", padx=15, pady=(0, 15))
-
-        # create Frames in container
-        self.fr_status = tk.Frame(top_row, bg=self.theme_config["dark_2"])
-        self.fr_setup = tk.Frame(top_row, bg=self.theme_config["dark_2"])
-        self.fr_stimulus = tk.Frame(bottom_row, bg=self.theme_config["dark_2"])
-        self.fr_math = tk.Frame(bottom_row, bg=self.theme_config["dark_2"])
-        # set up prompt (also in container)
-        self.prompt = guic.Prompt(bottom_row, self.theme_config, "Data Logger Output",
+        # create Frames
+        self.fr_status = tk.Frame(self, bg=self.theme_config["dark_2"])
+        self.fr_setup = tk.Frame(self, bg=self.theme_config["dark_2"])
+        self.fr_stimulus = tk.Frame(self, bg=self.theme_config["dark_2"])
+        self.fr_math = tk.Frame(self, bg=self.theme_config["dark_2"])
+        self.prompt = guic.Prompt(self, self.theme_config, "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt_s"])
 
-        # pack all Frames
-        self.fr_status.pack(side="left", padx=(0, 15))
-        self.fr_setup.pack(side="left")
-        self.fr_stimulus.pack(side="left", padx=(0, 15))
-        self.fr_math.pack(side="left", padx=(0, 15))
-        self.prompt.pack(side="left")
+        # place everything in grid
+        self.fr_status.grid(row=0, column=0, sticky="nw")
+        self.fr_setup.grid(row=0, column=1, columnspan=3, sticky="nw")
+        self.fr_stimulus.grid(row=1, column=1, sticky="nw")
+        self.fr_math.grid(row=1, column=2, sticky="nw")
+        # TODO: this tab is a good candidate for placing the prompt on the bottom row if we aren't in compact mode
+        self.prompt.grid(row=1, column=3, rowspan=3, sticky="nsew")
 
-        # Place container with grid (only one grid call on main tab)
-        self.fr_top_container.grid(row=1, column=0)
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
 
         # initialize tab content
         self.initTabContent()
@@ -92,9 +80,10 @@ class TabLog(guic.ThemedFrame):
         print("Initializing tab 8 (Logger) content")
 
         # print welcome text_data
-        l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
-                       font=(self.theme_config["font"]["family"], 16))
-        l1.grid(row=0, column=0, columnspan=4)
+        # TODO: don't display this in compact mode
+        # l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
+        #                font=(self.theme_config["font"]["family"], 16))
+        # l1.grid(row=0, column=0, columnspan=4)
 
         self.init_fr_status()
         self.init_fr_setup()

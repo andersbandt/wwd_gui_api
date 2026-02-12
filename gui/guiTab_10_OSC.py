@@ -17,6 +17,7 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+
 class TabOSC(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)
@@ -45,17 +46,6 @@ class TabOSC(guic.ThemedFrame):
         # initialize tab content
         self.initTabContent()
 
-        # place everything in grid
-        self.fr_info.grid(row=0, column=0, padx=15, pady=15, sticky="NW")
-        self.fr_channel.grid(row=1, column=0, padx=15, pady=15, sticky="NW")
-        self.fr_control.grid(row=1, column=1, padx=15, pady=15, sticky="NW")
-        self.prompt.grid(row=2, column=0, columnspan=2, padx=15, pady=10, sticky="NSEW")
-
-        # configure grid weights so prompt expands to fill available space
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
-
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
                                             self.theme_config,
@@ -67,7 +57,20 @@ class TabOSC(guic.ThemedFrame):
                                             status_cmd=lambda: self.cc.get_osc_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+
+        # place everything in grid
+        # TODO: this needs to reference `theme_config` for all the pad spacing
+        self.fr_info.grid(row=0, column=0, padx=5, pady=5, sticky="NW")
+        self.fr_port.grid(row=0, column=1, padx=5, pady=5, stick="N")
+        self.fr_control.grid(row=0, column=2, rowspan=3, padx=5, pady=5, sticky="NW")
+        self.fr_channel.grid(row=1, column=0, padx=5, pady=5, sticky="NW")
+        self.prompt.grid(row=2, column=0, columnspan=2, padx=5, pady=10, sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        # self.columnconfigure(0, weight=1)
+        # self.columnconfigure(1, weight=1)
+        # self.rowconfigure(2, weight=1)
+
 
     def initTabContent(self):
         print("Initializing tab 10 (OSC) content")

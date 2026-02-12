@@ -8,10 +8,6 @@ import argparse
 from gui import gui_driver
 
 
-# TODO: give the README a solid review
-
-
-
 def main():
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="A description of your script.")

@@ -56,9 +56,9 @@ class TabFG(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0)
-        self.fr_control.grid(row=1, column=0)
-        self.prompt.grid(row=1, column=1, sticky="NSEW")
+        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(1, weight=1)
@@ -75,7 +75,7 @@ class TabFG(guic.ThemedFrame):
                                             status_cmd=lambda: self.cc.get_fg_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+        self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
         print("Initializing tab 9 (FG) content")

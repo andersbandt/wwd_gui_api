@@ -59,9 +59,8 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
 
 
 # TODO: (GUI updates)
-#   1- audit all the frame padding. Make sure they reference theme_config
-#   2- if not in compact mode make sure the prompt goes to the bottom row with columnspan across the whole thing?
-#   3- evaluate using pack on certain tabs
+#   1- if not in compact mode make sure the prompt goes to the bottom row with columnspan across the whole thing?
+#   2- evaluate using pack on certain tabs
 
 
 # TODO: should I remove the prompt width and height things now? because I reference the actual frame width and height now ya know?
@@ -88,6 +87,9 @@ class ThemedApp:
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
 
+        # Store compact mode flag so tabs can check it
+        self.theme_config["compact"] = compact
+
         # Save original font size for notebook tabs (before any scaling)
         self.tab_font_size = self.theme_config["font"]["size"]
 
@@ -97,6 +99,8 @@ class ThemedApp:
                 self.theme_config, 0.75,
                 "pad.xpad_s",
                 "pad.ypad_s",
+                "pad.frame_x",
+                "pad.frame_y",
                 # "size.w_prompt",
                 # "size.h_prompt",
                 #"size.w_prompt_s",

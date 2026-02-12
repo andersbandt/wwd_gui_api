@@ -41,7 +41,9 @@
         "xpad_m": 4,
         "ypad_m": 7,
         "xpad_l": 5,
-        "ypad_l": 10
+        "ypad_l": 10,
+        "frame_x": 15,
+        "frame_y": 12
     },
     "button": {
         "background": "#4A4A4A",

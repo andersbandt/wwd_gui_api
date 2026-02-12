@@ -44,16 +44,16 @@ class TabATE(guic.ThemedFrame):
                                    "ATE Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt_s"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
         # initialize tab content
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
-        self.fr_control.grid(row=1, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
-        self.fr_accuracy.grid(row=2, column=0, padx=2, pady=self.theme_config["pad"]["ypad_s"])
-        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"], sticky="NSEW")
+        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_accuracy.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(1, weight=1)
@@ -71,7 +71,7 @@ class TabATE(guic.ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, rowspan=2, padx=15, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_port.grid(row=0, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
         print("Initializing tab 7 (ATE) content")

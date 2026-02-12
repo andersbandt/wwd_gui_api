@@ -142,7 +142,9 @@ class MainApplication(ThemedApp):
         for tab, name in zip(tabs, self.tab_names):
             self.nb.add(tab, text=name)
 
-        self.nb.grid(column=0, row=0)
+        self.nb.grid(column=0, row=0, sticky="nsew")
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
         return True
 
     def on_tab_changed(self, event):

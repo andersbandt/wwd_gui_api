@@ -52,24 +52,46 @@ class TabLog(guic.ThemedFrame):
         self.math_evaluator = None
         self.math_preset_dir = os.path.join(os.path.dirname(basefilepath), "config", "math_presets")
 
-        # create Frames
+        # create top row Frames (parented to self)
         self.fr_status = tk.Frame(self, bg=self.theme_config["dark_2"])
         self.fr_setup = tk.Frame(self, bg=self.theme_config["dark_2"])
-        self.fr_stimulus = tk.Frame(self, bg=self.theme_config["dark_2"])
-        self.fr_math = tk.Frame(self, bg=self.theme_config["dark_2"])
-        self.prompt = guic.Prompt(self, self.theme_config, "Data Logger Output",
+
+        # bottom row container (its own grid, independent column sizing from top row)
+        self.fr_bottom = tk.Frame(self, bg=self.theme_config["bg_dark"])
+        self.fr_stimulus = tk.Frame(self.fr_bottom, bg=self.theme_config["dark_2"])
+        self.fr_math = tk.Frame(self.fr_bottom, bg=self.theme_config["dark_2"])
+
+        # Prompt parent depends on mode:
+        #   compact -> inside fr_bottom (beside stimulus/math)
+        #   normal  -> on its own row at the bottom of the tab (full width)
+        compact = self.theme_config.get("compact", False)
+        prompt_parent = self.fr_bottom if compact else self
+        self.prompt = guic.Prompt(prompt_parent, self.theme_config, "Data Logger Output",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt_s"])
 
-        # place everything in grid
-        self.fr_status.grid(row=0, column=0, sticky="nw")
-        self.fr_setup.grid(row=0, column=1, columnspan=3, sticky="nw")
-        self.fr_stimulus.grid(row=1, column=1, sticky="nw")
-        self.fr_math.grid(row=1, column=2, sticky="nw")
-        # TODO: this tab is a good candidate for placing the prompt on the bottom row if we aren't in compact mode
-        self.prompt.grid(row=1, column=3, rowspan=3, sticky="nsew")
+        # place top row
+        self.fr_status.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+        self.fr_setup.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
 
-        # configure grid weights so prompt expands to fill available space
+        # place bottom row container spanning full width
+        self.fr_bottom.grid(row=1, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+
+        # place items inside bottom row (independent column sizing)
+        self.fr_stimulus.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+        self.fr_math.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+
+        if compact:
+            # compact: prompt sits beside stimulus/math in fr_bottom
+            self.prompt.grid(row=0, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+            self.fr_bottom.columnconfigure(2, weight=1)
+            self.fr_bottom.rowconfigure(0, weight=1)
+        else:
+            # normal: prompt gets its own full-width row at the bottom
+            self.prompt.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+            self.rowconfigure(2, weight=1)
+
+        # parent weights
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
 

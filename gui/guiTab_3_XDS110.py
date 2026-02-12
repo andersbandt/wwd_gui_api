@@ -37,7 +37,7 @@ class tabXDS110(guic.ThemedFrame):
                                    "XDS110 Comms",
                                   height=self.theme_config["size"]["h_prompt"],
                                   width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12, sticky="NSEW")
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)
@@ -45,11 +45,11 @@ class tabXDS110(guic.ThemedFrame):
 
         # init frames within tab
         self.fr_xds110 = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_xds110.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_xds110.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_firmware = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_firmware.grid(row=1, column=2, padx=30, pady=12, rowspan=2)
+        self.fr_firmware.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], rowspan=2)
         self.fr_target = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_target.grid(row=2, column=0, padx=30, pady=12)
+        self.fr_target.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
         # add some other GUI variables
         self.status_xds110 = ColorCircle(self.fr_xds110, width=50, height=50, bg=self.theme_config["bg_dark"])

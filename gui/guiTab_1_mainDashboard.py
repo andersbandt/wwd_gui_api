@@ -89,11 +89,11 @@ class TabMainDashboard(guic.ThemedFrame):
             self.fr_port.connect_previous_port()
 
         # place everything on the grid
-        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
-        self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
-        self.fr_port.grid(row=1, column=1, padx=30, pady=12)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12, sticky="nsew")
+        self.fr_main_status.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_relay_control.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)
@@ -127,7 +127,8 @@ class TabMainDashboard(guic.ThemedFrame):
         # Create and place individual relay control buttons
         for i in range(self.cc.relay.num_relays):
             name = self.cc.relay.get_relay_mapping(i + 1)
-            btn = ttk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i + 1))
+            btn = tk.Button(fr_m, text=f"{name}", fg=self.theme_config["fg_dark"], bg=self.theme_config["dark_2"],
+                           command=lambda i=i: self.toggle_relay(i + 1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=5)
             self.relay_btns.append(btn)
 
@@ -178,9 +179,9 @@ class TabMainDashboard(guic.ThemedFrame):
         if self.fr_main_status.status:
             for i, btn in enumerate(self.relay_btns):
                 if self.cc.relay.get_state_state(i + 1):
-                    btn.config(style="TButtonOn.TButton")
+                    btn.config(bg=self.theme_config["success"], fg=self.theme_config["fg_dark"])
                 else:
-                    btn.config(style="TButtonOff.TButton")
+                    btn.config(bg=self.theme_config["error"], fg=self.theme_config["fg_dark"])
         else:
             if event == "call":
                 self.prompt.print("Can't refresh relay state with disconnected relay", "error")

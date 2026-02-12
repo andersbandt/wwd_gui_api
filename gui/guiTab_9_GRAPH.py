@@ -69,9 +69,9 @@ class TabGraph(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_setup.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_files.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=2, column=0, columnspan=4, padx=30, pady=12, sticky="NSEW")
+        self.fr_setup.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_files.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=2, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)

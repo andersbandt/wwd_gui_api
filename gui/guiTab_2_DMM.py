@@ -73,10 +73,10 @@ class TabDMM(guic.ThemedFrame):
 
 
         # place Frames into grid
-        self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
-        self.fr_control.grid(row=0, column=1, pady=10, padx=10)
-        self.fr_port.grid(row=0, column=2, padx=30, pady=12)
-        self.prompt.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky='NSEW')
+        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='W')
+        self.fr_control.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_port.grid(row=0, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=1, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='NSEW')
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)

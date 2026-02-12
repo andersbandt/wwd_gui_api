@@ -26,6 +26,8 @@ from gui import guiTab_8_LOG
 from gui import guiTab_9_GRAPH
 from gui import guiTab_10_OSC
 
+NUM_TABS = 10
+
 
 def parse_autoconnect_config():
     # initialize the config parser
@@ -43,7 +45,7 @@ def parse_autoconnect_config():
 
     # read in parameters from the config file
     autoconn_vars = []
-    for i in range(1, 11): #tag:HARDCODE
+    for i in range(1, NUM_TABS + 1):
         tmp = config["AUTOCONNECT"][f"tab_{i}"]
         if tmp.strip().upper() == "YES":
             autoconn_vars.append(True)
@@ -119,7 +121,7 @@ class MainApplication(ThemedApp):
         if self.autoconnect:
             autoconnect = parse_autoconnect_config()
         else:
-            autoconnect = [False for i in range(11)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
+            autoconnect = [False] * (NUM_TABS + 1)
 
 
         # create Tab objects

@@ -96,123 +96,172 @@ class TabGraph(guic.ThemedFrame):
         self.init_fr_files()
 
     def init_fr_setup(self):
-        # Preset configuration UI
-        tk.Label(self.fr_setup, text="Preset:").grid(row=0, column=0, padx=5, pady=2, sticky='e')
+        xpad = self.theme_config["pad"]["xpad_s"]
+        ypad = self.theme_config["pad"]["ypad_s"]
 
+        # allow column 1 to stretch so title/text fields expand
+        self.fr_setup.columnconfigure(1, weight=1)
+
+        row = 0
+
+        # ── Preset controls ──────────────────────────────
+        tk.Label(self.fr_setup, text="Preset:").grid(row=row, column=0, padx=5, pady=2, sticky='e')
         self.preset_combo = ttk.Combobox(self.fr_setup, width=18, state='readonly')
-        self.preset_combo.grid(row=0, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                               pady=self.theme_config["pad"]["ypad_s"])
+        self.preset_combo.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
         self.preset_combo.bind('<<ComboboxSelected>>', self.on_preset_select)
+        row += 1
 
         btn_save_preset = tk.Button(self.fr_setup, text="Save",
                                     command=self.save_preset,
                                     bg=self.theme_config["success"],
                                     fg=self.theme_config["fg_dark"],
                                     height=1, width=8)
-        btn_save_preset.grid(row=1, column=0, padx=self.theme_config["pad"]["xpad_s"],
-                             pady=self.theme_config["pad"]["ypad_s"])
+        btn_save_preset.grid(row=row, column=0, padx=xpad, pady=ypad)
 
         btn_load_preset = tk.Button(self.fr_setup, text="Load",
                                     command=self.load_preset,
                                     bg=self.theme_config["light_2"],
                                     fg=self.theme_config["fg_dark"],
                                     height=1, width=8)
-        btn_load_preset.grid(row=1, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                             pady=self.theme_config["pad"]["ypad_s"], sticky='w')
+        btn_load_preset.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='w')
 
         btn_clear_all = tk.Button(self.fr_setup, text="Clear All",
                                   command=self.clear_all_fields,
                                   bg=self.theme_config["warning"],
                                   fg=self.theme_config["fg_dark"],
                                   height=1, width=8)
-        btn_clear_all.grid(row=1, column=2, padx=self.theme_config["pad"]["xpad_s"],
-                           pady=self.theme_config["pad"]["ypad_s"], sticky='w')
+        btn_clear_all.grid(row=row, column=2, padx=xpad, pady=ypad, sticky='w')
+        row += 1
 
-        # graph labeling
-        tk.Label(self.fr_setup, text="Title").grid(row=2, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="X-axis").grid(row=3, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Y-axis").grid(row=4, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="X-scale").grid(row=5, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Y-scale").grid(row=6, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="X-variable").grid(row=7, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Y-variable").grid(row=8, column=0, padx=5, pady=2)
-        tk.Label(self.fr_setup, text="Plot style").grid(row=9, column=0, padx=5, pady=2)
+        # ── Graph Appearance ──────────────────────────────
+        sep1 = ttk.Separator(self.fr_setup, orient='horizontal')
+        sep1.grid(row=row, column=0, columnspan=3, sticky='ew', pady=(8, 2))
+        row += 1
 
-        self.title = tk.Text(self.fr_setup, height=2, width=20)
+        lbl_section1 = tk.Label(self.fr_setup, text="Graph Appearance",
+                                font=(self.theme_config["font"]["family"], 9, "bold"),
+                                bg=self.theme_config["light_4"])
+        lbl_section1.grid(row=row, column=0, columnspan=2, sticky='w', padx=5)
+        row += 1
+
+        lbl_title = tk.Label(self.fr_setup, text="Title")
+        lbl_title.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        lbl_x_axis = tk.Label(self.fr_setup, text="X-axis")
+        lbl_y_axis = tk.Label(self.fr_setup, text="Y-axis")
+        lbl_plot_style = tk.Label(self.fr_setup, text="Plot style")
+
+        self.title = tk.Text(self.fr_setup, height=1, width=20)
         self.x_label = tk.Text(self.fr_setup, height=1, width=20)
         self.y_label = tk.Text(self.fr_setup, height=1, width=20)
-        self.x_scale = tk.Spinbox(self.fr_setup, from_=1, to=10e9)
-        self.y_scale = tk.Spinbox(self.fr_setup, from_=1, to=10e9)
-        self.x_var = tk.Text(self.fr_setup, height=1, width=20)
-        self.y_var = tk.Text(self.fr_setup, height=1, width=20)
         self.plot_style_drop = guih.generate_drop_down(self.fr_setup, ["Line", "Scatter", "Line + Scatter"])
 
         self.title.bind("<Tab>", focus_next_widget)
         self.x_label.bind("<Tab>", focus_next_widget)
         self.y_label.bind("<Tab>", focus_next_widget)
-        self.x_scale.bind("<Tab>", focus_next_widget)
-        self.y_scale.bind("<Tab>", focus_next_widget)
-        self.x_var.bind("<Tab>", focus_next_widget)
-        self.y_var.bind("<Tab>", focus_next_widget)
 
-        # Widgets
-        self.title.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                        pady=self.theme_config["pad"]["ypad_s"])
-        self.x_label.grid(row=3, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                          pady=self.theme_config["pad"]["ypad_s"])
-        self.y_label.grid(row=4, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                          pady=self.theme_config["pad"]["ypad_s"])
-        self.x_scale.grid(row=5, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                          pady=self.theme_config["pad"]["ypad_s"])
-        self.y_scale.grid(row=6, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                          pady=self.theme_config["pad"]["ypad_s"])
-        self.x_var.grid(row=7, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                        pady=self.theme_config["pad"]["ypad_s"])
-        self.y_var.grid(row=8, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                        pady=self.theme_config["pad"]["ypad_s"])
-        self.plot_style_drop[0].grid(row=9, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                                     pady=self.theme_config["pad"]["ypad_s"])
+        # title gets sticky='ew' so it expands with the frame
+        self.title.grid(row=row, column=1, columnspan=2, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
 
-        # Set default plot style
+        lbl_x_axis.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.x_label.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
+
+        lbl_y_axis.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.y_label.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
+
+        lbl_plot_style.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.plot_style_drop[0].grid(row=row, column=1, padx=xpad, pady=ypad)
         self.plot_style_drop[1].set("Line + Scatter")
+        row += 1
 
-        # add check box and text field to label graphs by string in filename
+        # labeling options
         self.var_use_file_labeler = tk.IntVar()
-        ttk.Checkbutton(self.fr_setup,
-                        text="Use Filename Labeler",
-                        variable=self.var_use_file_labeler,
-                        onvalue=1,
-                        offvalue=0).grid(row=10, column=0, padx=self.theme_config["pad"]["xpad_s"],
-                                         pady=self.theme_config["pad"]["ypad_s"])
+        cb_file_label = ttk.Checkbutton(self.fr_setup,
+                                        text="Use Filename Labeler",
+                                        variable=self.var_use_file_labeler,
+                                        onvalue=1, offvalue=0)
+        cb_file_label.grid(row=row, column=0, padx=xpad, pady=ypad)
         # NOTE: Currently uses full filename stem when checkbox is enabled.
         #       This text field is reserved for future enhancement to specify which parts
         #       of the filename to use (e.g., index, range, or slice notation).
         self.file_labeler = tk.Text(self.fr_setup, height=1, width=20)
-        self.file_labeler.grid(row=10, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                               pady=self.theme_config["pad"]["ypad_s"])
+        self.file_labeler.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
 
-        # add check box and text field to label graphs by column name
         self.var_use_data_labeler = tk.IntVar()
-        ttk.Checkbutton(self.fr_setup,
-                        text="Use Data (header) Labeler",
-                        variable=self.var_use_data_labeler,
-                        onvalue=1,
-                        offvalue=0).grid(row=11, column=0, padx=self.theme_config["pad"]["xpad_s"],
-                                         pady=self.theme_config["pad"]["ypad_s"])
+        cb_data_label = ttk.Checkbutton(self.fr_setup,
+                                        text="Use Data (header) Labeler",
+                                        variable=self.var_use_data_labeler,
+                                        onvalue=1, offvalue=0)
+        cb_data_label.grid(row=row, column=0, padx=xpad, pady=ypad)
         self.data_labeler = tk.Text(self.fr_setup, height=1, width=20)
-        self.data_labeler.grid(row=11, column=1, padx=self.theme_config["pad"]["xpad_s"],
-                               pady=self.theme_config["pad"]["ypad_s"])
+        self.data_labeler.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
 
-        # add checkbox for color normalization
         self.var_normalize_colors = tk.IntVar()
-        ttk.Checkbutton(self.fr_setup,
-                        text="Normalize colors by data value",
-                        variable=self.var_normalize_colors,
-                        onvalue=1,
-                        offvalue=0).grid(row=12, column=0, columnspan=2,
-                                         padx=self.theme_config["pad"]["xpad_s"],
-                                         pady=self.theme_config["pad"]["ypad_s"],
-                                         sticky='w')
+        cb_norm = ttk.Checkbutton(self.fr_setup,
+                                  text="Normalize colors by data value",
+                                  variable=self.var_normalize_colors,
+                                  onvalue=1, offvalue=0)
+        cb_norm.grid(row=row, column=0, columnspan=2, padx=xpad, pady=ypad, sticky='w')
+        row += 1
+
+        # ── Data Configuration ────────────────────────────
+        sep2 = ttk.Separator(self.fr_setup, orient='horizontal')
+        sep2.grid(row=row, column=0, columnspan=3, sticky='ew', pady=(8, 2))
+        row += 1
+
+        lbl_section2 = tk.Label(self.fr_setup, text="Data Configuration",
+                                font=(self.theme_config["font"]["family"], 9, "bold"),
+                                bg=self.theme_config["light_4"])
+        lbl_section2.grid(row=row, column=0, columnspan=2, sticky='w', padx=5)
+        row += 1
+
+        lbl_x_var = tk.Label(self.fr_setup, text="X-variable")
+        lbl_y_var = tk.Label(self.fr_setup, text="Y-variable")
+        lbl_x_scale = tk.Label(self.fr_setup, text="X-scale")
+        lbl_y_scale = tk.Label(self.fr_setup, text="Y-scale")
+
+        self.x_var = tk.Text(self.fr_setup, height=1, width=20)
+        self.y_var = tk.Text(self.fr_setup, height=1, width=20)
+        self.x_scale = tk.Spinbox(self.fr_setup, from_=1, to=10e9)
+        self.y_scale = tk.Spinbox(self.fr_setup, from_=1, to=10e9)
+
+        self.x_var.bind("<Tab>", focus_next_widget)
+        self.y_var.bind("<Tab>", focus_next_widget)
+        self.x_scale.bind("<Tab>", focus_next_widget)
+        self.y_scale.bind("<Tab>", focus_next_widget)
+
+        lbl_x_var.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.x_var.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
+
+        lbl_y_var.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.y_var.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
+        row += 1
+
+        lbl_x_scale.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.x_scale.grid(row=row, column=1, padx=xpad, pady=ypad)
+        row += 1
+
+        lbl_y_scale.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.y_scale.grid(row=row, column=1, padx=xpad, pady=ypad)
+        row += 1
+
+        # ── Tooltips ─────────────────────────────────────
+        guic.Tooltip(lbl_title, "Graph title displayed above the plot")
+        guic.Tooltip(lbl_x_axis, "Label shown on the X-axis")
+        guic.Tooltip(lbl_y_axis, "Label shown on the Y-axis")
+        guic.Tooltip(lbl_plot_style, "Line, scatter, or both")
+        guic.Tooltip(cb_file_label, "Color/label each line by its source filename")
+        guic.Tooltip(cb_data_label, "Color/label each line by a CSV column value")
+        guic.Tooltip(cb_norm, "Map label values to a color gradient instead of discrete colors")
+        guic.Tooltip(lbl_x_var, "CSV column name to use for X-axis data")
+        guic.Tooltip(lbl_y_var, "CSV column name to use for Y-axis data")
+        guic.Tooltip(lbl_x_scale, "Multiply all X values by this factor (e.g. 0.001 to convert ms to s)")
+        guic.Tooltip(lbl_y_scale, "Multiply all Y values by this factor")
 
     def init_fr_files(self):
         fr_m = self.fr_files

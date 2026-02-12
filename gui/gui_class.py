@@ -280,6 +280,51 @@ class ColorCircle(tk.Canvas):
 
 
 ##########################################
+### TOOLTIP                      #########
+##########################################
+
+class Tooltip:
+    """Hover tooltip for any Tkinter widget.
+
+    Usage:
+        Tooltip(some_widget, "This is the help text")
+    """
+    def __init__(self, widget, text, delay=400):
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self.tip_window = None
+        self._after_id = None
+        widget.bind("<Enter>", self._schedule)
+        widget.bind("<Leave>", self._hide)
+
+    def _schedule(self, event=None):
+        self._after_id = self.widget.after(self.delay, self._show)
+
+    def _show(self):
+        if self.tip_window:
+            return
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() + 4
+        y = self.widget.winfo_rooty()
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, justify='left',
+                         background="#ffffe0", relief='solid', borderwidth=1,
+                         font=("TkDefaultFont", "9", "normal"),
+                         wraplength=250)
+        label.pack()
+
+    def _hide(self, event=None):
+        if self._after_id:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
+
+
+##########################################
 ### CONNECTION FRAMES            #########
 ##########################################
 

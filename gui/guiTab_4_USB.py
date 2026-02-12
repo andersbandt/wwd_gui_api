@@ -12,8 +12,19 @@ import os
 
 # import user defined modules
 from common.serial_helper import SerialProcessor
+from common.path_helper import get_data_dir
 from gui import gui_helper as guih
 from gui import gui_class as guic
+
+# Target serial commands
+ACTIVATE_TEST_CMD = "DAGA"
+TEST_TYPE_COMMANDS = {
+    "flash-read":     "FR91",
+    "flash-read-all": "FR01",
+    "flash-erase":    "FE42",
+    "imu-graph":      "IG85",
+    "clock-test":     "CR81",
+}
 
 
 class TabUSB(guic.ThemedFrame):
@@ -86,11 +97,7 @@ class TabUSB(guic.ThemedFrame):
         btn_toggle_target.grid(row=2, column=2, padx=15, pady=22)
         self.test_drop = guih.generate_drop_down(
             self.fr_state,
-            ["flash-read",
-             "flash-read-all",
-             "flash-erase",
-             "imu_graph",
-             "clock-test"]
+            list(TEST_TYPE_COMMANDS.keys())
         )
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
 
@@ -121,7 +128,7 @@ class TabUSB(guic.ThemedFrame):
     ##############################################################################
 
     def activate_test_mode(self):
-        command = "DAGA"  # tag:HARDCODE
+        command = ACTIVATE_TEST_CMD
         self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj is not None:
             if self.ser_obj.serStatus:
@@ -137,21 +144,15 @@ class TabUSB(guic.ThemedFrame):
     def set_test_type(self):
         test_type_command = self.test_drop[1].get()
         self.prompt.print(f"INFO: test type {test_type_command} ...")
-        if test_type_command == "flash-read":
-            command = "FR91"
-        elif test_type_command == "flash-read-all":
-            command = "FR01"
-        elif test_type_command == "flash-erase":
-            command = "FE42"
-        elif test_type_command == "imu-graph":
-            command = "IG85"
-        elif test_type_command == "clock-test":
-            command = "CR81"
-            self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
-        else:
+
+        command = TEST_TYPE_COMMANDS.get(test_type_command)
+        if command is None:
             print(f"ERROR: Unknown test command: {test_type_command}")
             self.prompt.print(f"ERROR: Unknown test command: {test_type_command}", "error")
             return False
+
+        if test_type_command == "clock-test":
+            self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
 
         self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj.serStatus:
@@ -202,13 +203,13 @@ class TabUSB(guic.ThemedFrame):
             # File logging - raw mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, os.path.join("data", "text_data"), "raw") # tag:HARDCODE
+                args=(self.basefilepath, get_data_dir("text_data"), "raw")
             )
         elif output_mode == "Log to File (Timestamp)":
             # File logging - timestamp mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, os.path.join("data", "text_data"), "timestamp") # tag:HARDCODE
+                args=(self.basefilepath, get_data_dir("text_data"), "timestamp")
             )
         else:
             self.prompt.print(f"ERROR: Unknown output mode: {output_mode}", "error")

@@ -4,60 +4,34 @@
 
 ---
 
-## Pre-Release Cleanup
+## concise tasks
 
-### 1. ~~Add MIT License File~~ (DONE)
 
-### 2. Clean Requirements.txt
-- **Issues**:
-  - `libusb` shouldn't be in requirements.txt (system package)
-  - `usb` and `pyusb` are redundant (keep `pyusb`)
-  - Missing version pinning (risky for reproducibility)
-- **Action**:
-  ```txt
-  pyserial>=3.5
-  matplotlib>=3.5.0
-  pandas>=1.4.0
-  numpy>=1.21.0
-  scipy>=1.7.0
-  pyusb>=1.2.1
-  PyVISA>=1.12.0
-  pyvisa-py>=0.5.3
-  ```
-
-### 3. Add .gitignore
-- **Should ignore**:
-  - `__pycache__/`, `*.pyc`, `*.pyo`
-  - `.vscode/`, `.idea/`
-  - `data/*.csv`, `data/*.log` (user data)
-  - `config/ports_used.xml` (machine-specific)
-  - `*.egg-info/`, `dist/`, `build/`
-
-### 4. Cleanup README
+- [ ] cleanup README
+- [ ] evaluate versioning for requirements.txt
+- [ ] need to give the serial logging a whirl
+- [ ] test the math functions properly
+- have Claude go through and compare my application to pymeasure. Strengths? Weaknesses?
 
 ---
 
 ## Open Tasks
 
 ### 5. Remove Hardcoded Values
-- **Found 10 instances** with `tag:HARDCODE`
+
 - **Priority fixes**:
-  - `gui_driver.py:49` - Hardcoded tab count `range(1, 10)`
-  - `guiTab_3_XDS110.py:66` - Hardcoded config file path
-  - `guiTab_4_USB.py` - Hardcoded data paths and commands
-- **Action**: Move to config file or constants
+## Hardcoded Values to Fix
+- [ ] `guiTab_3_XDS110.py:` config file path
+- [ ] `guiTab_3_XDS110.py:291` - Sleep timer value (move to master.ini)
+- [ ] `gui_driver.py:35` - Config file path
+- [ ] `gui_driver.py:180` - Hard coded window dimensions (there is a TODO)
 
-### 6. Add Graph UI Improvements
-- **Location**: `guiTab_9_GRAPH.py:109, 119`
-- **Issues**:
-  - "make it more intuitive on what is labeling vs data specific"
-  - "title text box might have to be bigger"
-- **Action**: Add section separators, make title box auto-expand, add tooltips
 
-### 7. Fix Threading Issue in Logger
-- **Location**: `guiTab_8_LOG.py:513`
-- **Issue**: "do I have to stop the thread here?"
-- **Action**: Properly stop/join thread in `stop_record()`
+### 7. evaluate logger stop record
+- **Location**: `guiTab_8_LOG.py. There is a TODO`
+- **Issue**: I shouldn't set self.record_status on each `COMMUNICATION ERROR`
+- **Action**: Properly handle communication errors in thread records
+
 
 ### 8. Add Unit Tests
 - **Current**: Only 1 test file in submodule
@@ -67,16 +41,7 @@
   - `common/` utilities
 - **Framework**: `pytest`
 
-### 9. Improve Serial Timing Logging
-- **Location**: `guiTab_8_LOG.py:523`
-- **Issue**: "needs to know if we want serial data to base timing off UART output"
-- **Feature**: Option to trigger recording on serial data arrival
 
-### 10. USB Connection After Startup
-- **Location**: `guiTab_1_mainDashboard.py:53`
-- **Issue**: USB doesn't connect properly after program startup
-
----
 
 ## Code Cleanup - Technical Debt
 
@@ -183,17 +148,7 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 
 ---
 
-## Hardcoded Values to Fix
 
-- [ ] `guiTab_3_XDS110.py:66` - Config file path
-- [ ] `guiTab_3_XDS110.py:291` - Sleep timer value
-- [ ] `guiTab_4_USB.py:127` - Command string
-- [ ] `guiTab_4_USB.py:203,209` - Data paths
-- [ ] `guiTab_8_LOG.py:553` - Enum mapping
-- [ ] `gui_driver.py:35` - Config file path
-- [ ] `gui_driver.py:49` - Tab count range
-- [ ] `gui_driver.py:125` - Autoconnect list size
-- [ ] `gui_driver.py:180` - Unknown hardcode
 
 ---
 

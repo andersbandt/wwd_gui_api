@@ -26,7 +26,7 @@ from gui import guiTab_8_LOG
 from gui import guiTab_9_GRAPH
 from gui import guiTab_10_OSC
 
-NUM_TABS = 10
+NUM_TABS = 10 # tag:HARDCODE
 
 
 def parse_autoconnect_config():
@@ -61,8 +61,8 @@ def parse_theme_config():
     Returns:
         str: Path to the theme file (e.g., "config/darcula.json")
     """
-    config_file_path = "config/master.ini"
-    default_theme = "config/darcula.json"
+    config_file_path = "config/master.ini" # tag:HARDCODE
+    default_theme = "config/darcula.json" # tag:HARDCODE - but not really an issue because this is fallback if read from config file fails
 
     if not os.path.exists(config_file_path):
         print(f"Configuration file {config_file_path} does not exist. Using default theme.")
@@ -183,6 +183,7 @@ def main(autoconnect, force_compact=False):
     print("Executing main function of gui_driver.py")
 
     # tag:HARDCODE
+    # TODO: evaluate not having hardcoded pixel dimensions. It's hard because everything else is hard coded by pixels
     desired_w = 1300
     desired_h = 900
     margin_w = 50
@@ -215,7 +216,6 @@ def main(autoconnect, force_compact=False):
     # x = (ws / 2) - (w / 4) # NOTE: I think this was when I wanted to be like 3/4 of the way right?
     x = 20
     y = 20
-
 
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 

@@ -61,13 +61,12 @@ class TabUSB(guic.ThemedFrame):
 
         # place everything in grid
         self.fr_port.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.fr_state.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=1, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+        self.fr_state.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="n")
+        self.prompt.grid(row=1, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nswe")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
-
 
     def initTabContent(self):
         print("Initializing tab 4 (USB) content")
@@ -155,10 +154,13 @@ class TabUSB(guic.ThemedFrame):
             self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
 
         self.prompt.print(f"INFO: issuing command {command} ...")
-        if self.ser_obj.serStatus:
-            self.ser_obj.send_data(command)
-            self.prompt.print(f"INFO: issued command!\n")
-            return True
+        if self.ser_obj is not None:
+            if self.ser_obj.serStatus:
+                self.ser_obj.send_data(command)
+                self.prompt.print(f"INFO: issued command!\n")
+                return True
+            self.prompt.print("ERROR: can't issue command, no serial connection\n")
+            return False
         else:
             self.prompt.print("ERROR: can't issue command, no serial connection\n")
             return False
@@ -229,8 +231,8 @@ class TabUSB(guic.ThemedFrame):
         Returns:
             int: Baud rate from config, defaults to 9600 if not found
         """
-        config_file_path = "config/master.ini"
-        default_baud = 9600
+        config_file_path = "config/master.ini" # tag:HARDCODE
+        default_baud = 9600 # tag:HARDCODE
 
         if not os.path.exists(config_file_path):
             print(f"Config file not found. Using default baud rate: {default_baud}")

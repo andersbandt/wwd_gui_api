@@ -7,6 +7,9 @@ import usb.util
 print(usb.core.find())
 
 
+# TODO: is this file even used?
+
+
 # print all found devices?
 dev = usb.core.find(find_all=True)
 if dev is None:

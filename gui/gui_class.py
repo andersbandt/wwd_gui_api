@@ -58,12 +58,8 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
-# TODO: (GUI updates)
-#   1- if not in compact mode make sure the prompt goes to the bottom row with columnspan across the whole thing?
-#   2- evaluate using pack on certain tabs
 
-
-# TODO: should I remove the prompt width and height things now? because I reference the actual frame width and height now ya know?
+# TODO: Claude should evaluate removing the `h_prompt` and `w_prompt` things in my `darcula.json`. Because now the prompt autoexpands to fill frame?
 
 
 ##########################################
@@ -190,8 +186,6 @@ class ThemedFrame(tk.Frame):
 
 
 
-# TODO: with my new column configure and expand stuff how do I get that to reflect in the text box width?
-#   also, how can I make it so it doesn't expand past the window edge and get cut off ever?
 class Prompt(ThemedFrame):
     def __init__(self, master, theme_config, title, height, width):
         super().__init__(master, theme_config, height=height, width=width)
@@ -204,15 +198,15 @@ class Prompt(ThemedFrame):
 
         # clear button
         clear_button = tk.Button(self, text="Clear console", command=self.clear,
-                                 bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"])
+                                 bg=self.theme_config["light_1"], fg=self.theme_config["fg_light"])
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
 
         # toggle timestamps button
         self.toggle_timestamp_btn = tk.Button(self,
                                                text="Timestamps: ON",
                                                command=self.toggle_timestamp,
-                                 bg=self.theme_config["dark_3"], fg=self.theme_config["fg_light"])
-        self.toggle_timestamp_btn.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
+                                 bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"])
+        self.toggle_timestamp_btn.grid(row=0, column=2, padx=7, pady=4, sticky="ew")
 
         # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
@@ -224,7 +218,7 @@ class Prompt(ThemedFrame):
                                                 borderwidth=10)
         self.prompt.tag_configure("error", foreground=self.theme_config["error"])
         self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
-        self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=10, sticky="nsew")
+        self.prompt.grid(row=1, column=0, columnspan=3, padx=5, pady=10, sticky="nsew")
 
         # make it so ScrolledText will stretch
         self.grid_rowconfigure(1, weight=1)       # row=1 holds the ScrolledText

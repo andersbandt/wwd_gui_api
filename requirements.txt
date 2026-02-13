@@ -6,18 +6,12 @@ numpy
 scipy
 fpdf
 usb
-pyusb
 future
 setuptools
 PyVISA
 pyvisa-py
 sv_ttk
-libusb
 dash
 simpleeval
-
-
-#added by anders
-#tkinter
 
 

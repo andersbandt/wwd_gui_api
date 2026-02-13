@@ -9,7 +9,7 @@ from tkinter import messagebox
 ####      GUI OBJECT GENERATION FUNCTIONS           ##########################
 ##############################################################################
 
-def generate_drop_down(frame, options, callback_func=None, theme_config=None):
+def generate_drop_down(frame, options, callback_func=None, theme_config=None, width=None):
     """
     Generate a dropdown menu with optional theming.
 
@@ -39,13 +39,15 @@ def generate_drop_down(frame, options, callback_func=None, theme_config=None):
     drop = OptionMenu(frame, clicked_opt, *options)  # create drop down menu of years
 
     # Apply theming if provided, otherwise use defaults
+    if width is None:
+        width=15
+
     if theme_config is not None:
         drop.config(
-            width=15,
+            width=width,
             font=(theme_config["font"]["family"],
-                  theme_config["font"]["size"],
-                  theme_config["font"]["style"]),
-            bg=theme_config["light_3"],
+                  theme_config["font"]["size_s"]), # NOTE: not including `bold` here
+            bg=theme_config["dark_3"],
             fg=theme_config["fg_light"]
         )
     else:

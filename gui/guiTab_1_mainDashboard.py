@@ -135,10 +135,10 @@ class TabMainDashboard(guic.ThemedFrame):
         # add some text with user information
         note = tk.Label(fr_m, text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
-        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
+        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_5"],
                          command=lambda: self.open_config_ini())
         btn3.grid(row=6, column=0, padx=10, pady=5)
-        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
+        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_6"],
                          command=lambda: self.open_master_ini())
         btn4.grid(row=6, column=2, padx=10, pady=5)
 

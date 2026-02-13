@@ -28,6 +28,8 @@ from gui import gui_class as guic
 #       - Color represents the data label value (consistent across files)
 #       - Line style represents the file (up to 4 distinct styles)
 
+# TODO: good candidate for placing the prompt not on the bottom row in compact mode
+
 
 # Define named tuple for file data
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])

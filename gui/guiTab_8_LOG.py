@@ -101,11 +101,11 @@ class TabLog(guic.ThemedFrame):
     def initTabContent(self):
         print("Initializing tab 8 (Logger) content")
 
-        # print welcome text_data
-        # TODO: don't display this in compact mode
-        # l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
-        #                font=(self.theme_config["font"]["family"], 16))
-        # l1.grid(row=0, column=0, columnspan=4)
+        # print welcome text_data (only in standard mode)
+        if not self.theme_config.get("compact", False):
+            l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
+                           font=(self.theme_config["font"]["family"], 16))
+            l1.grid(row=0, column=0, columnspan=4)
 
         self.init_fr_status()
         self.init_fr_setup()
@@ -376,6 +376,8 @@ class TabLog(guic.ThemedFrame):
         self.step_mode_drop = guih.generate_drop_down(
             self.fr_stimulus,
             [s.value for s in logger.StepMode],
+            theme_config=self.theme_config,
+            width=10
         )
         self.step_mode_drop[0].grid(row=7, column=0, stick='w', padx=5, pady=2)
 
@@ -1091,6 +1093,7 @@ class TabLog(guic.ThemedFrame):
 
     def organize_record_params(self):
         # get all needed GUI elements
+        # TODO: put this prefix into the `master.ini` file
         prefix = "AREC" # tag:HARDCODE
         ext_text = self.output_file_name.get("1.0", "end").strip("\n")
 
@@ -1211,9 +1214,8 @@ class TabLog(guic.ThemedFrame):
                             row[logger.COL_PS_VMEAS2] = self.cc.ps.get_voltage(2)
                             row[logger.COL_PS_IMEAS2] = self.cc.ps.get_current(2)
                     except COMMUNICATION_ERRORS as e:
-                        # TODO: evaluate shutting off record here
-                        # self.record_status = False
-                        guih.alert_user("Logger: PS comm error", str(e), "error")
+                        self.record_status = False
+                        guih.alert_user("Serial logger: PS comm error", str(e), "error")
                         break
 
                 # Collect Function Generator data if requested
@@ -1341,6 +1343,8 @@ class TabLog(guic.ThemedFrame):
                     row[logger.COL_PS_VMEAS2] = self.cc.ps.get_set_voltage(2)
                     row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
             except COMMUNICATION_ERRORS as e:
+                # TODO: have Claude reformat the exceptions to be formatted like below (don't stop record, just log an error)
+                #   is "ERROR" the best? Seems like some manual pain after to reformat everything
                 self.record_status = False
                 guih.alert_user("Communication Error", str(e), "error")
 

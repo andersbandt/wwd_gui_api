@@ -247,7 +247,6 @@ class TabDMM(guic.ThemedFrame):
         elif unit == "V":
             self.meas1_scale = 1
 
-    # TODO: do I want to consider having some error handling for if a command is not found?
     def dmm_set_mode(self):
         if self.cc.dmm is not None:
             mode = self.mode_drop[1].get()

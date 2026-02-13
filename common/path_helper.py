@@ -4,6 +4,10 @@ import os
 import configparser
 
 
+# TODO: add function here to retrieve config file (master.ini)
+#   make it so every instance of path `config/master.ini` instead references the function?
+
+
 def get_data_dir(subdir=None, create=True):
     """
     Get the data directory path, optionally with a subdirectory.

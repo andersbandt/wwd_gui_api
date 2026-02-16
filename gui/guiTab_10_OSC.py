@@ -629,6 +629,10 @@ class TabOSC(guic.ThemedFrame):
         if self.id:  # CONNECTION SUCCESS
             self.channel_count = self.cc.osc.channel_count
 
+            # Save the selected model BEFORE re-init (which recreates the dropdown)
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "OSC_PyVISA")
+
             # re-initialize channel-count dependent frames
             self.init_fr_info()
             self.init_fr_channel()
@@ -638,10 +642,6 @@ class TabOSC(guic.ThemedFrame):
             self.labelIDValue.config(text=self.id)
             self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
             self.fr_port.set_status(True)
-
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "OSC_PyVISA")
 
             # Update channel display states
             self.update_osc()

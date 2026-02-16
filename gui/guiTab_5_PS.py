@@ -376,6 +376,10 @@ class TabPS(guic.ThemedFrame):
             return False
 
         if self.id:  # CONNECTION SUCCESS
+            # Save the selected model BEFORE re-init (which recreates the dropdown)
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "PS_PyVISA")
+
             # re-initialize channel count dependent frames
             self.init_fr_info()
             self.init_fr_control()
@@ -393,10 +397,6 @@ class TabPS(guic.ThemedFrame):
             self.cc.ps.output_off(2)
             self.ch1_on = 0
             self.ch2_on = 0
-
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "PS_PyVISA")
 
             # gui_refresh
             self.gui_refresh_channel_state()

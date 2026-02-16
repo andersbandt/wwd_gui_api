@@ -184,6 +184,41 @@ class ClassController:
 
         return None
 
+    def set_used_method(self, method, usage):
+        """Save the port detection method for a specific tab/usage as an XML attribute."""
+        try:
+            tree = ET.parse("config/ports_used.xml")
+            root = tree.getroot()
+        except (FileNotFoundError, ET.ParseError):
+            root = ET.Element("PortsUsed")
+            tree = ET.ElementTree(root)
+
+        usage_element = root.find(usage)
+        if usage_element is None:
+            usage_element = ET.SubElement(root, usage)
+            usage_element.text = ""
+
+        usage_element.set("method", str(method))
+
+        ET.indent(root, space="    ", level=0)
+        with open("config/ports_used.xml", "wb") as xml_file:
+            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
+
+    def get_used_method(self, usage):
+        """Retrieve the saved port detection method for a specific tab/usage."""
+        try:
+            tree = ET.parse("config/ports_used.xml")
+            root = tree.getroot()
+        except (FileNotFoundError, ET.ParseError):
+            return None
+
+        usage_element = root.find(usage)
+        if usage_element is not None:
+            method = usage_element.get("method")
+            if method is not None:
+                return int(method)
+        return None
+
     def add_active_connection(self, port, usage):
         """
         Register a port as actively connected.

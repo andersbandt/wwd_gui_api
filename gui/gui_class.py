@@ -391,6 +391,11 @@ class SerialConnFrame(ConnFrame):
         self.initialize_fr()
 
     def initialize_fr(self):
+        # restore saved port detection method (if available)
+        saved_method = self.cc.get_used_method(self.name)
+        if saved_method is not None:
+            self.port_func = saved_method
+
         # initialize port connection method dropdown
         self.port_func_drop = guih.generate_drop_down(
             self,
@@ -399,10 +404,16 @@ class SerialConnFrame(ConnFrame):
         )
         self.port_func_drop[0].grid(row=1, column=1, padx=3, pady=1)
 
+        # set dropdown to match current port_func
+        label = next((k for k, v in self.port_func_options.items() if v == self.port_func), None)
+        if label:
+            self.port_func_drop[1].set(label)
+
         # initialize port list dropdown
+        active_ports = set(self.cc.active_connections.keys())
         self.com_drop = guih.generate_drop_down(
             self,
-            serial_api.get_ports(method=self.port_func)
+            serial_api.get_ports(method=self.port_func, exclude_ports=active_ports)
         )
         self.com_drop[0].grid(row=2, column=1, columnspan=1, padx=3, pady=1)
         self.refresh_ports(first_run=True)
@@ -442,14 +453,22 @@ class SerialConnFrame(ConnFrame):
             self.gui_refresh()
             return False
 
+        # Register port early so that refresh_ports() (called inside
+        # port_init → gui_refresh) will exclude it from the scan.
+        # Without this, the Linux port-scan method opens the port at 9600
+        # baud which corrupts the active 115200 connection.
+        self.cc.add_active_connection(self.port, self.name)
+
         # Proceed with connection
         super().connect()
 
-        # If connection successful, track it
-        if self.status:
-            self.cc.add_active_connection(self.port, self.name)
+        # If connection failed, roll back the early registration
+        if not self.status:
+            self.cc.remove_active_connection(self.port)
+        else:
             if set_used_port:
                 self.cc.set_used_port(self.port, self.name)
+                self.cc.set_used_method(self.port_func, self.name)
 
         return self.status
 
@@ -467,17 +486,27 @@ class SerialConnFrame(ConnFrame):
         self.refresh_ports(first_run=True)
 
     def refresh_ports(self, first_run=False, timeout=5):
+        if self.com_drop is None:
+            return
+
         menu = self.com_drop[0]["menu"]
         menu.delete(0, "end")
 
+        # Get actively-connected ports so the scan skips them (opening a
+        # port at default 9600 baud would corrupt an existing connection)
+        active_ports = set(self.cc.active_connections.keys())
+
         # update port list (with timeout to prevent GUI freeze)
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(serial_api.get_ports, method=self.port_func)
+            future = executor.submit(serial_api.get_ports, method=self.port_func, exclude_ports=active_ports)
             try:
                 ports = future.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
                 ports = []
                 print(f"WARNING: Port scan timed out after {timeout}s")
+
+        if not ports:
+            ports = []
 
         # add each port name to the drop-down menu
         for string in ports:

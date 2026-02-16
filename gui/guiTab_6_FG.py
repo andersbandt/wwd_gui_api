@@ -379,6 +379,10 @@ class TabFG(guic.ThemedFrame):
             return False
 
         if self.id:  # CONNECTION SUCCESS
+            # Save the selected model BEFORE re-init (which recreates the dropdown)
+            selected_model = self.ate_drop[1].get()
+            self.cc.set_used_model(selected_model, "FG_PyVISA")
+
             # NOTE: re-initialize the frames in case anything like channel count, etc. needs different GUI elements
             self.init_fr_info()
             self.init_fr_control()
@@ -395,10 +399,6 @@ class TabFG(guic.ThemedFrame):
                 self.cc.fg.write("OUTPut OFF")
             except Exception:
                 pass  # Some FGs may not support this command
-
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "FG_PyVISA")
 
             return True
         else:  # BAD ID received

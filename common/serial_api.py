@@ -9,8 +9,8 @@ import glob
 import platform
 
 
-def get_ports(method=None):
-    if method is None:
+def get_ports(method=None, exclude_ports=None):
+    if method is None or method == 0:
         os_name = platform.system()
         if os_name == "Windows":
             method = 1
@@ -23,10 +23,15 @@ def get_ports(method=None):
 
     # METHOD 2: trying to get Linux to work. Search for serial ports in /dev/
     elif method == 2:
-        temp_ports = glob.glob('/dev/tty[A-Za-z]*') # NOTE: this method just prints a fuck ton of ports
+        temp_ports = glob.glob('/dev/tty[A-Za-z]*')
 
         ports = []
         for a_port in temp_ports:
+            # Skip ports with active connections - opening them at default
+            # 9600 baud would corrupt the existing connection's baud rate
+            if exclude_ports and a_port in exclude_ports:
+                ports.append(a_port)
+                continue
 
             try:
                 s = serial.Serial(a_port)

@@ -474,6 +474,7 @@ TODO: Add more detailed information about interpreting results, expected accurac
         self.prompt.print("Connect to PYVISA resource!")
         ate_temp = self.registry[self.ate_drop[1].get()]
         self.ate = ate_temp(self.fr_port.get_port())
+        time.sleep(1)
 
         try:
             import usb

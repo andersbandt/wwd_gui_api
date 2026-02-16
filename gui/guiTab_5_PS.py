@@ -48,11 +48,7 @@ class TabPS(guic.ThemedFrame):
         self.ps_i2 = 0
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "PS Console Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt_s"])
+        self.prompt = guic.Prompt(self, self.theme_config, "PS Console Output")
 
         # initialize tab content
         self.initTabContent()
@@ -380,6 +376,8 @@ class TabPS(guic.ThemedFrame):
             selected_model = self.ate_drop[1].get()
             self.cc.set_used_model(selected_model, "PS_PyVISA")
 
+            self.channel_count = self.cc.ps.channel_count
+
             # re-initialize channel count dependent frames
             self.init_fr_info()
             self.init_fr_control()
@@ -390,7 +388,6 @@ class TabPS(guic.ThemedFrame):
             self.labelIDValue.config(text=self.id)
             self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
             self.fr_port.set_status(True)
-            self.channel_count = self.cc.ps.channel_count
 
             # turn channels off and set voltages
             self.cc.ps.output_off(1)

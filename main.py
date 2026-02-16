@@ -8,8 +8,6 @@ import argparse
 from gui import gui_driver
 
 
-# TODO: change tab color if there is something active happening there ???
-
 
 def main():
     # Create an ArgumentParser object

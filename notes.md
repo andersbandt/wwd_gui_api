@@ -1,6 +1,6 @@
 # Development Notes & Recommendations
 
-*Generated: 2025-02-03 | Last updated: 2026-02-12*
+*Generated: 2025-02-03 | Last updated: 2026-02-16*
 
 ---
 
@@ -16,21 +16,6 @@
 ---
 
 ## Open Tasks
-
-### 5. Remove Hardcoded Values
-
-- **Priority fixes**:
-## Hardcoded Values to Fix
-- [ ] `guiTab_3_XDS110.py:` config file path
-- [ ] `guiTab_3_XDS110.py:291` - Sleep timer value (move to master.ini)
-- [ ] `gui_driver.py:35` - Config file path
-- [ ] `gui_driver.py:180` - Hard coded window dimensions (there is a TODO)
-
-
-### 7. evaluate logger stop record
-- **Location**: `guiTab_8_LOG.py. There is a TODO`
-- **Issue**: I shouldn't set self.record_status on each `COMMUNICATION ERROR`
-- **Action**: Properly handle communication errors in thread records
 
 
 ### 8. Add Unit Tests
@@ -50,16 +35,7 @@
 - **Issue**: Appears underutilized, unclear purpose
 - **Action**: Document what each does, consider if they should be in main app or separate scripts, move IMU-specific code (`imu/`) if not used
 
-### 12. Add Error Handling Improvements
-- **Found**: 3 empty `except: pass` blocks
-- **Action**: Add logging/error messages
 
-### 13. Create Equipment Driver Documentation
-- **Action**:
-  - Document base class usage
-  - Provide template
-  - Examples from existing drivers
-  - Add CONTRIBUTING.md to the EEequipment module
 
 ---
 
@@ -105,13 +81,13 @@ Tabs spawn `threading.Thread` directly in button callbacks with no lifecycle man
 
 ### Problem 4: Configuration Parsing Scattered Across Tabs
 
-Multiple tabs read `config/master.ini` or other config files independently.
+Multiple tabs read `config/master.ini` or other config files independently. Hardcoded paths have been replaced with `path_helper.get_config_path()`, but each tab still parses the file independently.
 
-- `guiTab_2_DMM.py:85-102` -- `load_dmm_config` reads `master.ini`
-- `guiTab_3_XDS110.py:358-376` -- `parse_target_config` reads target `.ini` files
-- `guiTab_4_USB.py:224-251` -- `get_baud_rate` reads `master.ini`
-- `gui_driver.py:30-52` -- `parse_autoconnect_config` reads `master.ini`
-- `gui_class.py:468-481` -- `get_previous_port` reads `ports_used.xml`
+- `guiTab_2_DMM.py` -- `load_dmm_config` reads `master.ini`
+- `guiTab_3_XDS110.py` -- `parse_target_config` reads target `.ini` files
+- `guiTab_4_USB.py` -- `get_baud_rate` reads `master.ini`
+- `gui_driver.py` -- `parse_autoconnect_config` reads `master.ini`
+- `gui_class.py` -- `get_previous_port` reads `ports_used.xml`
 
 **Recommendation:** Create a `ConfigService` that loads and caches all configuration at startup. Tabs never touch `configparser` or file paths directly.
 
@@ -148,10 +124,6 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 
 ---
 
-
-
----
-
 ## Design Patterns & Strengths
 
 - **ClassController** - Centralized equipment management
@@ -174,6 +146,7 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 ### Long Term:
 - [ ] Web interface option (Flask/FastAPI backend)
 - [ ] Database storage option (SQLite/PostgreSQL)
+- [ ] Change tab color when something is active (e.g., connection live, recording in progress)
 
 ---
 

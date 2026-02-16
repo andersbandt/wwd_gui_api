@@ -28,7 +28,6 @@ from gui import gui_class as guic
 #       - Color represents the data label value (consistent across files)
 #       - Line style represents the file (up to 4 distinct styles)
 
-# TODO: good candidate for placing the prompt not on the bottom row in compact mode
 
 
 # Define named tuple for file data
@@ -61,11 +60,7 @@ class TabGraph(guic.ThemedFrame):
         self.fr_files = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                  "Data Logger Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "Data Logger Output")
 
         # initialize tab content
         self.initTabContent()

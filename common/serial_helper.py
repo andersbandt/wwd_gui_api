@@ -164,7 +164,7 @@ class SerialProcessor(SerialGeneral):
             try:  # NOTE: this try/except is because if the mode is "print to screen mode", it will have a TypeError here
                 logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
             except TypeError:
-                pass
+                print("SerialProcessor: logfile not writable (GUI display mode)")
             return self.num_lines
         else:
             return 0

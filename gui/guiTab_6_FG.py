@@ -46,11 +46,7 @@ class TabFG(guic.ThemedFrame):
         self.data_dir = path_helper.get_full_data_path(subdir="fg_data")
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                  "FG Console Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "FG Console Output")
 
         # initialize tab content
         self.initTabContent()
@@ -397,8 +393,8 @@ class TabFG(guic.ThemedFrame):
             self.output_on = False
             try:
                 self.cc.fg.write("OUTPut OFF")
-            except Exception:
-                pass  # Some FGs may not support this command
+            except Exception as e:
+                print(f"FG: Could not turn output off on connect: {e}")
 
             return True
         else:  # BAD ID received

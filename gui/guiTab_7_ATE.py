@@ -39,11 +39,7 @@ class TabATE(guic.ThemedFrame):
         self.ate = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "ATE Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt_s"])
+        self.prompt = guic.Prompt(self, self.theme_config, "ATE Output")
         self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
         # initialize tab content
@@ -270,7 +266,6 @@ Understanding Results:
 - Linearity error: Deviation from ideal 1:1 relationship
 - Repeatability: Consistency across multiple runs
 
-TODO: Add more detailed information about interpreting results, expected accuracy specifications, and troubleshooting common issues.
 """
 
         # Insert text and make read-only

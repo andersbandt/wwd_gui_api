@@ -12,7 +12,7 @@ import os
 
 # import user defined modules
 from common.serial_helper import SerialProcessor
-from common.path_helper import get_data_dir
+from common.path_helper import get_data_dir, get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -40,11 +40,7 @@ class TabUSB(guic.ThemedFrame):
 
         # init frames within tab
         self.fr_state = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "Debug serial",
-                                  height=self.theme_config["size"]["h_prompt"]*2.75,
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "Debug serial")
         self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close(),
                                                   status_cmd=lambda: self.ser_obj.serStatus if self.ser_obj else False)
         if autoconnect:
@@ -231,7 +227,7 @@ class TabUSB(guic.ThemedFrame):
         Returns:
             int: Baud rate from config, defaults to 9600 if not found
         """
-        config_file_path = "config/master.ini" # tag:HARDCODE
+        config_file_path = get_config_path()
         default_baud = 9600 # tag:HARDCODE
 
         if not os.path.exists(config_file_path):

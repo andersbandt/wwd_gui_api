@@ -11,6 +11,7 @@ import os
 from EEequipment.xds110 import xds110_api as xds110
 from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
+from common.path_helper import get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
@@ -32,11 +33,7 @@ class tabXDS110(guic.ThemedFrame):
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "XDS110 Comms",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "XDS110 Comms")
         self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
@@ -62,7 +59,7 @@ class tabXDS110(guic.ThemedFrame):
         self.initTabContent()
 
         # load target settings
-        self.parse_target_config("master.ini") #tag:HARDCODE
+        self.parse_target_config(get_config_path())
 
     def initTabContent(self):
         print("Initializing tab 4 (XDS110) content")
@@ -287,7 +284,7 @@ class tabXDS110(guic.ThemedFrame):
         # toggle power
         if self.var_toggle.get():
             self.turn_power_off(flash_option)
-            time.sleep(6) # wait 6 seconds before powerup again. tag:HARDCODE_VAR
+            time.sleep(self.toggle_power_delay)
         # turn on power
         power_status = self.turn_power_on(flash_option)
         if power_status is False:
@@ -348,16 +345,15 @@ class tabXDS110(guic.ThemedFrame):
     def autoload_config(self):
         cfg = self.defaultTarget_drop[1].get()
         print(f"Autoloading with config num: {cfg}")
-        self.parse_target_config(f"{cfg}.ini")
+        self.parse_target_config(os.path.join("config", f"{cfg}.ini"))
 
 
     ##############################################################################
     ####      HELPER FUNCTIONS        ############################################
     ##############################################################################
 
-    def parse_target_config(self, filename):
+    def parse_target_config(self, config_file_path):
         # initialize the config parser
-        config_file_path = "config/" + filename
         if os.path.exists(config_file_path):
             config = configparser.ConfigParser()
             config.read(config_file_path)
@@ -371,6 +367,7 @@ class tabXDS110(guic.ThemedFrame):
         debug_config = int(config["Target"]["debug_config"])
         self.device_vdds = float(config["Target"]["vdds"])
         self.device_usb_relay = int(config["Target"]["usb_relay"])
+        self.toggle_power_delay = int(config["Target"].get("toggle_power_delay", "6"))
 
         self.targetConfig_drop[1].set(self.tg_opt[power_type])
         self.serialNumber_drop[1].set(self.db_opt[debug_config])

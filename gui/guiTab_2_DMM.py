@@ -13,6 +13,7 @@ from datetime import datetime
 # import user defined modules
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+from common.path_helper import get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -47,11 +48,7 @@ class TabDMM(guic.ThemedFrame):
         self.default_sample_speed = self.load_dmm_config()
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "DMM Console Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "DMM Console Output")
 
         # initialize tab content
         self.initTabContent()
@@ -85,7 +82,7 @@ class TabDMM(guic.ThemedFrame):
     def load_dmm_config(self):
         """Load DMM configuration from master.ini"""
         config = configparser.ConfigParser()
-        config.read("config/master.ini")
+        config.read(get_config_path())
 
         # Get sample speed with default fallback
         sample_speed = "fast"  # Default value

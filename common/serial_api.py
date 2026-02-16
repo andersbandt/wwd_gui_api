@@ -38,7 +38,7 @@ def get_ports(method=None, exclude_ports=None):
                 s.close()
                 ports.append(a_port)
             except serial.SerialException:
-                pass
+                pass  # Port exists but can't be opened (in use or no permission)
 
     elif method == 3:
         rm = pyvisa.ResourceManager('@py')

@@ -14,6 +14,7 @@ from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
+from common.path_helper import get_config_path
 from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_DMM
@@ -31,7 +32,7 @@ NUM_TABS = 10 # tag:HARDCODE
 
 def parse_autoconnect_config():
     # initialize the config parser
-    config_file_path = "config/master.ini" # tag:HARDCODE
+    config_file_path = get_config_path()
     if os.path.exists(config_file_path):
         config = configparser.ConfigParser()
         config.read(config_file_path)
@@ -61,7 +62,7 @@ def parse_theme_config():
     Returns:
         str: Path to the theme file (e.g., "config/darcula.json")
     """
-    config_file_path = "config/master.ini" # tag:HARDCODE
+    config_file_path = get_config_path()
     default_theme = "config/darcula.json" # tag:HARDCODE - but not really an issue because this is fallback if read from config file fails
 
     if not os.path.exists(config_file_path):
@@ -183,8 +184,7 @@ def main(autoconnect, force_compact=False):
     print("Executing main function of gui_driver.py")
 
     # tag:HARDCODE
-    # TODO: evaluate not having hardcoded pixel dimensions. It's hard because everything else is hard coded by pixels
-    desired_w = 1300
+    desired_w = 1350
     desired_h = 900
     margin_w = 50
     margin_h = 125

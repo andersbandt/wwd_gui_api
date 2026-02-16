@@ -66,9 +66,7 @@ class TabLog(guic.ThemedFrame):
         #   normal  -> on its own row at the bottom of the tab (full width)
         compact = self.theme_config.get("compact", False)
         prompt_parent = self.fr_bottom if compact else self
-        self.prompt = guic.Prompt(prompt_parent, self.theme_config, "Data Logger Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt_s"])
+        self.prompt = guic.Prompt(prompt_parent, self.theme_config, "Data Logger Output")
 
         # place top row
         self.fr_status.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
@@ -1093,8 +1091,7 @@ class TabLog(guic.ThemedFrame):
 
     def organize_record_params(self):
         # get all needed GUI elements
-        # TODO: put this prefix into the `master.ini` file
-        prefix = "AREC" # tag:HARDCODE
+        prefix = path_helper.get_logger_prefix()
         ext_text = self.output_file_name.get("1.0", "end").strip("\n")
 
         # create recording config
@@ -1342,11 +1339,13 @@ class TabLog(guic.ThemedFrame):
                     row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
                     row[logger.COL_PS_VMEAS2] = self.cc.ps.get_set_voltage(2)
                     row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-            except COMMUNICATION_ERRORS as e:
-                # TODO: have Claude reformat the exceptions to be formatted like below (don't stop record, just log an error)
-                #   is "ERROR" the best? Seems like some manual pain after to reformat everything
-                self.record_status = False
-                guih.alert_user("Communication Error", str(e), "error")
+            except COMMUNICATION_ERRORS:
+                row[logger.COL_PS_VSET1] = "ERROR"
+                row[logger.COL_PS_VMEAS1] = "ERROR"
+                row[logger.COL_PS_IMEAS1] = "ERROR"
+                if self.record_config.ps_channel == 2:
+                    row[logger.COL_PS_VSET2] = "ERROR"
+                    row[logger.COL_PS_VMEAS2] = "ERROR"
 
         # Function Generator data if requested
         if self.record_config.use_fg:
@@ -1366,9 +1365,9 @@ class TabLog(guic.ThemedFrame):
             try:
                 osc_data = logger.collect_osc_measurements(self.cc.osc, self.record_config.osc_config)
                 row.update(osc_data)
-            except COMMUNICATION_ERRORS as e:
-                self.record_status = False
-                guih.alert_user("OSC Communication Error", str(e), "error")
+            except COMMUNICATION_ERRORS:
+                for col in logger.build_osc_headers(self.record_config.osc_config):
+                    row[col] = "ERROR"
 
         return row
 

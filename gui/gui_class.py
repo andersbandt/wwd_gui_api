@@ -33,7 +33,7 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
         A new dictionary with scaled values
 
     Example:
-        scaled = scale_theme(config, 0.75, "pad.xpad_s", "pad.ypad_s", "size.w_prompt")
+        scaled = scale_theme(config, 0.75, "pad.xpad_s", "pad.ypad_s")
     """
     scaled = copy.deepcopy(theme_cfg)
 
@@ -58,8 +58,6 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
-
-# TODO: Claude should evaluate removing the `h_prompt` and `w_prompt` things in my `darcula.json`. Because now the prompt autoexpands to fill frame?
 
 
 ##########################################
@@ -97,9 +95,6 @@ class ThemedApp:
                 "pad.ypad_s",
                 "pad.frame_x",
                 "pad.frame_y",
-                # "size.w_prompt",
-                # "size.h_prompt",
-                #"size.w_prompt_s",
                 "font.size_prompt"
             )
 
@@ -187,8 +182,8 @@ class ThemedFrame(tk.Frame):
 
 
 class Prompt(ThemedFrame):
-    def __init__(self, master, theme_config, title, height, width):
-        super().__init__(master, theme_config, height=height, width=width)
+    def __init__(self, master, theme_config, title, height=10, width=80):
+        super().__init__(master, theme_config)
         self.height = height
         self.width = width
         self.set_bg(self.theme_config["light_4"])

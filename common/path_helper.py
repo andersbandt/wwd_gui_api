@@ -4,8 +4,23 @@ import os
 import configparser
 
 
-# TODO: add function here to retrieve config file (master.ini)
-#   make it so every instance of path `config/master.ini` instead references the function?
+def get_config_path():
+    """Get the path to the master configuration file (master.ini)."""
+    return os.path.join("config", "master.ini")
+
+
+def get_logger_prefix():
+    """Get the recording filename prefix from master.ini [LOGGER] section."""
+    config_file_path = get_config_path()
+    default_prefix = "AREC"
+
+    if os.path.exists(config_file_path):
+        config = configparser.ConfigParser()
+        config.read(config_file_path)
+        if "LOGGER" in config:
+            return config["LOGGER"].get("prefix", default_prefix).strip()
+
+    return default_prefix
 
 
 def get_data_dir(subdir=None, create=True):
@@ -23,7 +38,7 @@ def get_data_dir(subdir=None, create=True):
         get_data_dir()              # Returns "data"
         get_data_dir("ps_data")     # Returns "data/ps_data"
     """
-    config_file_path = "config/master.ini"
+    config_file_path = get_config_path()
     default_data_dir = "data"
 
     # Read data directory from config

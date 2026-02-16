@@ -71,11 +71,7 @@ class TabMainDashboard(guic.ThemedFrame):
         self.fr_main_status.status = self.cc.relay.status
 
         # setup prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "Main",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "Main")
 
 
         # initialize tab content

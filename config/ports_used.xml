@@ -1,9 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<PortsUsed>
-    <USB_serial>COM14</USB_serial>
-    <ATE_serial>/dev/ttyACM4</ATE_serial>
-    <DMM_Serial model="XDM1041">/dev/ttyUSB0</DMM_Serial>
-    <PS_PyVISA model="E3640A">USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA>
-    <FG_PyVISA>GPIB0::10::INSTR</FG_PyVISA>
-    <OSC_PyVISA model="DSOX4104A">USB0::2391::1416::CN50290972::0::INSTR</OSC_PyVISA>
-</PortsUsed>

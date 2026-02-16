@@ -1,3 +1,4 @@
+"""Timestamp parsing and datetime utilities."""
 
 # import needed modules
 from datetime import datetime

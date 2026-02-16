@@ -1,9 +1,4 @@
-"""
-@file     guiTab_4_USB.py
-@author   Anders Bandt
-@date     March 2024
-@brief    control device through serial (COM) port
-"""
+"""USB serial communication tab."""
 
 # import needed packages
 import tkinter as tk
@@ -17,8 +12,19 @@ import os
 
 # import user defined modules
 from common.serial_helper import SerialProcessor
+from common.path_helper import get_data_dir, get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
+
+# Target serial commands
+ACTIVATE_TEST_CMD = "DAGA"
+TEST_TYPE_COMMANDS = {
+    "flash-read":     "FR91",
+    "flash-read-all": "FR01",
+    "flash-erase":    "FE42",
+    "imu-graph":      "IG85",
+    "clock-test":     "CR81",
+}
 
 
 class TabUSB(guic.ThemedFrame):
@@ -32,31 +38,14 @@ class TabUSB(guic.ThemedFrame):
         # serial Object (SerialProcessor)
         self.ser_obj = None
 
-        # print welcome text_data
-        l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel",
-                       font=("Arial", 16))
-        l1.grid(row=0, column=0, columnspan=2)
-
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "Debug serial",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
-
         # init frames within tab
-        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close())
+        self.fr_state = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.prompt = guic.Prompt(self, self.theme_config, "Debug serial")
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close(),
+                                                  status_cmd=lambda: self.ser_obj.serStatus if self.ser_obj else False)
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=1, column=0, padx=30, pady=12)
 
-        # init state frame
-        self.fr_state = tk.Frame(self, bg="#00bcd4")
-        self.fr_state.grid(row=1, column=1, padx=30, pady=12)
-        self.canvas2 = tk.Canvas(self.fr_state, width=50, height=50)  # create a Canvas widget
-        self.test_drop = None  # fr_state
-        self.output_mode_drop = None  # fr_state - output mode selector
-        self.output_file_name = None  # fr_state
 
         # initialize threads (actual init is in thread_print) or something
         self.t1 = None
@@ -66,30 +55,44 @@ class TabUSB(guic.ThemedFrame):
         # initialize tab content
         self.initTabContent()
 
+        # place everything in grid
+        self.fr_port.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_state.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="n")
+        self.prompt.grid(row=1, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nswe")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
+
     def initTabContent(self):
         print("Initializing tab 4 (USB) content")
+
+        # add tab header information
+        l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel", font=("Arial", 16))
+        l1.grid(row=0, column=0, columnspan=2)
+
         self.init_fr_state()
 
     def init_fr_state(self):
         # TARGET - BUTTON/STATUS
         btn_act_test = Button(self.fr_state, text="Activate test mode",
                               command=self.activate_test_mode,
-                              bg="green", fg="white", height=2, width=15)
+                              fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+                              height=2, width=15)
         btn_act_test.grid(row=1, column=2, padx=15, pady=22)
-        self.canvas2.grid(row=1, column=3, padx=15, pady=22)
+
+        self.test_status_circ = guic.ColorCircle(self.fr_state, 50, 50, self.theme_config["bg_dark"])
+        self.test_status_circ.grid(row=1, column=3, padx=15, pady=22)
 
         # TOGGLE
         btn_toggle_target = Button(self.fr_state, text="Set test type",
                                    command=self.set_test_type,
-                                   bg="orange", fg="black", height=2, width=15)
+                                   fg=self.theme_config["fg_dark"], bg=self.theme_config["light_6"],
+                                   height=2, width=15)
         btn_toggle_target.grid(row=2, column=2, padx=15, pady=22)
         self.test_drop = guih.generate_drop_down(
             self.fr_state,
-            ["flash-read",
-             "flash-read-all",
-             "flash-erase",
-             "imu_graph",
-             "clock-test"]
+            list(TEST_TYPE_COMMANDS.keys())
         )
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
 
@@ -114,52 +117,46 @@ class TabUSB(guic.ThemedFrame):
         self.fr_port.refresh_ports()
         self.fr_port.gui_refresh()
 
-        if self.ser_obj is not None:
-            if self.ser_obj.serStatus is False:
-                self.port_close()
-
 
     ##############################################################################
     ####      BUTTON ACTION FUNCTIONS        #####################################
     ##############################################################################
 
     def activate_test_mode(self):
-        command = "DAGA"  # tag:HARDCODE
-        my_oval = self.canvas2.create_oval(50 * .25, 50 * .25, 50 * .75, 50 * 0.75)  # x0, y0, x1, y1
+        command = ACTIVATE_TEST_CMD
         self.prompt.print(f"INFO: issuing command {command} ...")
-        if self.ser_obj.serStatus:
-            # send the TEST MODE command for ACTIVATION
-            self.ser_obj.send_data(command)
-            self.prompt.print(f"INFO: issued command!\n")
-            self.canvas2.itemconfig(my_oval, fill="green")  # Fill the circle with GREEN
+        if self.ser_obj is not None:
+            if self.ser_obj.serStatus:
+                # send the TEST MODE command for ACTIVATION
+                self.ser_obj.send_data(command)
+                self.prompt.print(f"Issued command!\n")
+                self.test_status_circ.set_color(self.theme_config["success"])
         else:
-            self.prompt.print("ERROR: can't issue command, no serial connection\n")
-            self.canvas2.itemconfig(my_oval, fill="red")  # Fill the circle with RED
+            self.prompt.print("ERROR: can't issue command, no serial connection\n", print_type="error")
+            self.test_status_circ.set_color(self.theme_config["error"])
+            self.test_status_circ.set_color(self.theme_config["error"])
 
     def set_test_type(self):
         test_type_command = self.test_drop[1].get()
         self.prompt.print(f"INFO: test type {test_type_command} ...")
-        if test_type_command == "flash-read":
-            command = "FR91"
-        elif test_type_command == "flash-read-all":
-            command = "FR01"
-        elif test_type_command == "flash-erase":
-            command = "FE42"
-        elif test_type_command == "imu-graph":
-            command = "IG85"
-        elif test_type_command == "clock-test":
-            command = "CR81"
-            self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
-        else:
+
+        command = TEST_TYPE_COMMANDS.get(test_type_command)
+        if command is None:
             print(f"ERROR: Unknown test command: {test_type_command}")
             self.prompt.print(f"ERROR: Unknown test command: {test_type_command}", "error")
             return False
 
+        if test_type_command == "clock-test":
+            self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
+
         self.prompt.print(f"INFO: issuing command {command} ...")
-        if self.ser_obj.serStatus:
-            self.ser_obj.send_data(command)
-            self.prompt.print(f"INFO: issued command!\n")
-            return True
+        if self.ser_obj is not None:
+            if self.ser_obj.serStatus:
+                self.ser_obj.send_data(command)
+                self.prompt.print(f"INFO: issued command!\n")
+                return True
+            self.prompt.print("ERROR: can't issue command, no serial connection\n")
+            return False
         else:
             self.prompt.print("ERROR: can't issue command, no serial connection\n")
             return False
@@ -175,10 +172,14 @@ class TabUSB(guic.ThemedFrame):
 
         Args:
             timestamp: Timestamp string from serial data
-            data: Serial data string
+            data: Serial data string (may contain multiple newline-delimited lines)
         """
-        # Schedule GUI update on main thread (thread-safe)
-        self.after(0, lambda: self.prompt.print(f"{data.strip()}", timestamp=True))
+        # Split multi-line chunks so each line gets its own timestamp
+        lines = data.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if line:
+                self.after(0, lambda l=line: self.prompt.print(l, timestamp=True))
 
     def thread_print_display(self):
         self.t1 = guic.StoppableThread(
@@ -200,13 +201,13 @@ class TabUSB(guic.ThemedFrame):
             # File logging - raw mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, os.path.join("data", "text_data"), "raw") # tag:HARDCODE
+                args=(self.basefilepath, get_data_dir("text_data"), "raw")
             )
         elif output_mode == "Log to File (Timestamp)":
             # File logging - timestamp mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, os.path.join("data", "text_data"), "timestamp") # tag:HARDCODE
+                args=(self.basefilepath, get_data_dir("text_data"), "timestamp")
             )
         else:
             self.prompt.print(f"ERROR: Unknown output mode: {output_mode}", "error")
@@ -226,8 +227,8 @@ class TabUSB(guic.ThemedFrame):
         Returns:
             int: Baud rate from config, defaults to 9600 if not found
         """
-        config_file_path = "config/master.ini"
-        default_baud = 9600
+        config_file_path = get_config_path()
+        default_baud = 9600 # tag:HARDCODE
 
         if not os.path.exists(config_file_path):
             print(f"Config file not found. Using default baud rate: {default_baud}")
@@ -262,7 +263,7 @@ class TabUSB(guic.ThemedFrame):
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
-        threading.Thread(target=self.thread_print_display).start()
+        self.thread_print_display()
         self.prompt.print("Init successful!\n")
         return True
 
@@ -270,15 +271,18 @@ class TabUSB(guic.ThemedFrame):
         if self.ser_obj is not None:
             self.t1.stop()
             self.t2.stop()
+            if self.t3 is not None:
+                self.t3.stop()
+                self.t3 = None
             self.prompt.print("Serial close!")
             num_lines = self.ser_obj.stop_process()
             self.prompt.print(f"Port closed: {num_lines} lines wrote\n")
             self.ser_obj = None
         self.fr_port.set_status(False)
 
-
     def start_process(self, data_subfolder, file_ext, parameters):
-        self.t3.stop()
+        if self.t3 is not None:
+            self.t3.stop()
 
         current_datetime = datetime.now()
         formatted_datetime = current_datetime.strftime("_%H%M%S")
@@ -288,10 +292,12 @@ class TabUSB(guic.ThemedFrame):
         #     self.prompt1.print("Detected blank file name, going to use default")
         #     file_str_ext = None
 
-        threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath,
-                                                                  f"{formatted_datetime}_{file_ext}_{file_str_ext}",
-                                                                  "data",
-                                                                  data_subfolder,
-                                                                  parameters=parameters)
-                         ).start()
+        self.t3 = guic.StoppableThread(
+            target=lambda: self.ser_obj.process_data(self.basefilepath,
+                                                     f"{formatted_datetime}_{file_ext}_{file_str_ext}",
+                                                     "data",
+                                                     data_subfolder,
+                                                     parameters=parameters)
+        )
+        self.t3.start()
 

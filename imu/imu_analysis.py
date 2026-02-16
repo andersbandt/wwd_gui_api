@@ -1,4 +1,4 @@
-
+"""IMU accelerometer and gyroscope data analysis."""
 
 # import needed modules
 import pandas as pd

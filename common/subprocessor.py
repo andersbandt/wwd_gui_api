@@ -1,9 +1,4 @@
-"""
-@file     subprocessor
-@author   Anders Bandt
-@date     March 2024
-@brief    handles OS commands
-"""
+"""Subprocess wrapper for executing OS commands."""
 
 # import needed modules
 import subprocess

@@ -1,26 +1,14 @@
-"""
-@file     guiTab_6_PS.py
-@author   Anders Bandt
-@date     May 2024
-@brief    control power supply test equipment
-"""
+"""Power supply control tab."""
 
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
 import time
-from datetime import datetime
-
 
 # import user defined modules
-from common import plotter
-from common import path_helper
-from common.csv_helper import CSVHelper
 from EEequipment import equipment_manager
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -56,16 +44,8 @@ class TabPS(guic.ThemedFrame):
         self.ps_i1 = 0
         self.ps_i2 = 0
 
-        # set up recording / data information
-        self.recName = False
-        self.data_dir = path_helper.get_full_data_path(subdir="ps_data")
-
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "PS Console Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt_s"])
+        self.prompt = guic.Prompt(self, self.theme_config, "PS Console Output")
 
         # initialize tab content
         self.initTabContent()
@@ -78,16 +58,21 @@ class TabPS(guic.ThemedFrame):
                                             "PS_PyVISA",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.cc.get_ps_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, columnspan=2, pady=15, padx=15, sticky="W")
-        self.fr_port.grid(row=0, column=2, padx=15, pady=15)
-        self.fr_control.grid(row=1, column=0, pady=15, padx=15)
-        self.fr_status.grid(row=1, column=1, pady=15, padx=15)
-        self.prompt.grid(row=1, column=2, padx=30, pady=12, sticky="W")
+        self.fr_info.grid(row=0, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="W")
+        self.fr_port.grid(row=0, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_status.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(1, weight=1)
 
 
     def initTabContent(self):
@@ -102,6 +87,7 @@ class TabPS(guic.ThemedFrame):
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("ps")
+        self.cc.ps_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -207,22 +193,6 @@ class TabPS(guic.ThemedFrame):
             self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
             self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
-        # MISC CONTROL
-        self.channelRecord_drop = guih.generate_drop_down(
-            fr_m,
-            [1, 2],
-        )
-        self.plot_current_btn = tk.Button(fr_m, text="Live Plot current",
-                                           command=lambda: self.plot_current(),
-                                           )
-        self.var_record = tk.IntVar()
-        ttk.Checkbutton(fr_m,
-                        text="Record current",
-                        variable=self.var_record,
-                        onvalue=1,
-                        offvalue=0).grid(row=2, column=1)
-        self.plot_current_btn.grid(row=2, column=3, padx=10, pady=10)
-        self.channelRecord_drop[0].grid(row=2, column=0)
 
     def init_fr_status(self):
         # channel 1 CV/CC mode
@@ -380,95 +350,44 @@ class TabPS(guic.ThemedFrame):
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
 
-    # plot_current: starts a live plot and (optionally) records data to .csv
-    def plot_current(self):
-        # set up .csv recording
-        recording = self.var_record.get()
-        if recording:
-            self.recName = 'AREC_' + time.strftime('%Y%m%d%H%M%S', time.localtime()) + '.csv'
-            self.csvh = CSVHelper(self.data_dir + self.recName)
-            self.csvh.initialize_file(["Sample", "Time", "Current"])
-
-        self.prompt.print("Starting live current plot ...")
-        currentLivePlot = plotter.LivePlot("Live current plot", "Time (s)", "Current (A)")
-
-        def animate(i):
-            for j in range(0, 10):
-                # Retrieve the current reading and the timestamp
-                reading = self.cc.ps.get_current(int(self.channelRecord_drop[1].get()))
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-
-                currentLivePlot.xs.append(len(currentLivePlot.xs))  # or a timestamp
-                currentLivePlot.ys.append(reading)
-
-                # add row to data file
-                if recording:
-                    self.csvh.add_row([i,timestamp, reading])
-
-            # Clear and plot again, but avoid clearing the entire plot for better visual
-            currentLivePlot.ax.clear()
-            currentLivePlot.ax.plot(currentLivePlot.xs[-2000:], currentLivePlot.ys[-2000:], label="Current (A)")
-
-        currentLivePlot.show_animation(animate, interval=200)
-
     #################################
     #### SERIAL (COM)  ##############
     #################################
 
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
-        self.prompt.print("Connect to PYVISA resource!")
+        self.prompt.print("Connect to PyVISA resource!")
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.ps_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-        self.cc.set_ps(ate_temp(self.fr_port.get_port()))
-
-        try:
-            self.id = self.cc.ps.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to PS", e, "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to PS", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        if self.id:  # CONNECTION SUCCESS
-            # re-initialize channel count dependent frames
-            self.init_fr_info()
-            self.init_fr_control()
-            self.init_fr_status()
+        self.channel_count = self.cc.ps.channel_count
+        self.init_fr_info()
+        self.init_fr_control()
+        self.init_fr_status()
 
-            # start doing stuff
-            self.prompt.print(f"Connected to PS with id: {self.id}")
-            self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
-            self.fr_port.set_status(True)
-            self.channel_count = self.cc.ps.channel_count
+        self.prompt.print(f"Connected to PS with id: {result.device_id}")
+        self.labelIDValue.config(text=result.device_id)
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.set_status(True)
 
-            # turn channels off and set voltages
-            self.cc.ps.output_off(1)
-            self.cc.ps.output_off(2)
-            self.ch1_on = 0
-            self.ch2_on = 0
+        self.ch1_on = 0
+        self.ch2_on = 0
+        self.gui_refresh_channel_state()
 
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "PS_PyVISA")
-
-            # gui_refresh
-            self.gui_refresh_channel_state()
-            return True
-        else:  # BAD ID received
-            self.cc.set_ps(None)
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
-        self.prompt.print(f"Closing PYVISA resource!")
-        # TODO make sure all disconnect statements have some error handling around disconnect (or figure out how to handle it better)
-        try:
-            self.cc.ps.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't disconnect PS", e, "warning")
+        self.prompt.print("Closing PS resource!")
+        result = self.cc.ps_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect PS", result.error, "warning")
         self.fr_port.set_status(False)
-        self.cc.set_ps(None)
-        self.prompt.print(f"Connection is closed.")

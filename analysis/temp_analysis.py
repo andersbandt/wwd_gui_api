@@ -1,5 +1,4 @@
-
-
+"""Temperature sensor data conversion."""
 
 
 def analyze_ICM_42670(dig_temp_arr):

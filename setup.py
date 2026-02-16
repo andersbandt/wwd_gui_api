@@ -1,3 +1,5 @@
+"""Package setup configuration for wwd_gui_api."""
+
 from setuptools import setup
 
 setup(

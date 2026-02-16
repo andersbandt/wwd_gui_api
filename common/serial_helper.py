@@ -1,9 +1,4 @@
-"""
-@file     serial_helper.py
-@author   Anders Bandt
-@date     March 2024
-@brief    Python class for managing data with a serial connection
-"""
+"""Buffered serial reader with logging support."""
 
 # import needed modules
 import serial
@@ -61,8 +56,6 @@ class SerialProcessor(SerialGeneral):
         # Using queue.Queue for thread-safe producer/consumer pattern
         # Previously used collections.deque(maxlen=200) but it wasn't fully thread-safe
         self.r_buf = queue.Queue(maxsize=200)  # Thread-safe read buffer
-
-
 
     def init_data(self, data_mode, parameters):
         print("SerialProcessor data initialization")
@@ -168,7 +161,10 @@ class SerialProcessor(SerialGeneral):
         if self.procStatus:
             self.procStatus = False
             self.close()
-            logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
+            try:  # NOTE: this try/except is because if the mode is "print to screen mode", it will have a TypeError here
+                logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
+            except TypeError:
+                print("SerialProcessor: logfile not writable (GUI display mode)")
             return self.num_lines
         else:
             return 0

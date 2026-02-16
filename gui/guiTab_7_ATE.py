@@ -1,9 +1,4 @@
-"""
-@file     guiTab_7_ATE.py
-@author   Anders Bandt
-@date     November 2024
-@brief    control devices to assist in ATE control
-"""
+"""Automated test equipment sequencing tab."""
 
 # import needed GUI packages
 import tkinter as tk
@@ -44,21 +39,21 @@ class TabATE(guic.ThemedFrame):
         self.ate = None
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "ATE Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt_s"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+        self.prompt = guic.Prompt(self, self.theme_config, "ATE Output")
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
         # initialize tab content
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
-        self.fr_control.grid(row=1, column=0, padx=15, pady=self.theme_config["pad"]["ypad_s"])
-        self.fr_accuracy.grid(row=2, column=0, padx=2, pady=self.theme_config["pad"]["ypad_s"])
-        self.prompt.grid(row=2, column=1, columnspan=4, padx=30, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_accuracy.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=2, column=1, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -67,11 +62,12 @@ class TabATE(guic.ThemedFrame):
                                             "Generic_ATE",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.ate.status if self.ate else False)
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, rowspan=2, padx=15, pady=self.theme_config["pad"]["ypad_s"])
+        self.fr_port.grid(row=0, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
         print("Initializing tab 7 (ATE) content")
@@ -270,7 +266,6 @@ Understanding Results:
 - Linearity error: Deviation from ideal 1:1 relationship
 - Repeatability: Consistency across multiple runs
 
-TODO: Add more detailed information about interpreting results, expected accuracy specifications, and troubleshooting common issues.
 """
 
         # Insert text and make read-only
@@ -294,7 +289,11 @@ TODO: Add more detailed information about interpreting results, expected accurac
     def ate_query(self, command_str):
         if self.ate is not None:
             self.prompt.print("Sending command: " + command_str)
-            res = self.ate.query(command_str)
+            try:
+                res = self.ate.query(command_str)
+            except COMMUNICATION_ERRORS as e:
+                self.prompt.print("Communication error: " + str(e), "error")
+                return
             self.prompt.print(f"Got response: {res}")
 
     def ate_benchmark(self):
@@ -470,6 +469,7 @@ TODO: Add more detailed information about interpreting results, expected accurac
         self.prompt.print("Connect to PYVISA resource!")
         ate_temp = self.registry[self.ate_drop[1].get()]
         self.ate = ate_temp(self.fr_port.get_port())
+        time.sleep(1)
 
         try:
             import usb

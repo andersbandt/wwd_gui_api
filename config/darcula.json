@@ -23,7 +23,7 @@
     "selected_tab_foreground": "#FFFFFF",
     "h1": {
         "family": "Helvetica",
-        "size": 16,
+        "size": 14,
         "style": "bold"
     },
     "font": {
@@ -41,7 +41,9 @@
         "xpad_m": 4,
         "ypad_m": 7,
         "xpad_l": 5,
-        "ypad_l": 10
+        "ypad_l": 10,
+        "frame_x": 15,
+        "frame_y": 12
     },
     "button": {
         "background": "#4A4A4A",
@@ -59,9 +61,6 @@
       "ypad_s": 2,
       "ypad_m": 5,
       "ypad_l": 10,
-      "xpad": 5,
-      "w_prompt": 110,
-      "w_prompt_s": 85,
-      "h_prompt": 14
+      "xpad": 5
     }
 }

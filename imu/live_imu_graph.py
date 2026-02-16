@@ -1,4 +1,4 @@
-
+"""Live serial plotting of IMU sensor data."""
 
 import numpy  # Import numpy
 import matplotlib.pyplot as plt #import matplotlib library

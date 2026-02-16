@@ -1,4 +1,4 @@
-
+"""Serial port detection and enumeration utilities."""
 
 # import needed modules
 import time
@@ -9,8 +9,8 @@ import glob
 import platform
 
 
-def get_ports(method=None):
-    if method is None:
+def get_ports(method=None, exclude_ports=None):
+    if method is None or method == 0:
         os_name = platform.system()
         if os_name == "Windows":
             method = 1
@@ -23,21 +23,26 @@ def get_ports(method=None):
 
     # METHOD 2: trying to get Linux to work. Search for serial ports in /dev/
     elif method == 2:
-        temp_ports = glob.glob('/dev/tty[A-Za-z]*') # NOTE: this method just prints a fuck ton of ports
+        temp_ports = glob.glob('/dev/tty[A-Za-z]*')
 
         ports = []
         for a_port in temp_ports:
+            # Skip ports with active connections - opening them at default
+            # 9600 baud would corrupt the existing connection's baud rate
+            if exclude_ports and a_port in exclude_ports:
+                ports.append(a_port)
+                continue
 
             try:
                 s = serial.Serial(a_port)
                 s.close()
                 ports.append(a_port)
             except serial.SerialException:
-                pass
+                pass  # Port exists but can't be opened (in use or no permission)
 
     elif method == 3:
-        rm = pyvisa.ResourceManager()
-        ports = rm.list_resources()
+        rm = pyvisa.ResourceManager('@py')
+        ports = [r.replace('\x00', '') for r in rm.list_resources() if not r.startswith('ASRL')]
     else:
         ports = None
 

@@ -1,9 +1,4 @@
-"""
-@file     guiTab_1_mainDashboard.py
-@author   Anders Bandt
-@date
-@brief    main dashboard for ATE control
-"""
+"""Main dashboard tab with overview status and system controls."""
 
 # import needed packages
 import tkinter as tk
@@ -65,7 +60,8 @@ class TabMainDashboard(guic.ThemedFrame):
         self.fr_control = tk.Frame(self, bg=self.theme_config["dark_1"])
         self.fr_relay_control = tk.Frame(self, bg=self.theme_config["light_3"])
 
-        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None)
+        self.fr_main_status = guic.AutoConnFrame(self, self.theme_config, "Relay", self.relay_autoconnect, None,
+                                                        status_cmd=lambda: self.cc.get_relay_status())
 
 
 
@@ -75,11 +71,7 @@ class TabMainDashboard(guic.ThemedFrame):
         self.fr_main_status.status = self.cc.relay.status
 
         # setup prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "Main",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "Main")
 
 
         # initialize tab content
@@ -87,16 +79,22 @@ class TabMainDashboard(guic.ThemedFrame):
 
         # init serial port
         self.ser_obj = None
-        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close)
+        self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "ATE_serial", self.port_init, self.port_close,
+                                                  status_cmd=lambda: self.ser_obj.serStatus if self.ser_obj else False)
         if autoconnect:
             self.fr_port.connect_previous_port()
 
         # place everything on the grid
-        self.fr_main_status.grid(row=1, column=0, padx=30, pady=12)
-        self.fr_control.grid(row=2, column=1, padx=30, pady=12)
-        self.fr_relay_control.grid(row=2, column=0, padx=30, pady=12)
-        self.fr_port.grid(row=1, column=1, padx=30, pady=12)
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.fr_main_status.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_relay_control.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(10, weight=1)
 
         # refresh the relay state
         self.gui_refresh("auto")
@@ -125,17 +123,18 @@ class TabMainDashboard(guic.ThemedFrame):
         # Create and place individual relay control buttons
         for i in range(self.cc.relay.num_relays):
             name = self.cc.relay.get_relay_mapping(i + 1)
-            btn = ttk.Button(fr_m, text=f"{name}", command=lambda i=i: self.toggle_relay(i + 1))
+            btn = tk.Button(fr_m, text=f"{name}", fg=self.theme_config["fg_dark"], bg=self.theme_config["dark_2"],
+                           command=lambda i=i: self.toggle_relay(i + 1))
             btn.grid(row=i // 4 + 1, column=i % 4, padx=10, pady=5)
             self.relay_btns.append(btn)
 
         # add some text with user information
         note = tk.Label(fr_m, text="User note: go to `EEequipment/usbrelay` and edit the `config.ini` file to adjust the naming of these")
         note.grid(row=5, column=0, padx=10, pady=10, columnspan=4)
-        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
+        btn3 = tk.Button(fr_m, text=f"Open `config.ini`", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_5"],
                          command=lambda: self.open_config_ini())
         btn3.grid(row=6, column=0, padx=10, pady=5)
-        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"],
+        btn4 = tk.Button(fr_m, text=f"Open `master.ini`", fg=self.theme_config["fg_dark"], bg=self.theme_config["light_6"],
                          command=lambda: self.open_master_ini())
         btn4.grid(row=6, column=2, padx=10, pady=5)
 
@@ -176,9 +175,9 @@ class TabMainDashboard(guic.ThemedFrame):
         if self.fr_main_status.status:
             for i, btn in enumerate(self.relay_btns):
                 if self.cc.relay.get_state_state(i + 1):
-                    btn.config(style="TButtonOn.TButton")
+                    btn.config(bg=self.theme_config["success"], fg=self.theme_config["fg_dark"])
                 else:
-                    btn.config(style="TButtonOff.TButton")
+                    btn.config(bg=self.theme_config["error"], fg=self.theme_config["fg_dark"])
         else:
             if event == "call":
                 self.prompt.print("Can't refresh relay state with disconnected relay", "error")
@@ -186,12 +185,7 @@ class TabMainDashboard(guic.ThemedFrame):
 
         # update serial status
         self.fr_port.refresh_ports()
-        if self.ser_obj is not None:
-            if self.ser_obj.serStatus is False:
-                self.ser_obj.stop_process()
-                self.fr_port.set_status(False)
-            else:
-                self.fr_port.set_status(True)
+        self.fr_port.gui_refresh()
 
     def relay_autoconnect(self):
         usb_dev = usbrelay_controller.find()

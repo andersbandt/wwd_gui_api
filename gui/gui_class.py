@@ -1,10 +1,4 @@
-"""
-@file     gui_class.py
-@author   Anders Bandt
-@date     July 2024
-@brief    contains Class objects for the Tkinter GUI
-"""
-
+"""Themed Tkinter GUI component classes and utilities."""
 
 
 # import modules
@@ -16,6 +10,7 @@ from tkinter import scrolledtext
 
 import json
 import threading
+import concurrent.futures
 import copy
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -38,7 +33,7 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
         A new dictionary with scaled values
 
     Example:
-        scaled = scale_theme(config, 0.75, "pad.xpad_s", "pad.ypad_s", "size.w_prompt")
+        scaled = scale_theme(config, 0.75, "pad.xpad_s", "pad.ypad_s")
     """
     scaled = copy.deepcopy(theme_cfg)
 
@@ -63,9 +58,6 @@ def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
     return scaled
 
 
-# TODO: (GUI) Claude should audit all the frame spacing and make sure they reference theme_config
-# TODO: (GUI) if not in compact mode make it so prompt goes to the bottom row? and columnspan=4
-# TODO: (GUI) (this should probably get the same pack treatment I did in the logging tab)
 
 
 ##########################################
@@ -89,6 +81,9 @@ class ThemedApp:
         with open(theme_file, 'r') as f:
             self.theme_config = json.load(f)
 
+        # Store compact mode flag so tabs can check it
+        self.theme_config["compact"] = compact
+
         # Save original font size for notebook tabs (before any scaling)
         self.tab_font_size = self.theme_config["font"]["size"]
 
@@ -98,9 +93,8 @@ class ThemedApp:
                 self.theme_config, 0.75,
                 "pad.xpad_s",
                 "pad.ypad_s",
-                "size.w_prompt",
-                "size.h_prompt",
-                #"size.w_prompt_s"
+                "pad.frame_x",
+                "pad.frame_y",
                 "font.size_prompt"
             )
 
@@ -108,7 +102,8 @@ class ThemedApp:
             # NOTE: Notebook tabs are exempt - they use self.tab_font_size
             self.theme_config = scale_theme(
                 self.theme_config, 0.60,
-                "font.size"
+                "font.size",
+                "h1.size"
             )
 
             # Scale button height more aggressively to 45%
@@ -141,26 +136,10 @@ class ThemedApp:
                                    self.theme_config["font"]["size"],
                                    self.theme_config["font"]["style"]))
 
-        # self.style.configure('TGreenButton.TButton',
-        #                      background=self.theme_config["success"],
-        #                      foreground=self.theme_config["button"]["foreground"],
-        #                      font=(self.theme_config["font"]["family"],
-        #                            self.theme_config["font"]["size"],
-        #                            self.theme_config["font"]["style"]))
-        #
-        # self.style.configure('TYellowButton.TButton',
-        #                      background="#F1FA8C",
-        #                      foreground=self.theme_config["fg_dark"],
-        #                      font=(self.theme_config["font"]["family"],
-        #                            self.theme_config["font"]["size"],
-        #                            self.theme_config["font"]["style"]))
 
         self.style.configure("TButtonOn.TButton", background=self.theme_config["success"])
         self.style.configure("TButtonOff.TButton", background=self.theme_config["error"])
 
-        # self.style.map('TButton',
-        #                background=[('active', self.theme_config["button"]["active_background"])],
-        #                foreground=[('active', self.theme_config["button"]["active_foreground"])])
 
         # Configure label styles
         # generic label
@@ -188,6 +167,8 @@ class ThemedApp:
                                    self.theme_config["h1"]["style"]))
 
 
+# NOTE: this thing is mainly used for the tabs and the stuff in `gui_class.py`
+#   it's not currently used for many of of the sub-Frames in tabs
 class ThemedFrame(tk.Frame):
     def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
@@ -199,16 +180,28 @@ class ThemedFrame(tk.Frame):
         self.configure(bg=bg)
 
 
+
 class Prompt(ThemedFrame):
-    def __init__(self, master, theme_config, title, height, width):
-        super().__init__(master, theme_config, height=height, width=width)
+    def __init__(self, master, theme_config, title, height=10, width=80):
+        super().__init__(master, theme_config)
         self.height = height
         self.width = width
         self.set_bg(self.theme_config["light_4"])
+        self.show_timestamps = True
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
-        clear_button = tk.Button(self, text="Clear console", command=self.clear, fg=self.theme_config["fg_light"], bg=self.theme_config["dark_3"])
+
+        # clear button
+        clear_button = tk.Button(self, text="Clear console", command=self.clear,
+                                 bg=self.theme_config["light_1"], fg=self.theme_config["fg_light"])
         clear_button.grid(row=0, column=1, padx=7, pady=4, sticky="ew")
+
+        # toggle timestamps button
+        self.toggle_timestamp_btn = tk.Button(self,
+                                               text="Timestamps: ON",
+                                               command=self.toggle_timestamp,
+                                 bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"])
+        self.toggle_timestamp_btn.grid(row=0, column=2, padx=7, pady=4, sticky="ew")
 
         # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
@@ -220,14 +213,25 @@ class Prompt(ThemedFrame):
                                                 borderwidth=10)
         self.prompt.tag_configure("error", foreground=self.theme_config["error"])
         self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
-        self.prompt.grid(row=1, column=0, columnspan=2, padx=5, pady=3)
+        self.prompt.grid(row=1, column=0, columnspan=3, padx=5, pady=10, sticky="nsew")
+
+        # make it so ScrolledText will stretch
+        self.grid_rowconfigure(1, weight=1)       # row=1 holds the ScrolledText
+        self.grid_columnconfigure(0, weight=1)    # column=0 should stretch
+        self.grid_columnconfigure(1, weight=1)    # since you used columnspan=2
+
 
     # gui_print: prints a message on a Tkinter frame
-    def print(self, message, print_type=None, timestamp=True):
-        prefix = ">>> "
-        if timestamp:
+    def print(self, message, print_type=None, timestamp=None):
+        # function arg override
+        if timestamp is not None:
+            self.toggle_timestamp(state=timestamp)
+
+        if self.show_timestamps:
             time_str = datetime.now().strftime("%H:%M:%S")
             prefix = f"[{time_str}]>>> "
+        else:
+            prefix = ">>> "
 
         message = prefix + message + "\n"
         if print_type == "error":
@@ -237,6 +241,15 @@ class Prompt(ThemedFrame):
 
         self.prompt.see("end")  # Auto-scroll to the end
         return True
+
+    def toggle_timestamp(self, state=None):
+        if state is not None:
+            self.show_timestamps = state
+        else:
+            self.show_timestamps = not self.show_timestamps
+        state = "ON" if self.show_timestamps else "OFF"
+        self.toggle_timestamp_btn.config(text=f"Timestamps: {state}")
+
 
     def clear(self):
         self.prompt.delete("1.0", "end")  # basically line index from
@@ -256,16 +269,62 @@ class ColorCircle(tk.Canvas):
 
 
 ##########################################
+### TOOLTIP                      #########
+##########################################
+
+class Tooltip:
+    """Hover tooltip for any Tkinter widget.
+
+    Usage:
+        Tooltip(some_widget, "This is the help text")
+    """
+    def __init__(self, widget, text, delay=400):
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self.tip_window = None
+        self._after_id = None
+        widget.bind("<Enter>", self._schedule)
+        widget.bind("<Leave>", self._hide)
+
+    def _schedule(self, event=None):
+        self._after_id = self.widget.after(self.delay, self._show)
+
+    def _show(self):
+        if self.tip_window:
+            return
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() + 4
+        y = self.widget.winfo_rooty()
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, justify='left',
+                         background="#ffffe0", relief='solid', borderwidth=1,
+                         font=("TkDefaultFont", "9", "normal"),
+                         wraplength=250)
+        label.pack()
+
+    def _hide(self, event=None):
+        if self._after_id:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
+
+
+##########################################
 ### CONNECTION FRAMES            #########
 ##########################################
 
 class ConnFrame(ThemedFrame):
-    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=None):
         super().__init__(master, theme_config)
         self.master = master
         self.name = name
         self.connect_cmd = connect_cmd
         self.disconnect_cmd = disconnect_cmd
+        self.status_cmd = status_cmd
 
         self.port = None
 
@@ -276,8 +335,8 @@ class ConnFrame(ThemedFrame):
         self.init_base_fr()
 
     def init_base_fr(self):
-        label = ttk.Label(self, text=self.name, style="TPinkLabel.TLabel")
-        label.grid(row=0, column=0, pady=15, padx=10)
+        label = ttk.Label(self, text=self.name, style="TSpunkLabel.TLabel")
+        label.grid(row=0, column=1, pady=2)
 
     def connect(self):
         self.status = self.connect_cmd()
@@ -297,7 +356,8 @@ class ConnFrame(ThemedFrame):
             self.status_oval.set_color(self.theme_config["error"])
 
     def gui_refresh(self):
-        # TODO: in order to detect connection status here I need to also pass in a `status_cmd`
+        if self.status_cmd is not None:
+            self.status = self.status_cmd()
         self.set_status(self.status)
 
     def set_color(self, color):
@@ -305,8 +365,8 @@ class ConnFrame(ThemedFrame):
 
 
 class SerialConnFrame(ConnFrame):
-    def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None):
-        super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd)
+    def __init__(self, master, theme_config, class_controller, name, connect_cmd, disconnect_cmd, port_func=None, status_cmd=None):
+        super().__init__(master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=status_cmd)
         self.cc = class_controller
 
         # set up connection options
@@ -326,27 +386,38 @@ class SerialConnFrame(ConnFrame):
         self.initialize_fr()
 
     def initialize_fr(self):
+        # restore saved port detection method (if available)
+        saved_method = self.cc.get_used_method(self.name)
+        if saved_method is not None:
+            self.port_func = saved_method
+
         # initialize port connection method dropdown
         self.port_func_drop = guih.generate_drop_down(
             self,
             list(self.port_func_options.keys()),
             callback_func=self.set_port_func
         )
-        self.port_func_drop[0].grid(row=0, column=1, padx=3, pady=10)
+        self.port_func_drop[0].grid(row=1, column=1, padx=3, pady=1)
+
+        # set dropdown to match current port_func
+        label = next((k for k, v in self.port_func_options.items() if v == self.port_func), None)
+        if label:
+            self.port_func_drop[1].set(label)
+
+        # initialize port list dropdown
+        active_ports = set(self.cc.active_connections.keys())
+        self.com_drop = guih.generate_drop_down(
+            self,
+            serial_api.get_ports(method=self.port_func, exclude_ports=active_ports)
+        )
+        self.com_drop[0].grid(row=2, column=1, columnspan=1, padx=3, pady=1)
+        self.refresh_ports(first_run=True)
 
         # add Button for refreshing port list
         refresh_button = tk.Button(self, text="Refresh Ports",
                                    command=self.refresh_ports,
                                    fg=self.theme_config["fg_light"], bg=self.theme_config["light_1"])
-        refresh_button.grid(row=1, column=2, pady=1)
-
-        # initialize port list dropdown
-        self.com_drop = guih.generate_drop_down(
-            self,
-            serial_api.get_ports(method=self.port_func)
-        )
-        self.com_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=10)
-        self.refresh_ports(first_run=True)
+        refresh_button.grid(row=2, column=2, pady=1)
 
         # add Buttons for Connect / Disconnect
         btn_connect_serial = tk.Button(self, text="Connect to COM", command=self.connect,
@@ -358,10 +429,10 @@ class SerialConnFrame(ConnFrame):
                                        fg=self.theme_config["error"], bg=self.theme_config["dark_3"],
                                     font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_s"], "bold"),
                                           height=1, width=15)
-        btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=3)
+        btn_disconnect_serial.grid(row=4, column=1, padx=15, pady=1)
 
         # place CONNECT button and STATUS indicator
-        self.status_oval.grid(row=5, column=2, padx=15, pady=3)
+        self.status_oval.grid(row=3, column=2, rowspan=2, padx=15, pady=3)
 
     def connect(self, set_used_port=True):
         # Get the selected port
@@ -377,14 +448,22 @@ class SerialConnFrame(ConnFrame):
             self.gui_refresh()
             return False
 
+        # Register port early so that refresh_ports() (called inside
+        # port_init → gui_refresh) will exclude it from the scan.
+        # Without this, the Linux port-scan method opens the port at 9600
+        # baud which corrupts the active 115200 connection.
+        self.cc.add_active_connection(self.port, self.name)
+
         # Proceed with connection
         super().connect()
 
-        # If connection successful, track it
-        if self.status:
-            self.cc.add_active_connection(self.port, self.name)
+        # If connection failed, roll back the early registration
+        if not self.status:
+            self.cc.remove_active_connection(self.port)
+        else:
             if set_used_port:
                 self.cc.set_used_port(self.port, self.name)
+                self.cc.set_used_method(self.port_func, self.name)
 
         return self.status
 
@@ -401,12 +480,28 @@ class SerialConnFrame(ConnFrame):
         self.port_func = self.port_func_options[selected_label]
         self.refresh_ports(first_run=True)
 
-    def refresh_ports(self, first_run=False):
+    def refresh_ports(self, first_run=False, timeout=5):
+        if self.com_drop is None:
+            return
+
         menu = self.com_drop[0]["menu"]
         menu.delete(0, "end")
 
-        # update port list
-        ports = serial_api.get_ports(method=self.port_func)
+        # Get actively-connected ports so the scan skips them (opening a
+        # port at default 9600 baud would corrupt an existing connection)
+        active_ports = set(self.cc.active_connections.keys())
+
+        # update port list (with timeout to prevent GUI freeze)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(serial_api.get_ports, method=self.port_func, exclude_ports=active_ports)
+            try:
+                ports = future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                ports = []
+                print(f"WARNING: Port scan timed out after {timeout}s")
+
+        if not ports:
+            ports = []
 
         # add each port name to the drop-down menu
         for string in ports:
@@ -456,9 +551,9 @@ class SerialConnFrame(ConnFrame):
 
 
 class AutoConnFrame(ConnFrame):
-    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd):
+    def __init__(self, master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=None):
         self.master = master
-        super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd)
+        super().__init__(self.master, theme_config, name, connect_cmd, disconnect_cmd, status_cmd=status_cmd)
 
     def init_fr(self):
         self.status_oval.grid(row=1, column=2, padx=15, pady=22)

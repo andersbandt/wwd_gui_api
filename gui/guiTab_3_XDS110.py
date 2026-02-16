@@ -1,9 +1,4 @@
-"""
-@file     guiTab_5_USB.py
-@author   Anders Bandt
-@date     March 2024
-@brief    control device through serial (COM) port
-"""
+"""XDS110 JTAG debug probe interface tab."""
 
 # import needed packages
 import time
@@ -16,6 +11,7 @@ import os
 from EEequipment.xds110 import xds110_api as xds110
 from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
+from common.path_helper import get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
@@ -28,7 +24,6 @@ class tabXDS110(guic.ThemedFrame):
         self.cc = class_controller
         self.grid(row=0, column=0)
         self.basefilepath = basefilepath
-        self.command_active = 0
         self.after_call_id = None
 
         # print welcome text_data
@@ -37,20 +32,20 @@ class tabXDS110(guic.ThemedFrame):
         l1.grid(column=0, row=0)
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "XDS110 Comms",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=30, pady=12)
+        self.prompt = guic.Prompt(self, self.theme_config, "XDS110 Comms")
+        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(10, weight=1)
 
         # init frames within tab
         self.fr_xds110 = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_xds110.grid(row=1, column=0, padx=30, pady=12)
+        self.fr_xds110.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_firmware = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_firmware.grid(row=1, column=2, padx=30, pady=12, rowspan=2)
+        self.fr_firmware.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], rowspan=2)
         self.fr_target = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_target.grid(row=2, column=0, padx=30, pady=12)
+        self.fr_target.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
         # add some other GUI variables
         self.status_xds110 = ColorCircle(self.fr_xds110, width=50, height=50, bg=self.theme_config["bg_dark"])
@@ -63,7 +58,7 @@ class tabXDS110(guic.ThemedFrame):
         self.initTabContent()
 
         # load target settings
-        self.parse_target_config("master.ini") #tag:HARDCODE
+        self.parse_target_config(get_config_path())
 
     def initTabContent(self):
         print("Initializing tab 4 (XDS110) content")
@@ -71,19 +66,30 @@ class tabXDS110(guic.ThemedFrame):
         self.init_fr_target()
         self.init_fr_firmware()
 
+    def _run_in_thread(self, func, button):
+        """Disable button, run func in a background thread, re-enable when done."""
+        button.config(state="disabled")
+        def wrapper():
+            try:
+                func()
+            finally:
+                self.after(0, lambda: button.config(state="normal"))
+        threading.Thread(target=wrapper).start()
+
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
-        btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check", command=lambda: threading.Thread(target=self.check_xds110).start())
-        btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
+        self.btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check",
+                                          command=lambda: self._run_in_thread(self.check_xds110, self.btn_check_xds110))
+        self.btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
         self.status_xds110.grid(row=3, column=2, padx=15, pady=22)
 
     def init_fr_target(self):
         # ROW 1 + 2
         # TARGET - BUTTON/STATUS
-        btn_check_target = Button(self.fr_target, text="Target check",
-                                  command=lambda: threading.Thread(target=self.check_target).start(),
+        self.btn_check_target = Button(self.fr_target, text="Target check",
+                                  command=lambda: self._run_in_thread(self.check_target, self.btn_check_target),
                                   bg=self.theme_config["dark_2"], fg=self.theme_config["fg_light"], height=2, width=15)
-        btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
+        self.btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
         self.status_target.grid(row=1, column=2, rowspan=2, padx=15, pady=22)
 
         # TARGET VOLTAGE
@@ -99,10 +105,10 @@ class tabXDS110(guic.ThemedFrame):
                         offvalue=0).grid(row=2, column=3)
 
         # ROW 3
-        btn_toggle_target = Button(self.fr_target, text="Toggle target",
-                                   command=lambda: threading.Thread(target=self.toggle_target).start(),
+        self.btn_toggle_target = Button(self.fr_target, text="Toggle target",
+                                   command=lambda: self._run_in_thread(self.toggle_target, self.btn_toggle_target),
                                    bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"], height=2, width=15)
-        btn_toggle_target.grid(row=3, column=2, padx=15, pady=22)
+        self.btn_toggle_target.grid(row=3, column=2, padx=15, pady=22)
         self.toggle_drop = guih.generate_drop_down(
             self.fr_target,
             ["toggle", "assert", "deassert"]
@@ -119,13 +125,13 @@ class tabXDS110(guic.ThemedFrame):
         self.flashStatus = ColorCircle(fr_m, width=60, height=60, bg=self.theme_config["bg_dark"])
 
         # place buttons
-        btn_build_firmware = Button(fr_m, text="Build firmware",
-                                    command=lambda: threading.Thread(target=self.build_firmware).start(),
+        self.btn_build_firmware = Button(fr_m, text="Build firmware",
+                                    command=lambda: self._run_in_thread(self.build_firmware, self.btn_build_firmware),
                                     bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=2,
                                     width=20)
 
-        btn_flash_firmware = Button(fr_m, text="Load firmware",
-                                    command=lambda: threading.Thread(target=self.flash_firmware).start(),
+        self.btn_flash_firmware = Button(fr_m, text="Load firmware",
+                                    command=lambda: self._run_in_thread(self.flash_firmware, self.btn_flash_firmware),
                                     bg=self.theme_config["light_1"], fg=self.theme_config["fg_light"], height=2,
                                     width=20)
         load_config = Button(fr_m, text="Load configuration",
@@ -165,7 +171,7 @@ class tabXDS110(guic.ThemedFrame):
                                             offvalue=0)
 
         # place the usable objects with .grid()
-        btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
+        self.btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
         self.buildStatus.grid(row=1, column=1)
         ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2, column=0, padx=10, pady=15)
         self.entry_timesleep.grid(row=2, column=1)
@@ -175,7 +181,7 @@ class tabXDS110(guic.ThemedFrame):
         self.checkToggle.grid(row=5, column=2)
         self.targetConfig_drop[0].grid(row=2, column=2, padx=6, pady=10)
         self.serialNumber_drop[0].grid(row=3, column=2, pady=2)
-        btn_flash_firmware.grid(row=6, column=0, padx=15, pady=22)
+        self.btn_flash_firmware.grid(row=6, column=0, padx=15, pady=22)
         self.flashStatus.grid(row=6, column=1, padx=15, pady=22)
         self.defaultTarget_drop[0].grid(row=7, column=0, pady=2)
         load_config.grid(row=7, column=1, padx=15, pady=22)
@@ -288,7 +294,7 @@ class tabXDS110(guic.ThemedFrame):
         # toggle power
         if self.var_toggle.get():
             self.turn_power_off(flash_option)
-            time.sleep(6) # wait 6 seconds before powerup again. tag:HARDCODE_VAR
+            time.sleep(self.toggle_power_delay)
         # turn on power
         power_status = self.turn_power_on(flash_option)
         if power_status is False:
@@ -349,16 +355,15 @@ class tabXDS110(guic.ThemedFrame):
     def autoload_config(self):
         cfg = self.defaultTarget_drop[1].get()
         print(f"Autoloading with config num: {cfg}")
-        self.parse_target_config(f"{cfg}.ini")
+        self.parse_target_config(os.path.join("config", f"{cfg}.ini"))
 
 
     ##############################################################################
     ####      HELPER FUNCTIONS        ############################################
     ##############################################################################
 
-    def parse_target_config(self, filename):
+    def parse_target_config(self, config_file_path):
         # initialize the config parser
-        config_file_path = "config/" + filename
         if os.path.exists(config_file_path):
             config = configparser.ConfigParser()
             config.read(config_file_path)
@@ -372,6 +377,7 @@ class tabXDS110(guic.ThemedFrame):
         debug_config = int(config["Target"]["debug_config"])
         self.device_vdds = float(config["Target"]["vdds"])
         self.device_usb_relay = int(config["Target"]["usb_relay"])
+        self.toggle_power_delay = int(config["Target"].get("toggle_power_delay", "6"))
 
         self.targetConfig_drop[1].set(self.tg_opt[power_type])
         self.serialNumber_drop[1].set(self.db_opt[debug_config])

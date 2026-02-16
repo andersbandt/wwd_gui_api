@@ -1,9 +1,4 @@
-"""
-@file     logger.py
-@author   Anders Bandt
-@date     April 2024
-@brief    handle logging of application to output files
-"""
+"""Data logging configuration and CSV/text file output."""
 
 # import needed modules
 from common import csv_helper as csvh
@@ -46,6 +41,36 @@ COL_STIM_PS_VOLTAGE = "PS_Voltage"
 COL_STIM_FG_FREQUENCY = "FG_Frequency"
 COL_STIM_FG_DUTY_CYCLE = "FG_Duty_Cycle"
 COL_STIM_FALLBACK = "Stimulus_Value"
+
+# Oscilloscope measurement names (match DSOX4104A driver method suffixes)
+AVAILABLE_OSC_MEASUREMENTS = [
+    "frequency",
+    "period",
+    "duty_cycle",
+    "vpp",
+    "vmax",
+    "vmin",
+    "vavg",
+    "vrms",
+    "amplitude",
+    "rise_time",
+    "fall_time",
+]
+
+# Human-readable labels for OSC measurements
+OSC_MEASUREMENT_LABELS = {
+    "frequency": "Frequency",
+    "period": "Period",
+    "duty_cycle": "Duty Cycle",
+    "vpp": "Vpp",
+    "vmax": "Vmax",
+    "vmin": "Vmin",
+    "vavg": "Vavg",
+    "vrms": "Vrms",
+    "amplitude": "Amplitude",
+    "rise_time": "Rise Time",
+    "fall_time": "Fall Time",
+}
 
 
 #################################
@@ -92,15 +117,79 @@ def append_text(filename, data):
 #################################################
 
 @dataclass
+class OscRecordConfig:
+    """Per-channel measurement selection for oscilloscope recording."""
+    channels: dict = None  # {1: ["frequency", "vpp", "vrms"], 3: ["vpp"]}
+
+    def __post_init__(self):
+        if self.channels is None:
+            self.channels = {}
+
+    def has_measurements(self):
+        """Return True if any measurements are configured."""
+        return any(len(meas) > 0 for meas in self.channels.values())
+
+    def summary(self) -> str:
+        """Return a short summary string like 'CH1: 3 meas, CH3: 1 meas'"""
+        parts = []
+        for ch in sorted(self.channels.keys()):
+            meas = self.channels[ch]
+            if meas:
+                parts.append(f"CH{ch}: {len(meas)} meas")
+        return ", ".join(parts) if parts else "(none)"
+
+
+def build_osc_columns(osc_config: OscRecordConfig):
+    """Build ordered list of CSV column names for oscilloscope measurements.
+
+    Returns column names like 'OSC_CH1_Frequency', 'OSC_CH2_Vpp', etc.
+    """
+    columns = []
+    if osc_config is None:
+        return columns
+    for ch in sorted(osc_config.channels.keys()):
+        for meas_name in osc_config.channels[ch]:
+            label = OSC_MEASUREMENT_LABELS.get(meas_name, meas_name)
+            columns.append(f"OSC_CH{ch}_{label}")
+    return columns
+
+
+def collect_osc_measurements(osc, osc_config: OscRecordConfig):
+    """Call the oscilloscope driver for each configured measurement.
+
+    Args:
+        osc: DSOX4104A driver instance (or compatible)
+        osc_config: OscRecordConfig with channel/measurement selections
+
+    Returns:
+        dict mapping column name -> measured value
+    """
+    row = {}
+    if osc_config is None:
+        return row
+    for ch in sorted(osc_config.channels.keys()):
+        for meas_name in osc_config.channels[ch]:
+            label = OSC_MEASUREMENT_LABELS.get(meas_name, meas_name)
+            col = f"OSC_CH{ch}_{label}"
+            try:
+                method = getattr(osc, f"measure_{meas_name}")
+                row[col] = method(ch)
+            except Exception:
+                row[col] = "ERROR"
+    return row
+
+
+@dataclass
 class RecordConfig:
     use_ser: bool = False
     use_dmm: bool = False
     use_ps: bool = False
     use_fg: bool = False
-    # TODO: rename below back to ps_channel because I'm an idiot
-    channel: int = 1  # will be set to 2 if user confirms and PS supports it
+    use_osc: bool = False
+    ps_channel: int = 1
     serial_params: str = None
     make_graph: bool = False
+    osc_config: OscRecordConfig = None
 
     def pretty(self) -> str:
         """
@@ -112,9 +201,12 @@ class RecordConfig:
             "Use DMM": self.use_dmm,
             "Use Power Supply (PS)": self.use_ps,
             "Use Function Generator (FG)": self.use_fg,
-            "Channel": self.channel,
+            "Use Oscilloscope (OSC)": self.use_osc,
+            "Channel": self.ps_channel,
             "Serial Params": self.serial_params or "(not set)",
         }
+        if self.use_osc and self.osc_config:
+            display["OSC Measurements"] = self.osc_config.summary()
 
         # Compute column width for neat alignment
         key_width = max(len(k) for k in display.keys())
@@ -133,14 +225,17 @@ class RecordConfig:
         print(self.pretty())
 
 
-def create_record_config(use_ser, use_dmm, use_ps, use_fg, channel, serial_params, make_graph):
+def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channel, serial_params, make_graph,
+                         use_osc=False, osc_config=None):
     config = RecordConfig(use_ser=use_ser,
                           use_dmm=use_dmm,
                           use_ps=use_ps,
                           use_fg=use_fg,
-                          channel=channel,
+                          use_osc=use_osc,
+                          ps_channel=ps_channel,
                           serial_params=serial_params,
-                          make_graph=make_graph)
+                          make_graph=make_graph,
+                          osc_config=osc_config)
     return config
 
 
@@ -417,7 +512,7 @@ def get_stimulus_label(stimulus_type: StimulusType) -> str:
     return label_map.get(stimulus_type, "Stimulus")
 
 
-def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig = None):
+def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig = None, math_config=None):
     # SETUP CSV HEADER PARAMETERS
     headers = [COL_TIME]
 
@@ -445,6 +540,10 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
     if record_config.use_fg:
         headers += [COL_FG_FREQ, COL_FG_WAVEFORM]
 
+    # Oscilloscope selected?
+    if record_config.use_osc and record_config.osc_config:
+        headers += build_osc_columns(record_config.osc_config)
+
     # Stimulus columns (if stimulus mode enabled)
     if stimulus_config:
         if isinstance(stimulus_config, DualStimulusConfig) and stimulus_config.enabled:
@@ -455,6 +554,10 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
             param_name = get_stimulus_column_name(stimulus_config.stimulus_type)
             headers += [param_name, COL_STIMULUS_STEP]
 
+    # Math columns (user-defined computed columns)
+    if math_config is not None and not math_config.is_empty():
+        headers += math_config.get_column_names()
+
     return headers
 
 
@@ -462,7 +565,8 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
 # Orchestrator (single call)
 # ---------------------------
 
-def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig, stimulus_config: StimulusConfig = None):
+def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordConfig,
+                     stimulus_config: StimulusConfig = None, math_config=None):
     """
     High-level setup that:
       1) Creates the filename
@@ -471,7 +575,7 @@ def setup_recording(data_dir: str, prefix: str, ext_text: str, config: RecordCon
     Returns: (filename, headers, csv_helper, updated_config)
     """
     rec_name = build_log_name(prefix, ext_text, "csv")
-    headers = build_headers(config, stimulus_config)
+    headers = build_headers(config, stimulus_config, math_config=math_config)
     csvobj = csvh.init_csvh(data_dir, rec_name, headers)
     return rec_name, csvobj
 

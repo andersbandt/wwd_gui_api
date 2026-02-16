@@ -1,5 +1,8 @@
+"""Central controller that holds references to all connected equipment."""
 
 import xml.etree.ElementTree as ET
+
+from services import DMMService, PSService, FGService, OscService
 
 
 class ClassController:
@@ -9,12 +12,19 @@ class ClassController:
         self.ps = None
         self.relay = None
         self.fg = None
+        self.osc = None
 
         # Recording status flag - set by logging tab to prevent gui_refresh during active recording
         self.recording = False
 
         self.ports_used = {}  # Tracks last used ports (for XML config)
         self.active_connections = {}  # Tracks currently active connections {port: usage_name}
+
+        # Equipment services (tabs set registries during their init)
+        self.dmm_service = DMMService(self)
+        self.ps_service = PSService(self)
+        self.fg_service = FGService(self)
+        self.osc_service = OscService(self)
 
     def set_ser(self, ser):
         self.ser = ser
@@ -30,6 +40,9 @@ class ClassController:
 
     def set_fg(self, fg):
         self.fg = fg
+
+    def set_osc(self, osc):
+        self.osc = osc
 
     def get_ser_status(self):
         if self.ser is None:
@@ -60,6 +73,12 @@ class ClassController:
             return False
         else:
             return self.fg.status
+
+    def get_osc_status(self):
+        if self.osc is None:
+            return False
+        else:
+            return self.osc.status
 
     def set_used_port(self, port, usage):
         """
@@ -171,6 +190,41 @@ class ClassController:
             model = usage_element.get("model")
             return model
 
+        return None
+
+    def set_used_method(self, method, usage):
+        """Save the port detection method for a specific tab/usage as an XML attribute."""
+        try:
+            tree = ET.parse("config/ports_used.xml")
+            root = tree.getroot()
+        except (FileNotFoundError, ET.ParseError):
+            root = ET.Element("PortsUsed")
+            tree = ET.ElementTree(root)
+
+        usage_element = root.find(usage)
+        if usage_element is None:
+            usage_element = ET.SubElement(root, usage)
+            usage_element.text = ""
+
+        usage_element.set("method", str(method))
+
+        ET.indent(root, space="    ", level=0)
+        with open("config/ports_used.xml", "wb") as xml_file:
+            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
+
+    def get_used_method(self, usage):
+        """Retrieve the saved port detection method for a specific tab/usage."""
+        try:
+            tree = ET.parse("config/ports_used.xml")
+            root = tree.getroot()
+        except (FileNotFoundError, ET.ParseError):
+            return None
+
+        usage_element = root.find(usage)
+        if usage_element is not None:
+            method = usage_element.get("method")
+            if method is not None:
+                return int(method)
         return None
 
     def add_active_connection(self, port, usage):

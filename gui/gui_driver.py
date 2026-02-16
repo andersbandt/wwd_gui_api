@@ -1,9 +1,4 @@
-"""
-@file     gui_driver.opy
-@author   Anders Bandt
-@date     April 2024
-@brief    critical GUI code to launch Tkinter notebook
-"""
+"""Creates the Tkinter window and launches the main notebook interface."""
 
 
 # import needed packages
@@ -13,11 +8,13 @@ import os
 import time
 import configparser
 
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
+from common.path_helper import get_config_path
 from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_DMM
@@ -28,11 +25,14 @@ from gui import guiTab_6_FG
 from gui import guiTab_7_ATE
 from gui import guiTab_8_LOG
 from gui import guiTab_9_GRAPH
+from gui import guiTab_10_OSC
+
+NUM_TABS = 10 # tag:HARDCODE
 
 
 def parse_autoconnect_config():
     # initialize the config parser
-    config_file_path = "config/master.ini" # tag:HARDCODE
+    config_file_path = get_config_path()
     if os.path.exists(config_file_path):
         config = configparser.ConfigParser()
         config.read(config_file_path)
@@ -46,7 +46,7 @@ def parse_autoconnect_config():
 
     # read in parameters from the config file
     autoconn_vars = []
-    for i in range(1, 10): #tag:HARDCODE
+    for i in range(1, NUM_TABS + 1):
         tmp = config["AUTOCONNECT"][f"tab_{i}"]
         if tmp.strip().upper() == "YES":
             autoconn_vars.append(True)
@@ -62,8 +62,8 @@ def parse_theme_config():
     Returns:
         str: Path to the theme file (e.g., "config/darcula.json")
     """
-    config_file_path = "config/master.ini"
-    default_theme = "config/darcula.json"
+    config_file_path = get_config_path()
+    default_theme = "config/darcula.json" # tag:HARDCODE - but not really an issue because this is fallback if read from config file fails
 
     if not os.path.exists(config_file_path):
         print(f"Configuration file {config_file_path} does not exist. Using default theme.")
@@ -122,7 +122,7 @@ class MainApplication(ThemedApp):
         if self.autoconnect:
             autoconnect = parse_autoconnect_config()
         else:
-            autoconnect = [False for i in range(10)] # tag:HARDCODE (should be same in as one in `parse_autoconnect_config`
+            autoconnect = [False] * (NUM_TABS + 1)
 
 
         # create Tab objects
@@ -135,16 +135,19 @@ class MainApplication(ThemedApp):
         self.tab7 = guiTab_7_ATE.TabATE(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[6])
         self.tab8 = guiTab_8_LOG.TabLog(self.nb, self.controller, self.basefilepath, self.theme_config)
         self.tab9 = guiTab_9_GRAPH.TabGraph(self.nb, self.controller, self.basefilepath, self.theme_config)
+        self.tab10 = guiTab_10_OSC.TabOSC(self.nb, self.controller, self.basefilepath, self.theme_config, autoconnect[9])
 
         # Define an array of tab names
-        self.tab_names = ["MAIN", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "FG Control", "ATE", "Logger", "GRAPH"]
-        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8, self.tab9]
+        self.tab_names = ["MAIN", "DMM Control", "XDS110 JTAG", "USB COMM", "PS Control", "FG Control", "ATE", "Logger", "GRAPH", "OSC Control"]
+        tabs = [self.tab1, self.tab2, self.tab3, self.tab4, self.tab5, self.tab6, self.tab7, self.tab8, self.tab9, self.tab10]
 
         # Add tabs dynamically using a loop
         for tab, name in zip(tabs, self.tab_names):
             self.nb.add(tab, text=name)
 
-        self.nb.grid(column=0, row=0)
+        self.nb.grid(column=0, row=0, sticky="nsew")
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
         return True
 
     def on_tab_changed(self, event):
@@ -168,6 +171,8 @@ class MainApplication(ThemedApp):
             guiTab_7_ATE.TabATE.gui_refresh(self.tab7, "auto")
         elif selected_tab == self.tab_names[7]:
             guiTab_8_LOG.TabLog.gui_refresh(self.tab8, "auto")
+        elif selected_tab == self.tab_names[9]:
+            guiTab_10_OSC.TabOSC.gui_refresh(self.tab10, "auto")
 
 
 ###########################################################
@@ -179,7 +184,7 @@ def main(autoconnect, force_compact=False):
     print("Executing main function of gui_driver.py")
 
     # tag:HARDCODE
-    desired_w = 1300
+    desired_w = 1350
     desired_h = 900
     margin_w = 50
     margin_h = 125
@@ -212,7 +217,6 @@ def main(autoconnect, force_compact=False):
     x = 20
     y = 20
 
-
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
     # load theme configuration
@@ -237,9 +241,16 @@ def main(autoconnect, force_compact=False):
     # disconnect all active connections in `class_controller.py`
     if app.controller.ps is not None:
         print("Disconnect from power supply (and turning outputs off)")
-        app.controller.ps.output_off(1)
-        app.controller.ps.output_off(2)
-        app.controller.ps.disconnect()
+        try:
+            app.controller.ps.output_off(1)
+            app.controller.ps.output_off(2)
+        except COMMUNICATION_ERRORS:
+            print("Failed to turn off power supply due to IO error")
+        try:
+            app.controller.ps.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            print("Failed to disconnect from power supply due to IO error (see below line)")
+            print(e)
 
     if app.controller.dmm is not None:
         print("Disconnect from DMM")
@@ -248,6 +259,13 @@ def main(autoconnect, force_compact=False):
     if app.controller.fg is not None:
         print("Disconnect from FG")
         app.controller.fg.disconnect()
+
+    if app.controller.osc is not None:
+        print("Disconnect from OSC")
+        try:
+            app.controller.osc.disconnect()
+        except COMMUNICATION_ERRORS as e:
+            print(f"Failed to disconnect from OSC: {e}")
 
     if app.controller.relay is not None:
         app.controller.relay.open_all()

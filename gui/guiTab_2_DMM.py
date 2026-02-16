@@ -1,25 +1,20 @@
-"""
-@file     guiTab_3_DMM.py
-@author   Anders Bandt
-@date     May 2024
-@brief    control multimeter test equipment
-"""
+"""Digital multimeter control and data acquisition tab."""
 
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
-import time
 import configparser
-from datetime import datetime
 
 # import user defined modules
 from EEequipment import equipment_manager
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+from common.path_helper import get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
+
+
+
 
 
 
@@ -35,8 +30,7 @@ class TabDMM(guic.ThemedFrame):
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
 
-        # set up serial / DMM variables
-        self.dmm = None
+        # set up DMM variables
         self.dmm_id = None
         self.dmm_Auto = ''
         self.dmm_Range = ''
@@ -50,11 +44,7 @@ class TabDMM(guic.ThemedFrame):
         self.default_sample_speed = self.load_dmm_config()
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                   "DMM Console Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "DMM Console Output")
 
         # initialize tab content
         self.initTabContent()
@@ -67,7 +57,8 @@ class TabDMM(guic.ThemedFrame):
             "DMM_Serial",
             self.port_init,
             self.port_close,
-            port_func=3
+            port_func=3,
+            status_cmd=lambda: self.cc.get_dmm_status()
         )
         self.fr_port.initialize_fr()
         if autoconnect:
@@ -75,15 +66,19 @@ class TabDMM(guic.ThemedFrame):
 
 
         # place Frames into grid
-        self.fr_info.grid(row=0, column=0, padx=10, pady=10, sticky='W')
-        self.fr_control.grid(row=0, column=1, pady=10, padx=10)
-        self.fr_port.grid(row=0, column=2, padx=30, pady=12)
-        self.prompt.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky='W')
+        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='W')
+        self.fr_control.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_port.grid(row=0, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=1, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='NSEW')
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
 
     def load_dmm_config(self):
         """Load DMM configuration from master.ini"""
         config = configparser.ConfigParser()
-        config.read("config/master.ini")
+        config.read(get_config_path())
 
         # Get sample speed with default fallback
         sample_speed = "fast"  # Default value
@@ -112,6 +107,7 @@ class TabDMM(guic.ThemedFrame):
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("dmm")
+        self.cc.dmm_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -207,12 +203,12 @@ class TabDMM(guic.ThemedFrame):
         if not self.fr_port.status:
             return
 
-        self.dmm_Meas1 = self.dmm.read_value()
+        self.dmm_Meas1 = self.cc.dmm.read_value()
         self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
 
         if kind == "full":
-            self.dmm_Range = self.dmm.get_range()
-            self.dmm_Fu1 = self.dmm.get_mode()
+            self.dmm_Range = self.cc.dmm.get_range()
+            self.dmm_Fu1 = self.cc.dmm.get_mode()
 
         # update Label
         if self.fr_port.status:
@@ -246,22 +242,22 @@ class TabDMM(guic.ThemedFrame):
             self.meas1_scale = 1
 
     def dmm_set_mode(self):
-        if self.dmm is not None:
+        if self.cc.dmm is not None:
             mode = self.mode_drop[1].get()
             self.prompt.print(f"Setting DMM mode to {mode}")
-            self.dmm.set_mode(mode)
+            self.cc.dmm.set_mode(mode)
 
     def dmm_set_range(self):
-        if self.dmm is not None:
+        if self.cc.dmm is not None:
             dmm_range = self.range_drop[1].get()
             self.prompt.print(f"Setting DMM range to {dmm_range}")
-            self.dmm.set_range(dmm_range)
+            self.cc.dmm.set_range(dmm_range)
 
     def dmm_set_sample(self):
-        if self.dmm is not None:
+        if self.cc.dmm is not None:
             sample_speed = self.sample_drop[1].get()
             self.prompt.print(f"Setting DMM sample speed to {sample_speed}")
-            self.dmm.set_sample_speed(sample_speed)
+            self.cc.dmm.set_sample_speed(sample_speed)
 
 
     #################################
@@ -271,55 +267,32 @@ class TabDMM(guic.ThemedFrame):
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.dmm_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-        self.dmm = ate_temp(self.fr_port.get_port())
-
-        time.sleep(1)
-
-        try:
-            self.dmm_id = self.dmm.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to DMM", e, "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to DMM", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        # BAD ID received
-        if self.dmm_id == '' or self.dmm_id is None:
-            self.prompt.print("Connection failed")
-            self.dmm = None
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
-        # GOOD ID received
-        else:
-            self.prompt.print("Connected to DMM")
-            self.prompt.print(f"Got id: {self.dmm_id}")
-            self.cc.set_dmm(self.dmm)
+        self.prompt.print(f"Connected to DMM with id: {result.device_id}")
+        self.cc.dmm.set_sample_speed(self.default_sample_speed)
+        self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
 
-            # Set sample speed from config
-            self.cc.dmm.set_sample_speed(self.default_sample_speed)
-            self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
+        self.gui_refresh("call")
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.labelIDValue.config(text=result.device_id)
+        self.fr_port.set_status(True)
 
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "DMM_Serial")
-
-            self.gui_refresh("call")
-            self.labelTimeConnectedValue.config(
-                text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-            )
-            self.labelIDValue.config(text=self.dmm_id)
-            self.fr_port.set_status(True)
-            return True
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
-        # NOTE: added this Exception because we might call this after app is destroyed
-        try:
-            self.prompt.print(f"Serial close!")
-        except tk.TclError:
-            pass
-
-        self.dmm.disconnect()
+        self.prompt.print("Closing DMM resource!")
+        result = self.cc.dmm_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect DMM", result.error, "warning")
         self.fr_port.set_status(False)
 

@@ -1,18 +1,11 @@
-"""
-@file     guiTab_9_FG.py
-@author   Anders Bandt
-@date     January 2025
-@brief    control function generator test equipment
-"""
+"""Function generator control tab."""
 
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
 import time
-from datetime import datetime
 
 # import user defined modules
 from common import path_helper
@@ -51,19 +44,19 @@ class TabFG(guic.ThemedFrame):
         self.data_dir = path_helper.get_full_data_path(subdir="fg_data")
 
         # set up prompt
-        self.prompt = guic.Prompt(self,
-                                  self.theme_config,
-                                  "FG Console Output",
-                                  height=self.theme_config["size"]["h_prompt"],
-                                  width=self.theme_config["size"]["w_prompt"])
+        self.prompt = guic.Prompt(self, self.theme_config, "FG Console Output")
 
         # initialize tab content
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0)
-        self.fr_control.grid(row=1, column=0)
-        self.prompt.grid(row=1, column=1)
+        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -72,10 +65,11 @@ class TabFG(guic.ThemedFrame):
                                             "FG_PyVISA",
                                             self.port_init,
                                             self.port_close,
-                                            port_func=3)
+                                            port_func=3,
+                                            status_cmd=lambda: self.cc.get_fg_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=15, pady=15)
+        self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
         print("Initializing tab 9 (FG) content")
@@ -88,6 +82,7 @@ class TabFG(guic.ThemedFrame):
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("fg")
+        self.cc.fg_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -365,51 +360,33 @@ class TabFG(guic.ThemedFrame):
 
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
-        self.prompt.print("Connect to PYVISA resource!")
+        self.prompt.print("Connect to PyVISA resource!")
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.fg_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-        self.cc.set_fg(ate_temp(self.fr_port.get_port()))
-
-        try:
-            self.id = self.cc.fg.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to FG", str(e), "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to FG", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        if self.id:  # CONNECTION SUCCESS
-            # NOTE: re-initialize the frames in case anything like channel count, etc. needs different GUI elements
-            self.init_fr_info()
-            self.init_fr_control()
+        self.init_fr_info()
+        self.init_fr_control()
 
-            # start doing stuff
-            self.prompt.print(f"Connected to FG with id: {self.id}")
-            self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
-            self.fr_port.set_status(True)
+        self.prompt.print(f"Connected to FG with id: {result.device_id}")
+        self.labelIDValue.config(text=result.device_id)
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.set_status(True)
+        self.output_on = False
 
-            # turn output off initially
-            self.output_on = False
-            try:
-                self.cc.fg.write("OUTPut OFF")
-            except Exception:
-                pass  # Some FGs may not support this command
-
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "FG_PyVISA")
-
-            return True
-        else:  # BAD ID received
-            self.cc.set_fg(None)
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
-        self.prompt.print(f"Closing PYVISA resource!")
-        self.cc.fg.disconnect()
+        self.prompt.print("Closing FG resource!")
+        result = self.cc.fg_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect FG", result.error, "warning")
         self.fr_port.set_status(False)
-        self.cc.set_fg(None)
-        self.prompt.print(f"Connection is closed.")

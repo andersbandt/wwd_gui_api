@@ -2,6 +2,8 @@
 
 import xml.etree.ElementTree as ET
 
+from services import DMMService, PSService, FGService, OscService
+
 
 class ClassController:
     def __init__(self):
@@ -17,6 +19,12 @@ class ClassController:
 
         self.ports_used = {}  # Tracks last used ports (for XML config)
         self.active_connections = {}  # Tracks currently active connections {port: usage_name}
+
+        # Equipment services (tabs set registries during their init)
+        self.dmm_service = DMMService(self)
+        self.ps_service = PSService(self)
+        self.fg_service = FGService(self)
+        self.osc_service = OscService(self)
 
     def set_ser(self, ser):
         self.ser = ser

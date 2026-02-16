@@ -3,15 +3,12 @@
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
 import time
-from datetime import datetime
 
 # import user defined modules
 from EEequipment import equipment_manager
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -90,6 +87,7 @@ class TabPS(guic.ThemedFrame):
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("ps")
+        self.cc.ps_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -358,57 +356,38 @@ class TabPS(guic.ThemedFrame):
 
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
-        self.prompt.print("Connect to PYVISA resource!")
+        self.prompt.print("Connect to PyVISA resource!")
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.ps_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-        self.cc.set_ps(ate_temp(self.fr_port.get_port()))
-
-        try:
-            self.id = self.cc.ps.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to PS", e, "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to PS", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        if self.id:  # CONNECTION SUCCESS
-            # Save the selected model BEFORE re-init (which recreates the dropdown)
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "PS_PyVISA")
+        self.channel_count = self.cc.ps.channel_count
+        self.init_fr_info()
+        self.init_fr_control()
+        self.init_fr_status()
 
-            self.channel_count = self.cc.ps.channel_count
+        self.prompt.print(f"Connected to PS with id: {result.device_id}")
+        self.labelIDValue.config(text=result.device_id)
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.set_status(True)
 
-            # re-initialize channel count dependent frames
-            self.init_fr_info()
-            self.init_fr_control()
-            self.init_fr_status()
+        self.ch1_on = 0
+        self.ch2_on = 0
+        self.gui_refresh_channel_state()
 
-            # start doing stuff
-            self.prompt.print(f"Connected to PS with id: {self.id}")
-            self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
-            self.fr_port.set_status(True)
-
-            # turn channels off and set voltages
-            self.cc.ps.output_off(1)
-            self.cc.ps.output_off(2)
-            self.ch1_on = 0
-            self.ch2_on = 0
-
-            # gui_refresh
-            self.gui_refresh_channel_state()
-            return True
-        else:  # BAD ID received
-            self.cc.set_ps(None)
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
-        self.prompt.print(f"Closing PS resource!")
-        try:
-            self.cc.ps.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't disconnect PS", e, "warning")
+        self.prompt.print("Closing PS resource!")
+        result = self.cc.ps_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect PS", result.error, "warning")
         self.fr_port.set_status(False)
-        self.cc.set_ps(None)

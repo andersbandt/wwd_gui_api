@@ -18,7 +18,7 @@
 ## Open Tasks
 
 
-### 8. Add Unit Tests
+### 1. Add Unit Tests
 - **Current**: Only 1 test file in submodule
 - **Priority test coverage**:
   - `logger.py` - StimulusGenerator, CSV building
@@ -27,10 +27,7 @@
 - **Framework**: `pytest`
 
 
-
-## Code Cleanup - Technical Debt
-
-### 11. Consolidate Analysis Modules
+### 2. Consolidate Analysis Modules
 - **Location**: `analysis/` directory (7 files)
 - **Issue**: Appears underutilized, unclear purpose
 - **Action**: Document what each does, consider if they should be in main app or separate scripts, move IMU-specific code (`imu/`) if not used
@@ -43,14 +40,14 @@
 
 The tabs currently act as view, controller, and business logic all in one. The `ClassController` is a shared property bag rather than a mediating abstraction.
 
-### ~~Problem 1: Tabs Directly Call Equipment Driver APIs~~ (SCAFFOLDING DONE)
+### ~~Problem 1: Tabs Directly Call Equipment Driver APIs~~ (DONE for connect/disconnect)
 
-Per-equipment service classes created in `services/`:
+Per-equipment service classes created in `services/` and wired into tabs:
 - `EquipmentService` base class with common connect/disconnect lifecycle (template method pattern)
 - `DMMService`, `PSService`, `FGService`, `OscService` subclasses with device-specific operations
 - `ConnectionResult` dataclass returned by `connect()` with `success`, `device_id`, `error`, `timestamp`
-- Services handle business logic only; GUI updates remain the tab's responsibility
-- **Next step:** Wire services into `ClassController` and migrate tabs to use them
+- Services instantiated on `ClassController`; tabs call `cc.xxx_service.connect()`/`disconnect()`
+- `port_init`/`port_close` migrated for DMM, PS, FG, and OSC tabs
 
 **Remaining worst offenders (inline driver calls, not yet migrated):**
 - `guiTab_8_LOG.py` `_collect_data_row` (~line 1311) -- queries DMM, PS, FG, and OSC all in one method
@@ -58,18 +55,7 @@ Per-equipment service classes created in `services/`:
 - `guiTab_6_FG.py` (~line 228-289) -- constructs raw SCPI command strings inline
 - `guiTab_3_XDS110.py` `turn_power_on`/`turn_power_off` (~line 378-418) -- multi-equipment power sequencing in GUI
 
-### ~~Problem 2: Duplicated `port_init` / `port_close` Pattern~~ (SCAFFOLDING DONE)
-
-The common connect lifecycle is now captured in `services/equipment_service.py` `EquipmentService.connect()`. Each subclass only overrides `_store_on_controller`, `_clear_from_controller`, `_get_from_controller`, and `_post_connect`.
-
-**Next step:** Migrate each tab's `port_init` to call the corresponding service's `connect()` method:
-- `guiTab_2_DMM.py` -> `DMMService.connect()`
-- `guiTab_5_PS.py` -> `PSService.connect()`
-- `guiTab_6_FG.py` -> `FGService.connect()`
-- `guiTab_7_ATE.py` -> needs its own service or uses base `EquipmentService` directly
-- `guiTab_10_OSC.py` -> `OscService.connect()`
-
-### Problem 3: Threading Logic in GUI Tabs
+### Problem 2: Threading Logic in GUI Tabs
 
 Tabs spawn `threading.Thread` directly in button callbacks with no lifecycle management.
 
@@ -79,7 +65,7 @@ Tabs spawn `threading.Thread` directly in button callbacks with no lifecycle man
 
 **Recommendation:** Use `StoppableThread` (already in `gui_class.py`) consistently, and move long-running work into service-layer methods that accept progress/completion callbacks.
 
-### Problem 4: Configuration Parsing Scattered Across Tabs
+### Problem 3: Configuration Parsing Scattered Across Tabs
 
 Multiple tabs read `config/master.ini` or other config files independently. Hardcoded paths have been replaced with `path_helper.get_config_path()`, but each tab still parses the file independently.
 
@@ -91,7 +77,7 @@ Multiple tabs read `config/master.ini` or other config files independently. Hard
 
 **Recommendation:** Create a `ConfigService` that loads and caches all configuration at startup. Tabs never touch `configparser` or file paths directly.
 
-### Problem 5: Data Transformation / Analysis in Button Callbacks
+### Problem 4: Data Transformation / Analysis in Button Callbacks
 
 Statistical analysis and data manipulation embedded directly in GUI methods.
 
@@ -102,13 +88,13 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 
 **Recommendation:** Move analysis logic into `analysis/` modules or a `DataService`.
 
-### Problem 6: Shutdown Logic in GUI Driver
+### Problem 5: Shutdown Logic in GUI Driver
 
 `gui_driver.py:238-268` directly calls `ps.output_off(1)`, `ps.disconnect()`, `relay.open_all()`, etc.
 
 **Recommendation:** Add a `ClassController.shutdown()` method. (`PSService.safe_shutdown()` already exists as a starting point.)
 
-### Problem 7: Hardcoded Serial Commands in GUI
+### Problem 6: Hardcoded Serial Commands in GUI
 
 `guiTab_4_USB.py:124` has `"DAGA"`, and lines 141-149 map test names to codes like `"FR91"`, `"FR01"`, `"FE42"`.
 
@@ -118,9 +104,7 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 
 1. **`ClassController.shutdown()`** -- quick win, low risk (`PSService.safe_shutdown()` already exists)
 2. **`ConfigService`** -- consolidate config parsing, remove `configparser` from tabs
-3. ~~**Extract `port_init` pattern**~~ -- service classes created, need to wire into tabs
-4. ~~**Per-equipment service classes**~~ -- scaffolding done, need to migrate tab code
-5. **Move analysis to `analysis/` modules** -- improves testability
+3. **Move analysis to `analysis/` modules** -- improves testability
 
 ---
 
@@ -131,7 +115,7 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 - **Themed UI** - Consistent look with compact mode scaling
 - **StimulusConfig** - DRY principle applied successfully
 - **Command Registry** - Flexible equipment command management
-- **Service Layer** (new) - `services/` directory for GUI/logic separation
+- **Service Layer** - `services/` directory for GUI/logic separation, wired into connect/disconnect lifecycle
 
 ---
 

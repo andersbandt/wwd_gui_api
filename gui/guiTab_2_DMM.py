@@ -3,16 +3,12 @@
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
-import time
 import configparser
-from datetime import datetime
 
 # import user defined modules
 from EEequipment import equipment_manager
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from common.path_helper import get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
@@ -111,6 +107,7 @@ class TabDMM(guic.ThemedFrame):
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("dmm")
+        self.cc.dmm_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -270,53 +267,32 @@ class TabDMM(guic.ThemedFrame):
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.dmm_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-        dmm = ate_temp(self.fr_port.get_port())
-
-        time.sleep(1)
-
-        try:
-            self.dmm_id = dmm.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to DMM", e, "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to DMM", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        # BAD ID received
-        if self.dmm_id == '' or self.dmm_id is None:
-            self.prompt.print("Connection failed", "error")
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
-        # GOOD ID received
-        else:
-            self.prompt.print("Connected to DMM")
-            self.prompt.print(f"Got id: {self.dmm_id}")
-            self.cc.set_dmm(dmm)
+        self.prompt.print(f"Connected to DMM with id: {result.device_id}")
+        self.cc.dmm.set_sample_speed(self.default_sample_speed)
+        self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
 
-            # Set sample speed from config
-            self.cc.dmm.set_sample_speed(self.default_sample_speed)
-            self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
+        self.gui_refresh("call")
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.labelIDValue.config(text=result.device_id)
+        self.fr_port.set_status(True)
 
-            # Save the selected model for next time
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "DMM_Serial")
-
-            self.gui_refresh("call")
-            self.labelTimeConnectedValue.config(
-                text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-            )
-            self.labelIDValue.config(text=self.dmm_id)
-            self.fr_port.set_status(True)
-            return True
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
-        self.prompt.print(f"Closing DMM resource!")
-        try:
-            self.cc.dmm.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't disconnect PS", e, "warning")
+        self.prompt.print("Closing DMM resource!")
+        result = self.cc.dmm_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect DMM", result.error, "warning")
         self.fr_port.set_status(False)
-        self.cc.set_dmm(None)
 

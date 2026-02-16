@@ -38,7 +38,7 @@ class PSService(EquipmentService):
         try:
             instance.output_off(1)
             instance.output_off(2)
-        except (COMMUNICATION_ERRORS, AttributeError) as e:
+        except (*COMMUNICATION_ERRORS, AttributeError) as e:
             return f"Could not turn outputs off: {e}"
         return None
 

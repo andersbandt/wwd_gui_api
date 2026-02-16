@@ -43,6 +43,7 @@ class EquipmentService:
 
     equipment_type: str = ""       # override in subclass
     usage_name: str = ""           # override in subclass
+    connect_delay: float = 0       # seconds to wait after instantiation before test_conn
 
     def __init__(self, controller, registry=None):
         """
@@ -92,6 +93,11 @@ class EquipmentService:
                 success=False,
                 error=f"Failed to instantiate {model_name} on {port}: {e}"
             )
+
+        # --- optional delay before test ---
+        if self.connect_delay > 0:
+            import time
+            time.sleep(self.connect_delay)
 
         # --- test connection ---
         try:

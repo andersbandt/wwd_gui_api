@@ -36,7 +36,7 @@ class FGService(EquipmentService):
         """Turn output off after connecting (safety)."""
         try:
             instance.write("OUTPut OFF")
-        except (COMMUNICATION_ERRORS, AttributeError):
+        except (*COMMUNICATION_ERRORS, AttributeError):
             # Some FGs may not support this command format
             return "Could not turn output off (may not be supported)"
         return None

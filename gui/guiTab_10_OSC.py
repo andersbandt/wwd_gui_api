@@ -3,7 +3,6 @@
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
 from datetime import datetime
@@ -92,6 +91,7 @@ class TabOSC(guic.ThemedFrame):
 
         # equipment selector dropdown
         self.registry = equipment_manager.get_instruments("osc")
+        self.cc.osc_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -606,53 +606,33 @@ class TabOSC(guic.ThemedFrame):
     def port_init(self):
         self.prompt.print("Connect to PyVISA resource!")
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.osc_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-
-        try:
-            self.cc.set_osc(ate_temp(self.fr_port.get_port()))
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to OSC", str(e), "error")
-            raise e
-
-        try:
-            self.id = self.cc.osc.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to OSC", str(e), "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to OSC", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        if self.id:  # CONNECTION SUCCESS
-            self.channel_count = self.cc.osc.channel_count
+        self.channel_count = self.cc.osc.channel_count
+        self.init_fr_info()
+        self.init_fr_channel()
+        self.init_fr_control()
 
-            # Save the selected model BEFORE re-init (which recreates the dropdown)
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "OSC_PyVISA")
+        self.prompt.print(f"Connected to OSC with id: {result.device_id}")
+        self.labelIDValue.config(text=result.device_id)
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.set_status(True)
+        self.update_osc()
 
-            # re-initialize channel-count dependent frames
-            self.init_fr_info()
-            self.init_fr_channel()
-            self.init_fr_control()
-
-            self.prompt.print(f"Connected to OSC with id: {self.id}")
-            self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
-            self.fr_port.set_status(True)
-
-            # Update channel display states
-            self.update_osc()
-            return True
-        else:  # BAD ID received
-            self.cc.set_osc(None)
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
         self.prompt.print("Closing OSC resource!")
-        try:
-            self.cc.osc.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't disconnect OSC", str(e), "warning")
+        result = self.cc.osc_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect OSC", result.error, "warning")
         self.fr_port.set_status(False)
-        self.cc.set_osc(None)

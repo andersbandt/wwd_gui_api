@@ -19,6 +19,7 @@ class DMMService(EquipmentService):
 
     equipment_type = "dmm"
     usage_name = "DMM_Serial"
+    connect_delay = 1  # DMM needs settling time before test_conn
 
     def _store_on_controller(self, instance):
         self.cc.set_dmm(instance)
@@ -32,8 +33,8 @@ class DMMService(EquipmentService):
     def _post_connect(self, instance):
         """Set default sample speed after connecting."""
         try:
-            instance.set_sample_speed("SLOW")
-        except (COMMUNICATION_ERRORS, AttributeError):
+            instance.set_sample_speed("slow")
+        except (*COMMUNICATION_ERRORS, AttributeError):
             return "Could not set default sample speed"
         return None
 

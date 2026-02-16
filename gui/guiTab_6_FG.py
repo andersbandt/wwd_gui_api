@@ -3,11 +3,9 @@
 # import needed GUI packages
 import tkinter as tk
 from tkinter import ttk
-import tkinter.messagebox as tkmb
 
 # import needed packages
 import time
-from datetime import datetime
 
 # import user defined modules
 from common import path_helper
@@ -84,6 +82,7 @@ class TabFG(guic.ThemedFrame):
 
         # add equipment selector dropdown
         self.registry = equipment_manager.get_instruments("fg")
+        self.cc.fg_service.set_registry(self.registry)
         self.ate_drop = guih.generate_drop_down(
             self.fr_info,
             sorted(self.registry.keys())
@@ -361,53 +360,33 @@ class TabFG(guic.ThemedFrame):
 
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
-        self.prompt.print("Connect to PYVISA resource!")
+        self.prompt.print("Connect to PyVISA resource!")
         port = self.fr_port.get_port()
+        model_name = self.ate_drop[1].get()
+        result = self.cc.fg_service.connect(port, model_name)
 
-        ate_temp = self.registry[self.ate_drop[1].get()]
-        self.cc.set_fg(ate_temp(self.fr_port.get_port()))
-
-        try:
-            self.id = self.cc.fg.test_conn()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't connect to FG", str(e), "warning")
+        if not result.success:
+            self.prompt.print(result.error, "error")
+            guih.alert_user("Can't connect to FG", result.error, "warning")
             self.fr_port.set_status(False)
             return False
 
-        if self.id:  # CONNECTION SUCCESS
-            # Save the selected model BEFORE re-init (which recreates the dropdown)
-            selected_model = self.ate_drop[1].get()
-            self.cc.set_used_model(selected_model, "FG_PyVISA")
+        self.init_fr_info()
+        self.init_fr_control()
 
-            # NOTE: re-initialize the frames in case anything like channel count, etc. needs different GUI elements
-            self.init_fr_info()
-            self.init_fr_control()
+        self.prompt.print(f"Connected to FG with id: {result.device_id}")
+        self.labelIDValue.config(text=result.device_id)
+        self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.set_status(True)
+        self.output_on = False
 
-            # start doing stuff
-            self.prompt.print(f"Connected to FG with id: {self.id}")
-            self.labelIDValue.config(text=self.id)
-            self.labelTimeConnectedValue.config(text=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
-            self.fr_port.set_status(True)
-
-            # turn output off initially
-            self.output_on = False
-            try:
-                self.cc.fg.write("OUTPut OFF")
-            except Exception as e:
-                print(f"FG: Could not turn output off on connect: {e}")
-
-            return True
-        else:  # BAD ID received
-            self.cc.set_fg(None)
-            self.fr_port.set_status(False)
-            tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
-            return False
+        if result.error:
+            self.prompt.print(f"Warning: {result.error}", "warning")
+        return True
 
     def port_close(self):
-        self.prompt.print(f"Closing FG resource!")
-        try:
-            self.cc.fg.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Can't disconnect FG", e, "warning")
+        self.prompt.print("Closing FG resource!")
+        result = self.cc.fg_service.disconnect()
+        if not result.success:
+            guih.alert_user("Can't disconnect FG", result.error, "warning")
         self.fr_port.set_status(False)
-        self.cc.set_fg(None)

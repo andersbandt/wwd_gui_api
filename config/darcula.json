@@ -23,7 +23,7 @@
     "selected_tab_foreground": "#FFFFFF",
     "h1": {
         "family": "Helvetica",
-        "size": 16,
+        "size": 14,
         "style": "bold"
     },
     "font": {

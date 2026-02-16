@@ -36,6 +36,16 @@ class TabOSC(guic.ThemedFrame):
         self.channel_count = 4
         self.chan_on = [False, False, False, False]
 
+        # 1-2-5 timebase sequence (seconds/div)
+        self.tb_steps = [
+            5e-9, 10e-9, 20e-9, 50e-9, 100e-9, 200e-9, 500e-9,
+            1e-6, 2e-6, 5e-6, 10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6,
+            1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 50e-3, 100e-3, 200e-3, 500e-3,
+            1.0, 2.0, 5.0, 10.0, 20.0, 50.0,
+        ]
+        self.tb_index = 14  # default ~200us
+        self.tb_label = None
+
         # set up prompt
         self.prompt = guic.Prompt(self,
                                   self.theme_config,
@@ -209,12 +219,13 @@ class TabOSC(guic.ThemedFrame):
             row=cur_row, column=0, columnspan=3, pady=(10, 5))
         cur_row += 1
 
-        ttk.Label(fr, text="Scale (s/div)", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
-        self.tb_scale_entry = tk.Entry(fr, width=10)
-        self.tb_scale_entry.grid(row=cur_row, column=1, padx=5, pady=3)
-        tk.Button(fr, text="Set", width=6,
-                  command=lambda: self.set_timebase_scale(self.tb_scale_entry.get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+        self.tb_label = ttk.Label(fr, text=self._format_timebase(self.tb_steps[self.tb_index]),
+                                   style="TLabel", width=12, anchor="center")
+        self.tb_label.grid(row=cur_row, column=1, padx=5, pady=3)
+        tk.Button(fr, text="\u25C0", width=4, command=self.timebase_down).grid(
+            row=cur_row, column=0, padx=5, pady=3, sticky="e")
+        tk.Button(fr, text="\u25B6", width=4, command=self.timebase_up).grid(
+            row=cur_row, column=2, padx=5, pady=3, sticky="w")
         cur_row += 1
 
         ttk.Label(fr, text="Position (s)", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
@@ -309,6 +320,13 @@ class TabOSC(guic.ThemedFrame):
                     self.chan_toggle_btns[i].config(text="ON", bg=self.theme_config["success"])
                 else:
                     self.chan_toggle_btns[i].config(text="OFF", bg=self.theme_config["error"])
+            # Sync timebase index to current scope setting
+            current_tb = self.cc.osc.get_timebase_scale()
+            self.tb_index = min(range(len(self.tb_steps)),
+                                key=lambda i: abs(self.tb_steps[i] - current_tb))
+            if self.tb_label:
+                self.tb_label.config(text=self._format_timebase(self.tb_steps[self.tb_index]))
+
             self.prompt.print("OSC state updated")
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't update OSC", str(e), "warning")
@@ -412,17 +430,50 @@ class TabOSC(guic.ThemedFrame):
     # =========================================================================
     # Timebase Actions
     # =========================================================================
-    def set_timebase_scale(self, value_str):
+    @staticmethod
+    def _format_timebase(val):
+        """Format a timebase value into a human-readable string."""
+        if val < 1e-6:
+            return f"{val * 1e9:.0f} ns/div"
+        elif val < 1e-3:
+            return f"{val * 1e6:.0f} us/div"
+        elif val < 1.0:
+            return f"{val * 1e3:.0f} ms/div"
+        else:
+            return f"{val:.0f} s/div"
+
+    def _apply_timebase(self):
+        """Send current tb_index value to scope and update the label."""
+        scale = self.tb_steps[self.tb_index]
+        self.cc.osc.set_timebase_scale(scale)
+        if self.tb_label:
+            self.tb_label.config(text=self._format_timebase(scale))
+        self.prompt.print(f"Timebase: {self._format_timebase(scale)}")
+
+    def timebase_up(self):
         if not self.cc.get_osc_status():
             guih.alert_user("Can't set timebase", "No OSC connection!", "error")
             return
+        if self.tb_index >= len(self.tb_steps) - 1:
+            return
+        self.tb_index += 1
         try:
-            scale = float(value_str)
-            self.cc.osc.set_timebase_scale(scale)
-            self.prompt.print(f"Timebase scale set to {scale} s/div")
-        except ValueError:
-            guih.alert_user("Invalid Input", "Timebase scale must be a number", "error")
+            self._apply_timebase()
         except COMMUNICATION_ERRORS as e:
+            self.tb_index -= 1
+            guih.alert_user("Can't set timebase scale", str(e), "error")
+
+    def timebase_down(self):
+        if not self.cc.get_osc_status():
+            guih.alert_user("Can't set timebase", "No OSC connection!", "error")
+            return
+        if self.tb_index <= 0:
+            return
+        self.tb_index -= 1
+        try:
+            self._apply_timebase()
+        except COMMUNICATION_ERRORS as e:
+            self.tb_index += 1
             guih.alert_user("Can't set timebase scale", str(e), "error")
 
     def set_timebase_position(self, value_str):
@@ -561,7 +612,12 @@ class TabOSC(guic.ThemedFrame):
         port = self.fr_port.get_port()
 
         ate_temp = self.registry[self.ate_drop[1].get()]
-        self.cc.set_osc(ate_temp(self.fr_port.get_port()))
+
+        try:
+            self.cc.set_osc(ate_temp(self.fr_port.get_port()))
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't connect to OSC", str(e), "error")
+            raise e
 
         try:
             self.id = self.cc.osc.test_conn()

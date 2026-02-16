@@ -36,8 +36,8 @@ def get_ports(method=None):
                 pass
 
     elif method == 3:
-        rm = pyvisa.ResourceManager()
-        ports = rm.list_resources()
+        rm = pyvisa.ResourceManager('@py')
+        ports = [r.replace('\x00', '') for r in rm.list_resources() if not r.startswith('ASRL')]
     else:
         ports = None
 

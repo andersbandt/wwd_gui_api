@@ -2,8 +2,8 @@
 <PortsUsed>
     <USB_serial>COM14</USB_serial>
     <ATE_serial>/dev/ttyACM4</ATE_serial>
-    <DMM_Serial model="HP3478A">GPIB0::23::INSTR</DMM_Serial>
-    <PS_PyVISA model="E3640A">GPIB0::5::INSTR</PS_PyVISA>
+    <DMM_Serial model="XDM1041">/dev/ttyUSB0</DMM_Serial>
+    <PS_PyVISA model="E3640A">USB0::62700::5168::SPD1A134600512::0::INSTR</PS_PyVISA>
     <FG_PyVISA>GPIB0::10::INSTR</FG_PyVISA>
-    <OSC_PyVISA model="DSOX4104A">USB0::0x0957::0x17A0::MY53110117::INSTR</OSC_PyVISA>
+    <OSC_PyVISA model="DSOX4104A">USB0::2391::1416::CN50290972::0::INSTR</OSC_PyVISA>
 </PortsUsed>

@@ -288,7 +288,7 @@ class TabDMM(guic.ThemedFrame):
 
         # BAD ID received
         if self.dmm_id == '' or self.dmm_id is None:
-            self.prompt.print("Connection failed")
+            self.prompt.print("Connection failed", "error")
             self.fr_port.set_status(False)
             tkmb.showerror("Device error", "Device at " + port + " does not respond or is not correct config")
             return False

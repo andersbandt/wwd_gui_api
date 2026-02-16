@@ -24,7 +24,6 @@ class tabXDS110(guic.ThemedFrame):
         self.cc = class_controller
         self.grid(row=0, column=0)
         self.basefilepath = basefilepath
-        self.command_active = 0
         self.after_call_id = None
 
         # print welcome text_data
@@ -67,19 +66,30 @@ class tabXDS110(guic.ThemedFrame):
         self.init_fr_target()
         self.init_fr_firmware()
 
+    def _run_in_thread(self, func, button):
+        """Disable button, run func in a background thread, re-enable when done."""
+        button.config(state="disabled")
+        def wrapper():
+            try:
+                func()
+            finally:
+                self.after(0, lambda: button.config(state="normal"))
+        threading.Thread(target=wrapper).start()
+
     def init_fr_xds110(self):
         # XDS110 - BUTTON/STATUS
-        btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check", command=lambda: threading.Thread(target=self.check_xds110).start())
-        btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
+        self.btn_check_xds110 = tk.Button(self.fr_xds110, text="XDS110 Check",
+                                          command=lambda: self._run_in_thread(self.check_xds110, self.btn_check_xds110))
+        self.btn_check_xds110.grid(row=3, column=1, padx=15, pady=22)
         self.status_xds110.grid(row=3, column=2, padx=15, pady=22)
 
     def init_fr_target(self):
         # ROW 1 + 2
         # TARGET - BUTTON/STATUS
-        btn_check_target = Button(self.fr_target, text="Target check",
-                                  command=lambda: threading.Thread(target=self.check_target).start(),
+        self.btn_check_target = Button(self.fr_target, text="Target check",
+                                  command=lambda: self._run_in_thread(self.check_target, self.btn_check_target),
                                   bg=self.theme_config["dark_2"], fg=self.theme_config["fg_light"], height=2, width=15)
-        btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
+        self.btn_check_target.grid(row=1, column=1, rowspan=2, padx=15, pady=22)
         self.status_target.grid(row=1, column=2, rowspan=2, padx=15, pady=22)
 
         # TARGET VOLTAGE
@@ -95,10 +105,10 @@ class tabXDS110(guic.ThemedFrame):
                         offvalue=0).grid(row=2, column=3)
 
         # ROW 3
-        btn_toggle_target = Button(self.fr_target, text="Toggle target",
-                                   command=lambda: threading.Thread(target=self.toggle_target).start(),
+        self.btn_toggle_target = Button(self.fr_target, text="Toggle target",
+                                   command=lambda: self._run_in_thread(self.toggle_target, self.btn_toggle_target),
                                    bg=self.theme_config["light_3"], fg=self.theme_config["fg_dark"], height=2, width=15)
-        btn_toggle_target.grid(row=3, column=2, padx=15, pady=22)
+        self.btn_toggle_target.grid(row=3, column=2, padx=15, pady=22)
         self.toggle_drop = guih.generate_drop_down(
             self.fr_target,
             ["toggle", "assert", "deassert"]
@@ -115,13 +125,13 @@ class tabXDS110(guic.ThemedFrame):
         self.flashStatus = ColorCircle(fr_m, width=60, height=60, bg=self.theme_config["bg_dark"])
 
         # place buttons
-        btn_build_firmware = Button(fr_m, text="Build firmware",
-                                    command=lambda: threading.Thread(target=self.build_firmware).start(),
+        self.btn_build_firmware = Button(fr_m, text="Build firmware",
+                                    command=lambda: self._run_in_thread(self.build_firmware, self.btn_build_firmware),
                                     bg=self.theme_config["dark_2"], fg=self.theme_config["fg_dark"], height=2,
                                     width=20)
 
-        btn_flash_firmware = Button(fr_m, text="Load firmware",
-                                    command=lambda: threading.Thread(target=self.flash_firmware).start(),
+        self.btn_flash_firmware = Button(fr_m, text="Load firmware",
+                                    command=lambda: self._run_in_thread(self.flash_firmware, self.btn_flash_firmware),
                                     bg=self.theme_config["light_1"], fg=self.theme_config["fg_light"], height=2,
                                     width=20)
         load_config = Button(fr_m, text="Load configuration",
@@ -161,7 +171,7 @@ class tabXDS110(guic.ThemedFrame):
                                             offvalue=0)
 
         # place the usable objects with .grid()
-        btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
+        self.btn_build_firmware.grid(row=1, column=0, padx=15, pady=22)
         self.buildStatus.grid(row=1, column=1)
         ttk.Label(fr_m, text="Time delay to flash (seconds)").grid(row=2, column=0, padx=10, pady=15)
         self.entry_timesleep.grid(row=2, column=1)
@@ -171,7 +181,7 @@ class tabXDS110(guic.ThemedFrame):
         self.checkToggle.grid(row=5, column=2)
         self.targetConfig_drop[0].grid(row=2, column=2, padx=6, pady=10)
         self.serialNumber_drop[0].grid(row=3, column=2, pady=2)
-        btn_flash_firmware.grid(row=6, column=0, padx=15, pady=22)
+        self.btn_flash_firmware.grid(row=6, column=0, padx=15, pady=22)
         self.flashStatus.grid(row=6, column=1, padx=15, pady=22)
         self.defaultTarget_drop[0].grid(row=7, column=0, pady=2)
         load_config.grid(row=7, column=1, padx=15, pady=22)

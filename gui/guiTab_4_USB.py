@@ -263,7 +263,7 @@ class TabUSB(guic.ThemedFrame):
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
-        threading.Thread(target=self.thread_print_display).start()
+        self.thread_print_display()
         self.prompt.print("Init successful!\n")
         return True
 
@@ -271,6 +271,9 @@ class TabUSB(guic.ThemedFrame):
         if self.ser_obj is not None:
             self.t1.stop()
             self.t2.stop()
+            if self.t3 is not None:
+                self.t3.stop()
+                self.t3 = None
             self.prompt.print("Serial close!")
             num_lines = self.ser_obj.stop_process()
             self.prompt.print(f"Port closed: {num_lines} lines wrote\n")
@@ -278,7 +281,8 @@ class TabUSB(guic.ThemedFrame):
         self.fr_port.set_status(False)
 
     def start_process(self, data_subfolder, file_ext, parameters):
-        self.t3.stop()
+        if self.t3 is not None:
+            self.t3.stop()
 
         current_datetime = datetime.now()
         formatted_datetime = current_datetime.strftime("_%H%M%S")
@@ -288,10 +292,12 @@ class TabUSB(guic.ThemedFrame):
         #     self.prompt1.print("Detected blank file name, going to use default")
         #     file_str_ext = None
 
-        threading.Thread(target=lambda: self.ser_obj.process_data(self.basefilepath,
-                                                                  f"{formatted_datetime}_{file_ext}_{file_str_ext}",
-                                                                  "data",
-                                                                  data_subfolder,
-                                                                  parameters=parameters)
-                         ).start()
+        self.t3 = guic.StoppableThread(
+            target=lambda: self.ser_obj.process_data(self.basefilepath,
+                                                     f"{formatted_datetime}_{file_ext}_{file_str_ext}",
+                                                     "data",
+                                                     data_subfolder,
+                                                     parameters=parameters)
+        )
+        self.t3.start()
 

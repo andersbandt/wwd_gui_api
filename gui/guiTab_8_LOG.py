@@ -46,6 +46,7 @@ class TabLog(guic.ThemedFrame):
         self.stimulus_config = None
         self.stimulus_generator = None
         self.bus = None
+        self._record_thread = None
         self._dash_thread = None
         self._live_state = {}
         self.math_config = MathConfig()
@@ -870,6 +871,11 @@ class TabLog(guic.ThemedFrame):
             row.update(results)
 
     def start_record(self):
+        # Prevent double-start
+        if self._record_thread is not None and self._record_thread.is_alive():
+            self.prompt.print("Recording is already in progress!", print_type="warning")
+            return
+
         # Organize parameters first
         self.organize_record_params()
         self.set_record_speed()
@@ -975,10 +981,13 @@ class TabLog(guic.ThemedFrame):
         if self.var_live_plot.get():
             self._start_live_plot()
 
-        threading.Thread(target=self.thread_record).start()
+        self._record_thread = guic.StoppableThread(target=self.thread_record)
+        self._record_thread.start()
 
     def stop_record(self):
         self.record_status = False
+        if self._record_thread is not None:
+            self._record_thread.stop()
         self.cc.recording = False  # Signal to ClassController that recording has stopped
         self.prompt.print("Stopped data record!")
 

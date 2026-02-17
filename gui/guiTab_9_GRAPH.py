@@ -15,6 +15,7 @@ from tkinter import filedialog
 # import user defined modules
 from common import path_helper
 from common import plotter
+from analysis import data_helper
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -548,16 +549,12 @@ class TabGraph(guic.ThemedFrame):
             self.prompt.print(f"Columns: {', '.join(df.columns.tolist())}")
 
             # Show statistics for numeric columns
-            numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
-            if len(numeric_cols) > 0:
+            col_stats = data_helper.summarize_dataframe(df)
+            if col_stats:
                 self.prompt.print("\nStatistics:")
-                for col in numeric_cols:
-                    mean_val = df[col].mean()
-                    std_val = df[col].std()
-                    min_val = df[col].min()
-                    max_val = df[col].max()
+                for col, s in col_stats.items():
                     self.prompt.print(
-                        f"  {col}: mean={mean_val:.4f}, std={std_val:.4f}, min={min_val:.4f}, max={max_val:.4f}")
+                        f"  {col}: mean={s['mean']:.4f}, std={s['std']:.4f}, min={s['min']:.4f}, max={s['max']:.4f}")
 
         self.prompt.print("\nAnalysis complete!")
         return True

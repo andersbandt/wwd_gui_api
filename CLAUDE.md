@@ -94,7 +94,7 @@ The theming system supports "compact" mode for smaller screens, which scales dow
 - `fg_service.py` — `FGService`
 - `osc_service.py` — `OscService`
 
-**Status**: Service classes are created but NOT yet wired into tabs. See `notes.md` for migration plan.
+**Status**: Service classes are created but NOT yet wired into tabs. See `todo.md` for migration plan.
 
 ### Equipment Control Layer
 
@@ -244,7 +244,7 @@ git submodule update --init
 
 ## Key Project Files
 
-- **notes.md** — Development task tracker with open issues, refactoring priorities, and architecture improvement plans. This is the primary task/TODO list.
+- **todo.md** — Development task tracker with open issues, refactoring priorities, and architecture improvement plans. This is the primary task/TODO list.
 - **scripting.md** — Design notes for a planned scripting/automation system.
 - **docs/** — Screenshots and documentation assets.
 
@@ -255,5 +255,5 @@ git submodule update --init
 - The application performs graceful shutdown, turning off power supplies and opening all relays when closing (shutdown logic is in `gui_driver.py` lines 236-271)
 - Serial port detection methods can be changed via dropdown (Auto/Windows/Linux/PyVISA)
 - The GUI adjusts to screen size, using compact mode for smaller displays
-- A services layer (`services/`) has been scaffolded but not yet integrated — see `notes.md` for migration plan
-- Known architectural debt: tabs currently mix view, controller, and business logic; see `notes.md` "GUI / Logic Decoupling" section for details
+- A services layer (`services/`) has been scaffolded but not yet integrated — see `todo.md` for migration plan
+- Known architectural debt: tabs currently mix view, controller, and business logic; see `todo.md` "GUI / Logic Decoupling" section for details

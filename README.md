@@ -254,6 +254,8 @@ wwd_gui_api/
 
 **Themed Components**: Consistent UI with theme JSON and base classes.
 
+**Service Layer**: Per-equipment service classes in `services/` handle connect/disconnect lifecycle, equipment operations, and error handling — separating business logic from GUI code.
+
 ---
 
 ## 🗺️ Roadmap
@@ -355,6 +357,15 @@ We believe:
 ## 🚧 Project Status
 
 **Active Development** - This project is actively maintained and welcoming contributions.
+
+---
+
+## Useful Resources
+
+- [PyVISA docs](https://pyvisa.readthedocs.io/)
+- [Tkinter best practices](https://tkdocs.com/)
+- [Testing with pytest](https://docs.pytest.org/)
+- [SCPI commands](https://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments)
 
 ---
 

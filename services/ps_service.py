@@ -92,7 +92,7 @@ class PSService(EquipmentService):
         if ps is None:
             return False
         try:
-            ps.set_voltage(channel, voltage)
+            ps.set_voltage(voltage, channel=channel)
             return True
         except COMMUNICATION_ERRORS:
             return False
@@ -107,7 +107,7 @@ class PSService(EquipmentService):
         if ps is None:
             return False
         try:
-            ps.set_current(channel, current)
+            ps.set_current(current, channel=channel)
             return True
         except COMMUNICATION_ERRORS:
             return False
@@ -137,6 +137,20 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_current(channel)
+        except COMMUNICATION_ERRORS:
+            return None
+
+    def read_set_voltage(self, channel):
+        """Read the set (target) voltage on the given channel.
+
+        Returns:
+            float or None on failure.
+        """
+        ps = self._get_from_controller()
+        if ps is None:
+            return None
+        try:
+            return ps.get_set_voltage(channel)
         except COMMUNICATION_ERRORS:
             return None
 

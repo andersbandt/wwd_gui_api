@@ -24,7 +24,6 @@ from common import logger
 from common import plotter
 from common import path_helper
 from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math_config, load_math_config
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 
 class TabLog(guic.ThemedFrame):
@@ -1170,7 +1169,7 @@ class TabLog(guic.ThemedFrame):
 
         # turn on power supply if being used as a stimulus
         if self.stimulus_config.uses_ps():
-            self.cc.ps.output_on(self.stimulus_config.channel)
+            self.cc.ps_service.output_on(self.stimulus_config.channel)
 
         # start stimulus thread
         try:
@@ -1198,55 +1197,15 @@ class TabLog(guic.ThemedFrame):
                 # Wait for serial data (blocks until \n is received)
                 serial_data = self.cc.ser.read_line()
 
-                # Build timestamp
-                row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
-
-                # Add the serial data we just received
-                if self.record_config.use_ser:
-                    row[logger.COL_SERIAL] = serial_data
-
-                # Collect DMM data if requested
-                if self.record_config.use_dmm:
-                    row[logger.COL_DMM_MEAS1] = self.cc.dmm.read_value()
-
-                # Collect Power Supply data if requested
-                if self.record_config.use_ps:
-                    try:
-                        row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
-                        row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
-                        row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-                        if self.record_config.ps_channel == 2:
-                            row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
-                            row[logger.COL_PS_VMEAS2] = self.cc.ps.get_voltage(2)
-                            row[logger.COL_PS_IMEAS2] = self.cc.ps.get_current(2)
-                    except COMMUNICATION_ERRORS as e:
-                        self.record_status = False
-                        guih.alert_user("Serial logger: PS comm error", str(e), "error")
-                        break
-
-                # Collect Function Generator data if requested
-                if self.record_config.use_fg:
-                    try:
-                        row[logger.COL_FG_FREQ] = self.cc.fg.query(
-                            self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
-                        )
-                        row[logger.COL_FG_WAVEFORM] = self.cc.fg.query(
-                            self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
-                        )
-                    except Exception:
-                        row[logger.COL_FG_FREQ] = "ERROR"
-                        row[logger.COL_FG_WAVEFORM] = "ERROR"
-
-                # Collect Oscilloscope data if requested
-                if self.record_config.use_osc and self.record_config.osc_config:
-                    try:
-                        osc_data = logger.collect_osc_measurements(self.cc.osc, self.record_config.osc_config)
-                        row.update(osc_data)
-                    except COMMUNICATION_ERRORS as e:
-                        guih.alert_user("Logger: OSC comm error", str(e), "error")
-                        break
-
+                # Collect all data using shared helper
+                row = self._collect_data_row(serial_data=serial_data)
                 self._apply_math_columns(row)
+
+                # Check for PS errors that should stop recording
+                if self.record_config.use_ps and row.get(logger.COL_PS_VMEAS1) == "ERROR":
+                    self.record_status = False
+                    guih.alert_user("Serial logger: PS comm error", "Lost communication with power supply", "error")
+                    break
 
                 # Save row (locally and to sinks)
                 self.recorded_data.append(row)
@@ -1327,54 +1286,39 @@ class TabLog(guic.ThemedFrame):
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
             self.labelRNums.config(text=progress_text)
 
-    def _collect_data_row(self):
+    def _collect_data_row(self, serial_data=None):
         row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
 
         # Serial data if requested
         if self.record_config.use_ser is True:
-            row[logger.COL_SERIAL] = self.cc.ser.read_line()
+            row[logger.COL_SERIAL] = serial_data if serial_data is not None else self.cc.ser.read_line()
 
         # DMM data if requested
         if self.record_config.use_dmm:
-            row[logger.COL_DMM_MEAS1] = self.cc.dmm.read_value()
+            val, _ = self.cc.dmm_service.read_value()
+            row[logger.COL_DMM_MEAS1] = val if val is not None else "ERROR"
 
         # Power Supply data if requested
         if self.record_config.use_ps:
-            try:
-                row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
-                row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
-                row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-                if self.record_config.ps_channel == 2:
-                    row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
-                    row[logger.COL_PS_VMEAS2] = self.cc.ps.get_set_voltage(2)
-                    row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-            except COMMUNICATION_ERRORS:
-                row[logger.COL_PS_VSET1] = "ERROR"
-                row[logger.COL_PS_VMEAS1] = "ERROR"
-                row[logger.COL_PS_IMEAS1] = "ERROR"
-                if self.record_config.ps_channel == 2:
-                    row[logger.COL_PS_VSET2] = "ERROR"
-                    row[logger.COL_PS_VMEAS2] = "ERROR"
+            row[logger.COL_PS_VSET1] = self.cc.ps_service.read_set_voltage(1) or "ERROR"
+            row[logger.COL_PS_VMEAS1] = self.cc.ps_service.read_voltage(1) or "ERROR"
+            row[logger.COL_PS_IMEAS1] = self.cc.ps_service.read_current(1) or "ERROR"
+            if self.record_config.ps_channel == 2:
+                row[logger.COL_PS_VSET2] = self.cc.ps_service.read_set_voltage(2) or "ERROR"
+                row[logger.COL_PS_VMEAS2] = self.cc.ps_service.read_voltage(2) or "ERROR"
+                row[logger.COL_PS_IMEAS2] = self.cc.ps_service.read_current(2) or "ERROR"
 
         # Function Generator data if requested
         if self.record_config.use_fg:
-            try:
-                row[logger.COL_FG_FREQ] = self.cc.fg.query(
-                    self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
-                )
-                row[logger.COL_FG_WAVEFORM] = self.cc.fg.query(
-                    self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
-                )
-            except Exception:
-                row[logger.COL_FG_FREQ] = "ERROR"
-                row[logger.COL_FG_WAVEFORM] = "ERROR"
+            row[logger.COL_FG_FREQ] = self.cc.fg_service.get_frequency() or "ERROR"
+            row[logger.COL_FG_WAVEFORM] = self.cc.fg_service.get_shape() or "ERROR"
 
         # Oscilloscope data if requested
         if self.record_config.use_osc and self.record_config.osc_config:
             try:
                 osc_data = logger.collect_osc_measurements(self.cc.osc, self.record_config.osc_config)
                 row.update(osc_data)
-            except COMMUNICATION_ERRORS:
+            except Exception:
                 for col in logger.build_osc_headers(self.record_config.osc_config):
                     row[col] = "ERROR"
 
@@ -1392,13 +1336,13 @@ class TabLog(guic.ThemedFrame):
             return
 
         if loop_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
-            self.cc.ps.set_voltage(value, channel=loop_config.channel)
+            self.cc.ps_service.set_voltage(loop_config.channel, value)
 
         elif loop_config.stimulus_type == logger.StimulusType.FG_FREQUENCY:
-            self.cc.fg.set_frequency(value)
+            self.cc.fg_service.set_frequency(value)
 
         elif loop_config.stimulus_type == logger.StimulusType.FG_DUTY_CYCLE:
-            self.cc.fg.set_duty(value)
+            self.cc.fg_service.set_duty(value)
 
         else:
             raise ValueError(f"Unknown stimulus type: {loop_config.stimulus_type}")

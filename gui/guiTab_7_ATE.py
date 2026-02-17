@@ -11,6 +11,7 @@ from gui import gui_class as guic
 
 # import user created modules
 from common import plotter
+from analysis import stats_analysis
 
 # import needed packages
 from datetime import datetime
@@ -308,11 +309,11 @@ Understanding Results:
     def run_accuracy_test(self):
         """Run instrument accuracy test by sweeping PS and measuring with DMM"""
         # Check that PS and DMM are connected
-        if self.cc.ps is None:
+        if not self.cc.get_ps_status():
             guih.alert_user("PS Not Connected", "Please connect a power supply before running accuracy test", "error")
             return
 
-        if self.cc.dmm is None:
+        if not self.cc.get_dmm_status():
             guih.alert_user("DMM Not Connected", "Please connect a DMM before running accuracy test", "error")
             return
 
@@ -368,16 +369,19 @@ Understanding Results:
 
         # Perform sweep
         try:
-            self.cc.ps.output_on(ps_channel)
+            self.cc.ps_service.output_on(ps_channel)
             for step_num, voltage in enumerate(stimulus_gen, 1):
                 # Set PS voltage
-                self.cc.ps.set_voltage(voltage, channel=ps_channel)
+                self.cc.ps_service.set_voltage(ps_channel, voltage)
 
                 # Wait for settling
                 time.sleep(settling_time)
 
                 # Read DMM measurement
-                dmm_reading = self.cc.dmm.read_value()
+                dmm_reading, _ = self.cc.dmm_service.read_value()
+                if dmm_reading is None:
+                    self.prompt.print("DMM read error, aborting test", "error")
+                    break
 
                 # Calculate error
                 error = dmm_reading - voltage
@@ -391,71 +395,38 @@ Understanding Results:
                 self.prompt.print(f"Step {step_num}/{num_steps}: Set={voltage:.4f}V, Measured={dmm_reading:.4f}V, Error={error:.4f}V")
 
             # end test
-            self.cc.ps.output_off(ps_channel)
+            self.cc.ps_service.output_off(ps_channel)
 
             # Calculate statistics
-            errors_array = np.array(errors)
             set_array = np.array(set_voltages)
             measured_array = np.array(measured_voltages)
 
-            mean_error = np.mean(errors_array)
-            std_error = np.std(errors_array)
-            max_error = np.max(np.abs(errors_array))
-            rms_error = np.sqrt(np.mean(errors_array**2))
-
-            # Calculate percent errors
-            # Avoid division by zero by using full scale (stop - start)
-            full_scale = abs(stop_voltage - start_voltage)
-            if full_scale > 0:
-                mean_error_pct = (abs(mean_error) / full_scale) * 100
-                max_error_pct = (max_error / full_scale) * 100
-            else:
-                mean_error_pct = 0
-                max_error_pct = 0
-
-            # Format results
-            results = []
-            results.append("=" * 80)
-            results.append("INSTRUMENT ACCURACY TEST RESULTS")
-            results.append("=" * 80)
-            results.append(f"\nTest Configuration:")
-            results.append(f"  Voltage Range: {start_voltage}V to {stop_voltage}V")
-            results.append(f"  Number of Steps: {num_steps}")
-            results.append(f"  Settling Time: {settling_time}s")
-            results.append(f"  PS Channel: {ps_channel}")
-            results.append(f"\nStatistics:")
-            results.append(f"  Mean Error:          {mean_error:>10.6f} V  ({mean_error_pct:>6.3f}% of full scale)")
-            results.append(f"  Std Deviation:       {std_error:>10.6f} V")
-            results.append(f"  RMS Error:           {rms_error:>10.6f} V")
-            results.append(f"  Max Absolute Error:  {max_error:>10.6f} V  ({max_error_pct:>6.3f}% of full scale)")
-            results.append(f"\nDetailed Measurements:")
-            results.append(f"{'Step':<6} {'Set (V)':<12} {'Measured (V)':<12} {'Error (V)':<12} {'Error (%FS)':<12}")
-            results.append("-" * 80)
-
-            for i in range(len(set_voltages)):
-                error_pct = (abs(errors[i]) / full_scale) * 100 if full_scale > 0 else 0
-                results.append(f"{i+1:<6} {set_voltages[i]:<12.6f} {measured_voltages[i]:<12.6f} {errors[i]:<12.6f} {error_pct:<12.3f}")
-
-            results.append("=" * 80)
+            stats = stats_analysis.compute_accuracy_stats(set_array, measured_array)
+            report = stats_analysis.format_accuracy_report(
+                stats, set_voltages, measured_voltages,
+                config={
+                    "start_voltage": start_voltage,
+                    "stop_voltage": stop_voltage,
+                    "num_steps": num_steps,
+                    "settling_time": settling_time,
+                    "ps_channel": ps_channel,
+                })
 
             # Display results
-            self.prompt.print("\n".join(results), "normal")
+            self.prompt.print(report, "normal")
             self.prompt.print("Accuracy test complete!")
-            self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
+            self.prompt.print(f"Mean Error: {stats['mean_error']:.6f}V ({stats['mean_error_pct']:.3f}% FS), Max Error: {stats['max_error']:.6f}V ({stats['max_error_pct']:.3f}% FS)")
 
             # Plot results with residuals
             plotter.plot_accuracy_with_residuals(
                 set_array,
                 measured_array,
-                errors_array,
+                stats["errors"],
                 x_label="Set Voltage (V)",
                 y_label="Measured Voltage (V)",
                 title="Power Supply Accuracy Analysis")
 
 
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Communication Error", f"Error communicating with equipment: {str(e)}", "error")
-            self.prompt.print(f"Error during accuracy test: {str(e)}", "error")
         except Exception as e:
             guih.alert_user("Test Error", f"An error occurred during testing: {str(e)}", "error")
             self.prompt.print(f"Error during accuracy test: {str(e)}", "error")

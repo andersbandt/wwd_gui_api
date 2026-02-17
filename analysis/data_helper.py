@@ -146,5 +146,30 @@ def load_csv_numpy(file_path):
     return data
 
 
+def summarize_dataframe(df):
+    """Compute summary statistics for all numeric columns in a DataFrame.
+
+    Args:
+        df: pandas DataFrame.
+
+    Returns:
+        dict of {column_name: {"mean": float, "std": float, "min": float, "max": float}}.
+        Empty dict if no numeric columns.
+    """
+    numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+    if len(numeric_cols) == 0:
+        return {}
+
+    result = {}
+    for col in numeric_cols:
+        result[col] = {
+            "mean": df[col].mean(),
+            "std": df[col].std(),
+            "min": df[col].min(),
+            "max": df[col].max(),
+        }
+    return result
+
+
 def load_dataset():
     pass

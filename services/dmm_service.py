@@ -50,7 +50,7 @@ class DMMService(EquipmentService):
         if dmm is None:
             return (None, "DMM not connected")
         try:
-            raw = dmm.read_val()
+            raw = dmm.read_value()
             return (float(raw), str(raw))
         except COMMUNICATION_ERRORS as e:
             return (None, f"Read error: {e}")

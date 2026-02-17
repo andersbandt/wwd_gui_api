@@ -381,9 +381,7 @@ class tabXDS110(guic.ThemedFrame):
     def turn_power_on(self, flash_option):
         # CONFIG POWER
         if flash_option == "target_power" or flash_option == "probe_power":
-            try:
-                self.cc.ps.output_off(self.ps_channel)
-            except (AttributeError, ValueError):
+            if not self.cc.ps_service.output_off(self.ps_channel):
                 res = guih.promptYesNo("Can't access power supply!",
                                        "Can't access supply to turn off. Continue with flash?")
                 if not res:
@@ -391,7 +389,6 @@ class tabXDS110(guic.ThemedFrame):
                     return False
 
         if flash_option == "target_power":
-            pass
             try:
                 if self.device_usb_relay != 0:
                     self.cc.relay.set_state(self.device_usb_relay, 1)
@@ -404,12 +401,13 @@ class tabXDS110(guic.ThemedFrame):
             pass
         elif flash_option == "supply_power":
             self.cc.relay.set_state(self.device_usb_relay, 0)
-            try:
-                self.cc.ps.set_voltage(self.ps_channel, self.device_vdds)
-                self.cc.ps.output_on(self.ps_channel)
-            except (AttributeError, ValueError): # AttributeError covers PS not init case. ValueError covers disconnect case.
-                guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
-                self.flashStatus.set_color(self.theme_config["error"])  # RED
+            if not self.cc.ps_service.set_voltage(self.ps_channel, self.device_vdds):
+                guih.alert_user("Can't access power supply!", "Can't set voltage. Aborting flash", "error")
+                self.flashStatus.set_color(self.theme_config["error"])
+                return False
+            if not self.cc.ps_service.output_on(self.ps_channel):
+                guih.alert_user("Can't access power supply!", "Can't turn output on. Aborting flash", "error")
+                self.flashStatus.set_color(self.theme_config["error"])
                 return False
 
     def turn_power_off(self, flash_option):
@@ -418,4 +416,4 @@ class tabXDS110(guic.ThemedFrame):
         elif flash_option == "probe_power":
             return
         elif flash_option == "supply_power":
-            self.cc.ps.output_off(self.ps_channel)
+            self.cc.ps_service.output_off(self.ps_channel)

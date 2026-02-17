@@ -7,12 +7,9 @@ from tkinter import ttk
 import threading
 import serial
 from datetime import datetime
-import configparser
-import os
-
 # import user defined modules
 from common.serial_helper import SerialProcessor
-from common.path_helper import get_data_dir, get_config_path
+from common.path_helper import get_data_dir
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -220,39 +217,10 @@ class TabUSB(guic.ThemedFrame):
     #### SERIAL (COM)  ##############
     #################################
 
-    def get_baud_rate(self):
-        """
-        Read baud rate from master.ini config file.
-
-        Returns:
-            int: Baud rate from config, defaults to 9600 if not found
-        """
-        config_file_path = get_config_path()
-        default_baud = 9600 # tag:HARDCODE
-
-        if not os.path.exists(config_file_path):
-            print(f"Config file not found. Using default baud rate: {default_baud}")
-            return default_baud
-
-        config = configparser.ConfigParser()
-        config.read(config_file_path)
-
-        if "USB" not in config:
-            print(f"[USB] section not found in config. Using default baud rate: {default_baud}")
-            return default_baud
-
-        try:
-            baud_rate = config["USB"].getint("baud_rate", default_baud)
-            print(f"Using baud rate from config: {baud_rate}")
-            return baud_rate
-        except ValueError:
-            print(f"Invalid baud rate in config. Using default: {default_baud}")
-            return default_baud
-
     # NOTE: this is called by my SerialConnFrame. It must return True or False to properly set status
     def port_init(self):
         port = self.fr_port.get_port()
-        baud_rate = self.get_baud_rate()
+        baud_rate = self.cc.config_svc.get_baud_rate()
 
         self.prompt.print(f"Init with port: {port} @ {baud_rate} baud")
         try:

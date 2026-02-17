@@ -4,12 +4,8 @@
 import tkinter as tk
 from tkinter import ttk
 
-# import needed packages
-import configparser
-
 # import user defined modules
 from EEequipment import equipment_manager
-from common.path_helper import get_config_path
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -41,7 +37,7 @@ class TabDMM(guic.ThemedFrame):
         self.dmm_Meas2 = ''
 
         # Load DMM configuration
-        self.default_sample_speed = self.load_dmm_config()
+        self.default_sample_speed = self.cc.config_svc.get_dmm_sample_speed()
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "DMM Console Output")
@@ -74,25 +70,6 @@ class TabDMM(guic.ThemedFrame):
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
-
-    def load_dmm_config(self):
-        """Load DMM configuration from master.ini"""
-        config = configparser.ConfigParser()
-        config.read(get_config_path())
-
-        # Get sample speed with default fallback
-        sample_speed = "fast"  # Default value
-        if "DMM" in config:
-            sample_speed = config["DMM"].get("sample_speed", "fast").strip()
-
-        # Validate the value
-        valid_speeds = ["slow", "medium", "fast"]
-        if sample_speed not in valid_speeds:
-            print(f"Invalid DMM sample_speed '{sample_speed}' in config. Using 'fast'.")
-            sample_speed = "fast"
-
-        print(f"DMM default sample speed: {sample_speed}")
-        return sample_speed
 
     def initTabContent(self):
         print("Initializing tab 3 (DMM) content")

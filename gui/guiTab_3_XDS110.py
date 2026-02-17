@@ -4,7 +4,6 @@
 import time
 from tkinter import *
 from tkinter import filedialog
-import configparser
 import os
 
 # import user defined modules
@@ -12,6 +11,7 @@ from EEequipment.xds110 import xds110_api as xds110
 from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
 from common.path_helper import get_config_path
+from services.config_service import ConfigService
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
@@ -363,24 +363,20 @@ class tabXDS110(guic.ThemedFrame):
     ##############################################################################
 
     def parse_target_config(self, config_file_path):
-        # initialize the config parser
-        if os.path.exists(config_file_path):
-            config = configparser.ConfigParser()
-            config.read(config_file_path)
+        # Load target config via ConfigService
+        if config_file_path == get_config_path():
+            tc = self.cc.config_svc.get_target_config()
         else:
-            print(f"Configuration file {config_file_path} does not exist.")
-            raise BaseException
+            tc = ConfigService.load_target_config_from_file(config_file_path)
 
-        # read in parameters from the config file
-        power_type = int(config["Target"]["power_type"])
-        self.ps_channel = int(config["Target"]["ps_channel"])
-        debug_config = int(config["Target"]["debug_config"])
-        self.device_vdds = float(config["Target"]["vdds"])
-        self.device_usb_relay = int(config["Target"]["usb_relay"])
-        self.toggle_power_delay = int(config["Target"].get("toggle_power_delay", "6"))
+        # Apply parsed values to GUI variables
+        self.ps_channel = tc.ps_channel
+        self.device_vdds = tc.vdds
+        self.device_usb_relay = tc.usb_relay
+        self.toggle_power_delay = tc.toggle_power_delay
 
-        self.targetConfig_drop[1].set(self.tg_opt[power_type])
-        self.serialNumber_drop[1].set(self.db_opt[debug_config])
+        self.targetConfig_drop[1].set(self.tg_opt[tc.power_type])
+        self.serialNumber_drop[1].set(self.db_opt[tc.debug_config])
 
     def turn_power_on(self, flash_option):
         # CONFIG POWER

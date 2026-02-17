@@ -6,7 +6,6 @@ import tkinter as tk
 from tkinter import ttk
 import os
 import time
-import configparser
 
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 # import ClassController
@@ -14,7 +13,8 @@ from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
 
 # import tab classes
-from common.path_helper import get_config_path
+from common import path_helper
+from services.config_service import ConfigService
 from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_DMM
@@ -30,77 +30,16 @@ from gui import guiTab_10_OSC
 NUM_TABS = 10 # tag:HARDCODE
 
 
-def parse_autoconnect_config():
-    # initialize the config parser
-    config_file_path = get_config_path()
-    if os.path.exists(config_file_path):
-        config = configparser.ConfigParser()
-        config.read(config_file_path)
-    else:
-        print(f"Configuration file {config_file_path} does not exist.")
-        raise BaseException
-
-    # Ensure the section and option exist
-    if "AUTOCONNECT" not in config:
-        raise KeyError("Missing [AUTOCONNECT] section in config.")
-
-    # read in parameters from the config file
-    autoconn_vars = []
-    for i in range(1, NUM_TABS + 1):
-        tmp = config["AUTOCONNECT"][f"tab_{i}"]
-        if tmp.strip().upper() == "YES":
-            autoconn_vars.append(True)
-        else:
-            autoconn_vars.append(False)
-    return autoconn_vars
-
-
-def parse_theme_config():
-    """
-    Parse the theme configuration from master.ini.
-
-    Returns:
-        str: Path to the theme file (e.g., "config/darcula.json")
-    """
-    config_file_path = get_config_path()
-    default_theme = "config/darcula.json" # tag:HARDCODE - but not really an issue because this is fallback if read from config file fails
-
-    if not os.path.exists(config_file_path):
-        print(f"Configuration file {config_file_path} does not exist. Using default theme.")
-        return default_theme
-
-    config = configparser.ConfigParser()
-    config.read(config_file_path)
-
-    # Check if THEME section exists
-    if "THEME" not in config:
-        print("Missing [THEME] section in config. Using default theme.")
-        return default_theme
-
-    # Get theme_file setting
-    theme_file = config["THEME"].get("theme_file", "darcula.json").strip()
-
-    # Ensure it has the config/ prefix if not already present
-    if not theme_file.startswith("config/"):
-        theme_file = f"config/{theme_file}"
-
-    # Verify the theme file exists
-    if not os.path.exists(theme_file):
-        print(f"Theme file {theme_file} does not exist. Using default theme.")
-        return default_theme
-
-    print(f"Using theme: {theme_file}")
-    return theme_file
-
-
 class MainApplication(ThemedApp):
-    def __init__(self, window, height, width, theme_file, autoconnect, compact):
+    def __init__(self, window, height, width, theme_file, autoconnect, compact, config_svc):
         super().__init__(window, theme_file, compact=compact)
         self.autoconnect = autoconnect
+        self.config_svc = config_svc
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
         self.basefilepath = os.getcwd()
         self.controller = ClassController()
+        self.controller.config_svc = config_svc
 
         try:  # NOTE: I think I get weird libpath / StopIteration things if I don't have this thing properly installed
             usb_dev = usbrelay_controller.find()
@@ -120,7 +59,7 @@ class MainApplication(ThemedApp):
 
         # setup autoconnect array
         if self.autoconnect:
-            autoconnect = parse_autoconnect_config()
+            autoconnect = self.config_svc.get_autoconnect_flags()
         else:
             autoconnect = [False] * (NUM_TABS + 1)
 
@@ -183,6 +122,10 @@ class MainApplication(ThemedApp):
 def main(autoconnect, force_compact=False):
     print("Executing main function of gui_driver.py")
 
+    # Create centralized config service and wire into path_helper
+    config_svc = ConfigService()
+    path_helper.init_config_service(config_svc)
+
     # tag:HARDCODE
     desired_w = 1350
     desired_h = 900
@@ -220,7 +163,7 @@ def main(autoconnect, force_compact=False):
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
     # load theme configuration
-    theme_file = parse_theme_config()
+    theme_file = config_svc.get_theme_file()
 
     # place main app
     app = MainApplication(window,
@@ -228,7 +171,8 @@ def main(autoconnect, force_compact=False):
                           w,
                           theme_file,
                           autoconnect,
-                          compact)
+                          compact,
+                          config_svc)
 
     # run application
     window.mainloop()

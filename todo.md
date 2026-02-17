@@ -1,37 +1,24 @@
-# Development Notes & Recommendations
+# Development TODO and notes
 
-*Generated: 2025-02-03 | Last updated: 2026-02-17*
-
----
-
-## concise tasks
-
-
-- [ ] cleanup README
-- [ ] evaluate versioning for requirements.txt
-- [ ] need to give the serial logging a whirl
-- [ ] test the math functions properly
-- have Claude go through and compare my application to pymeasure. Strengths? Weaknesses?
+*Generated: 2026-02-03 | Last updated: 2026-02-17*
 
 ---
 
 ## Open Tasks
 
 
-### 1. Add Unit Tests
-- **Current**: Only 1 test file in submodule
-- **Priority test coverage**:
-  - `logger.py` - StimulusGenerator, CSV building
-  - `plotter.py` - plot_multi_file_data
-  - `common/` utilities
-- **Framework**: `pytest`
+- [ ] need to give the serial logging a whirl
+- [ ] test the math functions properly
 
 
-### 2. Consolidate Analysis Modules
-- **Location**: `analysis/` directory (7 files)
-- **Issue**: Appears underutilized, unclear purpose
-- **Action**: Document what each does, consider if they should be in main app or separate scripts, move IMU-specific code (`imu/`) if not used
+### longer-term tasks
 
+- [ ] add units tests. Priority should be on `logger.py`, `plotter,py`, and the `common` utilities
+- [ ] consolidate analysis modules. Give a review to what files are being used. Document what each one dose
+- [ ] Terminal-only API (connect and control instruments on CLI)
+- [ ] Web interface option (Flask/FastAPI backend)
+- [ ] Database storage option (SQLite/PostgreSQL)
+- [ ] Change tab color when something is active (e.g., connection live, recording in progress)
 
 
 ---
@@ -109,24 +96,8 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 
 **Recommendation:** Move to a config file or command dictionary, following the `CommandRegistry` pattern.
 
-### Refactoring Priority
 
-1. ~~**`ClassController.shutdown()`**~~ -- `PSService.safe_shutdown()` exists; full shutdown consolidation still pending
-2. ~~**`ConfigService`**~~ -- DONE
-3. ~~**Move analysis to `analysis/` modules**~~ -- partially done (accuracy stats, dataframe summary); `final_plot` remains
 
----
 
-## Future Vision
 
-### Short Term:
-- [ ] Plugin system for community equipment drivers
-- [ ] Automated report generation (PDF)
-- [ ] FFT/frequency analysis tools
-- [ ] Terminal-only API (connect and control instruments on CLI)
-
-### Long Term:
-- [ ] Web interface option (Flask/FastAPI backend)
-- [ ] Database storage option (SQLite/PostgreSQL)
-- [ ] Change tab color when something is active (e.g., connection live, recording in progress)
 

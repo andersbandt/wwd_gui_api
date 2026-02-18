@@ -1149,6 +1149,8 @@ class TabLog(guic.ThemedFrame):
 
     def thread_record_timed(self):
         while self.record_status:
+            t_start = time.monotonic()
+
             # Build a row of data based on what user wants
             row = self._collect_data_row()
             self._apply_math_columns(row)
@@ -1157,12 +1159,16 @@ class TabLog(guic.ThemedFrame):
             self.recorded_data.append(row)
             self._save_data_row(row)
 
-            # Update record counter and UI
+            # Update record counter and UI (thread-safe)
             self.recCnt += 1
-            self.labelRNums.config(text=f'#{self.recCnt:7d}')
+            cnt = self.recCnt
+            self.after(0, lambda n=cnt: self.labelRNums.config(text=f'#{n:7d}'))
 
-            # Wait for next sample
-            time.sleep(self.record_speed)
+            # Deadline-based sleep: only sleep the remaining time in the interval
+            elapsed = time.monotonic() - t_start
+            remaining = self.record_speed - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
 
     def start_record_stimulus(self):
         self.prompt.print(f"Starting stimulus sweep with {len(self.stimulus_generator)} steps")
@@ -1211,9 +1217,10 @@ class TabLog(guic.ThemedFrame):
                 self.recorded_data.append(row)
                 self._save_data_row(row)
 
-                # Update record counter and UI
+                # Update record counter and UI (thread-safe)
                 self.recCnt += 1
-                self.labelRNums.config(text=f'#{self.recCnt:7d}')
+                cnt = self.recCnt
+                self.after(0, lambda n=cnt: self.labelRNums.config(text=f'#{n:7d}'))
 
             except Exception as e:
                 self.prompt.print(f"Error in serial-triggered recording: {e}")
@@ -1246,10 +1253,10 @@ class TabLog(guic.ThemedFrame):
             self.recorded_data.append(row)
             self._save_data_row(row)
 
-            # Update progress
+            # Update progress (thread-safe)
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
-            self.labelRNums.config(text=progress_text)
+            self.after(0, lambda t=progress_text: self.labelRNums.config(text=t))
             self.prompt.print(f"Step {step_num}: Stimulus={stimulus_value:.3f}")
 
     def _thread_record_dual_stimulus(self):
@@ -1281,10 +1288,10 @@ class TabLog(guic.ThemedFrame):
             self.recorded_data.append(row)
             self._save_data_row(row)
 
-            # Update progress
+            # Update progress (thread-safe)
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
-            self.labelRNums.config(text=progress_text)
+            self.after(0, lambda t=progress_text: self.labelRNums.config(text=t))
 
     def _collect_data_row(self, serial_data=None):
         row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}

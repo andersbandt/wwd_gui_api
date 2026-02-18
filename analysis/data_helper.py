@@ -3,7 +3,12 @@
 import pandas as pd
 import numpy as np
 import csv
-# from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
+
+
+# TODO: I think there is overlap between this file and `stats_analysis
+# TODO: I should honestly really cleanup this whole analysis folder. Time analysis has literally two functions
+#   it's fine if it's put in a mega file with 1 million lines because it will have clear sections and stuff
 
 
 def scale_array(arr, low, high):

@@ -22,6 +22,9 @@ from common import logger
 import numpy as np
 
 
+# TODO: evaluate having the model on this tab. Can't I just connect to a generic instrument?
+# TODO: maybe should add mini status indicator for DMM and PS for the instrument accuracy testing?
+
 
 class TabATE(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
@@ -302,6 +305,8 @@ Understanding Results:
             self.prompt.print("Running benchmark with the `test_conn` function")
             time.sleep(0.2)
             # bench_result = self.ate.benchmark(100, self.ate.test_conn)
+            # TODO: how does this read_value handle equipment differences (
+            # TODO: add a dropdown for *IDN vs read_value selector?
             bench_result = self.ate.benchmark(100, self.ate.read_value)
             self.prompt.print(bench_result["string"])
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")

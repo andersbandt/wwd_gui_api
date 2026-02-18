@@ -40,6 +40,20 @@ def focus_next_widget(event):
     return "break"
 
 
+# TODO: need to determine what the filename labeler text box is doing
+
+# TODO: how crazy do I want to get with graph features? Like giving user control over xticks, graph lines, legend locatoin, etc.
+#   honestly a separate popup like my oscilloscope configuration could be really nice
+
+# TODO: I should greatly expand the analysis features. I can put a lot with just some extra buttons
+#   time-domain analysis (sample rate, FFT, etc)
+#   IMU analysis
+#   clock analysis
+#   statistics analysis
+
+
+
+
 class TabGraph(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)

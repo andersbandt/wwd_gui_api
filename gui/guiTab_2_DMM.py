@@ -10,6 +10,7 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+# TODO: if I can't get this FUNC2 thing working on my XDM1041 it should be removed
 
 
 

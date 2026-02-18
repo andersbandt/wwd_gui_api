@@ -182,6 +182,15 @@ In order to use `pyvisa` you will need to configure a backend for the VISA inter
 
 ## 📚 Usage Examples
 
+Being a GUI application, usage should be pretty simple and self explanatory.
+The one thing I'll note is that you can add the `-a` flag to automatically try and connect to your previous connections
+
+```commandline
+main.py -a
+```
+
+Other than that, here are some sample sequences one might follow to accomplish stuff using the app.
+
 ### Example 1: Log DMM Data
 ```python
 # In the Logger tab:

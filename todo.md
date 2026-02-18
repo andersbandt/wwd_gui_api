@@ -9,6 +9,9 @@
 
 - [ ] need to give the serial logging a whirl
 - [ ] test the math functions properly
+- [ ] clean up the "About" in the Github project page
+- [ ] clean up the "Initialing tab x ... printing message numbering"
+- [ ] add some documentation about pyvisa.ResourceManager('@py') in EEequipment
 
 
 ### longer-term tasks

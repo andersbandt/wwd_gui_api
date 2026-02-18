@@ -18,6 +18,8 @@ from queue import Queue, Empty
 
 
 # consistent color palette for multi-series / multi-subplot plots
+# TODO: overkill to throw this into theme config ???
+
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
@@ -264,6 +266,8 @@ def plot_accuracy_with_residuals(setpoints, measured, errors,
 
 
 
+
+# TODO: is there a need to break this function up or no?
 def plot_multi_file_data(file_data_list,
     x_var, y_var,
     x_scale=1, y_scale=1,
@@ -338,6 +342,8 @@ def plot_multi_file_data(file_data_list,
 
     # Preprocessing for 'data' and 'both' modes: color assignment
     data_value_to_color = {}
+    # TODO: should I get the colormap normalizer going? Need to get some cool data to try it out on first I guess
+    #   or is it working because I see `normalize_colors` used down below?
     colormap = None
     normalizer = None
     normalize_colors = label_config.get('normalize_colors', False)
@@ -494,9 +500,13 @@ def plot_multi_file_data(file_data_list,
 
         else:
             # No label
-            ax.plot(x_data * x_scale, y_data * y_scale,
+            # TODO: how can this tihing handle when the x-variable is Time? It's a string?
+            ax.plot(x_data, y_data * y_scale,
                    color=COLORS[color_idx % len(COLORS)],
                    marker=plot_marker, markersize=markersize, linestyle=linestyle)
+            #ax.plot(x_data * x_scale, y_data * y_scale,
+            #       color=COLORS[color_idx % len(COLORS)],
+            #       marker=plot_marker, markersize=markersize, linestyle=linestyle)
             color_idx += 1
 
         # Increment file index for line style assignment
@@ -575,6 +585,7 @@ def start_live_plot(
                     buf = cur_bufs.get(ch)
                     if buf is not None:
                         v = sample.get(ch)
+                        # TODO: my method of adding 'ERROR' if a reading failed doesn't work here! (can't convert to float)
                         buf.append(None if v is None else float(v))
 
 

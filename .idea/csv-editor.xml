@@ -38,6 +38,27 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\data\AREC_20260217151943_osc_testing.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\AREC_20260217152241_osc_testing.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\AREC_20260217153224_osc_testing.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
       </map>
     </option>
   </component>

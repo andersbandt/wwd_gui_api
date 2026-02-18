@@ -26,6 +26,21 @@ from common import path_helper
 from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math_config, load_math_config
 
 
+# TODO: is clearing the log data the default behavior I want when I press "stop record" and then "start record" again?
+#   also is that a feature or just how the code will execute? Do I want a pause/resume button?
+
+# TODO: this is probably very technically challenging but how do I handle multi-logging with equipment where one has a very slow sample rate?
+#   do I have to have sub-threads for each piece of equipment?
+
+# TODO: is it overkill to add unit scaling to the y-axis on this thing?
+
+# TODO: I should see if I can add a simulator mode to test this plotting thing (use np.random() or something)
+
+# TODO: does plotly have a way to export a file? Or do I just save the HTML?
+
+# TODO: where is the overhead in this? I can get 80Hz sample rate from a scope. Yet with 4 measurements I'm only getting like 1.8Hz (data saved)
+
+
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)
@@ -100,6 +115,7 @@ class TabLog(guic.ThemedFrame):
         print("Initializing tab 8 (Logger) content")
 
         # print welcome text_data (only in standard mode)
+        # TODO: this thing does not show up properly !!! (it shows up in the middle of the setup frame)
         if not self.theme_config.get("compact", False):
             l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
                            font=(self.theme_config["font"]["family"], 16))
@@ -478,7 +494,8 @@ class TabLog(guic.ThemedFrame):
             row=0, column=0, columnspan=3, pady=5, padx=10)
 
         # Listbox showing configured columns
-        self.math_listbox = tk.Listbox(self.fr_math, width=40, height=8,
+        # TODO: make this have a scrollbar (possible issues on compact screens)
+        self.math_listbox = tk.Listbox(self.fr_math, width=40, height=6,
                                        bg=self.theme_config["bg_light"],
                                        fg=self.theme_config["fg_light"],
                                        selectmode=tk.SINGLE)

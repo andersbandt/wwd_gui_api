@@ -168,7 +168,7 @@ class ThemedApp:
 
 
 # NOTE: this thing is mainly used for the tabs and the stuff in `gui_class.py`
-#   it's not currently used for many of of the sub-Frames in tabs
+#   it's not currently used for many of the sub-Frames in tabs
 class ThemedFrame(tk.Frame):
     def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
@@ -178,7 +178,6 @@ class ThemedFrame(tk.Frame):
 
     def set_bg(self, bg):
         self.configure(bg=bg)
-
 
 
 class Prompt(ThemedFrame):
@@ -574,6 +573,7 @@ class AutoConnFrame(ConnFrame):
 ### THREADS             ##################
 ##########################################
 
+# TODO: this should probably be in `common/threading.py` or something right?
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""

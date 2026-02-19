@@ -530,7 +530,7 @@ class SerialConnFrame(ConnFrame):
         root = ET.Element("PortsUsed")
         try:
             tree = ET.ElementTree(root, file="config/ports_used.xml")
-        except xml.etree.ElementTree.ParseError:
+        except (FileNotFoundError, xml.etree.ElementTree.ParseError):
             return False
 
         port_elem = tree.find(self.name)

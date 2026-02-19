@@ -17,37 +17,15 @@ from gui import gui_class as guic
 
 
 
-# TODO: add a GUI tab here exclusively for acquistion / sampling
-#   options on this equipment are {normal, peak detect, averaging(N), and high resolution
-#   <type> ::= {NORMal | AVERage | HRESolution | PEAK}
-#   check what the DSO1014A is capable of
-
-# NOTE: for above TODO
-# The :ACQuire:TYPE command selects the type of data acquisition that is to take
-# place. The acquisition types are:
-# • NORMal — sets the oscilloscope in the normal mode.
-# • AVERage — sets the oscilloscope in the averaging mode. You can set the count
-# by sending the :ACQuire:COUNt command followed by the number of averages.
-# In this mode, the value for averages is an integer from 1 to 65536. The COUNt
-# value determines the number of averages that must be acquired.
-# The AVERage type is not available when in segmented memory mode
-# (:ACQuire:MODE SEGMented).
-# • HRESolution — sets the oscilloscope in the high-resolution mode (also known
-# as smoothing). This mode is used to reduce noise at slower sweep speeds
-# where the digitizer samples faster than needed to fill memory for the displayed
-# time range.
-# For example, if the digitizer samples at 200 MSa/s, but the effective sample
-# rate is 1 MSa/s (because of a slower sweep speed), only 1 out of every 200
-# samples needs to be stored. Instead of storing one sample (and throwing others
-# away), the 200 samples are averaged together to provide the value for one
-# display point. The slower the sweep speed, the greater the number of samples
-# that are averaged together for each display point.
-# • PEAK — sets the oscilloscope in the peak detect mode. In this mode,
-# :ACQuire:COUNt has no meaning.
-# The AVERage and HRESolution types can give you extra bits of vertical resolution.
-# See the User's Guide for an explanation. When getting waveform data acquired
-# using the AVERage and HRESolution types, be sure to use the WORD or ASCii
-# waveform data formats to get the extra bits of vertical resolution.
+# NOTE: Acquisition type SCPI reference (:ACQuire:TYPE)
+# NORMal   — standard mode
+# AVERage  — averages N waveforms; N set via :ACQuire:COUNt (1–65536)
+#            not available in segmented memory mode
+# HRESolution — smoothing; averages oversampled points per display point
+#               useful at slower sweep speeds to reduce noise
+# PEAK     — peak detect; :ACQuire:COUNt has no meaning in this mode
+# AVERage and HRESolution yield extra vertical resolution; use WORD or
+# ASCii waveform format when reading data in those modes.
 
 
 
@@ -62,6 +40,7 @@ class TabOSC(guic.ThemedFrame):
         self.fr_port = None
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_channel = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_tb_trig = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # oscilloscope state
@@ -102,6 +81,7 @@ class TabOSC(guic.ThemedFrame):
         self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="N")
         self.fr_control.grid(row=0, column=2, rowspan=3, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.fr_channel.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_tb_trig.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.prompt.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
@@ -114,6 +94,7 @@ class TabOSC(guic.ThemedFrame):
         print("Initializing tab 10 (OSC) content")
         self.init_fr_info()
         self.init_fr_channel()
+        self.init_fr_tb_trig()
         self.init_fr_control()
 
     # =========================================================================
@@ -220,7 +201,7 @@ class TabOSC(guic.ThemedFrame):
                       ).grid(row=row, column=6, padx=3, pady=3)
 
     # =========================================================================
-    # fr_control — Acquisition, Timebase, Trigger, Save/Recall, Measure
+    # fr_control — Acquisition (run/stop + type), Save/Recall, Measure
     # =========================================================================
     def init_fr_control(self):
         fr = self.fr_control
@@ -244,9 +225,75 @@ class TabOSC(guic.ThemedFrame):
             row=cur_row, column=2, padx=5, pady=3)
         cur_row += 1
 
+        # --- Acquisition Type ---
+        ttk.Label(fr, text="Type", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        self.acq_type_drop = guih.generate_drop_down(fr, ["NORMal", "AVERage", "HRESolution", "PEAK"])
+        self.acq_type_drop[1].set("NORMal")
+        self.acq_type_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        tk.Button(fr, text="Set", width=6,
+                  command=lambda: self.set_acq_type(self.acq_type_drop[1].get())
+                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+        cur_row += 1
+
+        # Avg Count (only meaningful for AVERage mode)
+        ttk.Label(fr, text="Avg Count", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        self.acq_count_entry = tk.Entry(fr, width=10)
+        self.acq_count_entry.insert(0, "4")
+        self.acq_count_entry.grid(row=cur_row, column=1, padx=5, pady=3)
+        tk.Button(fr, text="Set", width=6,
+                  command=lambda: self.set_acq_count(self.acq_count_entry.get())
+                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+        cur_row += 1
+
+        # --- Save / Recall ---
+        ttk.Label(fr, text="Save / Recall", style="TPinkLabel.TLabel").grid(
+            row=cur_row, column=0, columnspan=3, pady=(10, 5))
+        cur_row += 1
+
+        self.save_filename_entry = tk.Entry(fr, width=18)
+        self.save_filename_entry.grid(row=cur_row, column=0, columnspan=2, padx=5, pady=3, sticky="W")
+        cur_row += 1
+
+        tk.Button(fr, text="Screenshot", width=10, command=self.save_screenshot).grid(
+            row=cur_row, column=0, padx=5, pady=3)
+        tk.Button(fr, text="Save Setup", width=10, command=self.save_setup).grid(
+            row=cur_row, column=1, padx=5, pady=3)
+        tk.Button(fr, text="Recall Setup", width=10, command=self.recall_setup).grid(
+            row=cur_row, column=2, padx=5, pady=3)
+        cur_row += 1
+
+        # --- Autoscale ---
+        tk.Button(fr, text="Autoscale", width=10, command=self.autoscale).grid(
+            row=cur_row, column=0, padx=5, pady=(10, 3))
+        cur_row += 1
+
+        # --- Quick Measurements ---
+        ttk.Label(fr, text="Measurements", style="TPinkLabel.TLabel").grid(
+            row=cur_row, column=0, columnspan=3, pady=(10, 5))
+        cur_row += 1
+
+        ttk.Label(fr, text="Channel", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
+        self.meas_ch_drop = guih.generate_drop_down(fr, ["1", "2", "3", "4"])
+        self.meas_ch_drop[1].set("1")
+        self.meas_ch_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        tk.Button(fr, text="Measure All", width=10, command=self.measure_all).grid(
+            row=cur_row, column=2, padx=5, pady=3)
+
+    # =========================================================================
+    # fr_tb_trig — Timebase + Trigger
+    # =========================================================================
+    def init_fr_tb_trig(self):
+        fr = self.fr_tb_trig
+
+        # clear existing widgets
+        for w in fr.winfo_children():
+            w.destroy()
+
+        cur_row = 0
+
         # --- Timebase Controls ---
         ttk.Label(fr, text="Timebase", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
+            row=cur_row, column=0, columnspan=3, pady=5)
         cur_row += 1
 
         self.tb_label = ttk.Label(fr, text=self._format_timebase(self.tb_steps[self.tb_index]),
@@ -295,41 +342,6 @@ class TabOSC(guic.ThemedFrame):
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_trigger_slope(self.trig_slope_drop[1].get())
                   ).grid(row=cur_row, column=2, padx=5, pady=3)
-        cur_row += 1
-
-        # --- Save / Recall ---
-        ttk.Label(fr, text="Save / Recall", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
-        cur_row += 1
-
-        self.save_filename_entry = tk.Entry(fr, width=18)
-        self.save_filename_entry.grid(row=cur_row, column=0, columnspan=2, padx=5, pady=3, sticky="W")
-        cur_row += 1
-
-        tk.Button(fr, text="Screenshot", width=10, command=self.save_screenshot).grid(
-            row=cur_row, column=0, padx=5, pady=3)
-        tk.Button(fr, text="Save Setup", width=10, command=self.save_setup).grid(
-            row=cur_row, column=1, padx=5, pady=3)
-        tk.Button(fr, text="Recall Setup", width=10, command=self.recall_setup).grid(
-            row=cur_row, column=2, padx=5, pady=3)
-        cur_row += 1
-
-        # --- Autoscale ---
-        tk.Button(fr, text="Autoscale", width=10, command=self.autoscale).grid(
-            row=cur_row, column=0, padx=5, pady=(10, 3))
-        cur_row += 1
-
-        # --- Quick Measurements ---
-        ttk.Label(fr, text="Measurements", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
-        cur_row += 1
-
-        ttk.Label(fr, text="Channel", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
-        self.meas_ch_drop = guih.generate_drop_down(fr, ["1", "2", "3", "4"])
-        self.meas_ch_drop[1].set("1")
-        self.meas_ch_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
-        tk.Button(fr, text="Measure All", width=10, command=self.measure_all).grid(
-            row=cur_row, column=2, padx=5, pady=3)
 
     # =========================================================================
     # gui_refresh
@@ -427,6 +439,32 @@ class TabOSC(guic.ThemedFrame):
     # =========================================================================
     # Acquisition Actions
     # =========================================================================
+    def set_acq_type(self, acq_type):
+        if not self.cc.get_osc_status():
+            guih.alert_user("Can't set acq type", "No OSC connection!", "error")
+            return
+        try:
+            self.cc.osc.set_acq_type(acq_type)
+            self.prompt.print(f"Acquisition type: {acq_type}")
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't set acquisition type", str(e), "error")
+
+    def set_acq_count(self, count_str):
+        if not self.cc.get_osc_status():
+            guih.alert_user("Can't set acq count", "No OSC connection!", "error")
+            return
+        try:
+            count = int(count_str)
+            if not (1 <= count <= 65536):
+                guih.alert_user("Invalid Input", "Count must be between 1 and 65536", "error")
+                return
+            self.cc.osc.set_acq_count(count)
+            self.prompt.print(f"Acquisition count: {count}")
+        except ValueError:
+            guih.alert_user("Invalid Input", "Count must be an integer", "error")
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't set acquisition count", str(e), "error")
+
     def acq_run(self):
         if not self.cc.get_osc_status():
             guih.alert_user("Can't run", "No OSC connection!", "error")
@@ -652,6 +690,7 @@ class TabOSC(guic.ThemedFrame):
         self.channel_count = self.cc.osc.channel_count
         self.init_fr_info()
         self.init_fr_channel()
+        self.init_fr_tb_trig()
         self.init_fr_control()
 
         self.prompt.print(f"Connected to OSC with id: {result.device_id}")

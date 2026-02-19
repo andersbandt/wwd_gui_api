@@ -8,10 +8,6 @@ import argparse
 from gui import gui_driver
 
 
-# TODO: now that I'm excluding ports_used.xml, should main handle creating it on first run? Or just have a file in the repo that is then ignored?
-#   TLDR: how do I initialize port_used.xml for a fresh install
-# TODO: also, is my config adding multiple entries?
-
 
 # TODO: can I get the little taskbar icon to be custom :)
 # TODO: also ask Claude how I can actually package this thing into an .exe or some executable ... that PyInstaller didn't seem to work for me

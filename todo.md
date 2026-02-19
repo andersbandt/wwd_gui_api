@@ -23,6 +23,18 @@
 - [ ] Web interface option (Flask/FastAPI backend)
 - [ ] Database storage option (SQLite/PostgreSQL)
 - [ ] Change tab color when something is active (e.g., connection live, recording in progress)
+- [ ] this is probably very technically challenging but how do I handle multi-logging with equipment where one has a very slow sample rate? 
+  - do I have to have sub-threads for each piece of equipment?
+- [ ] add a simulator mode using np.random() or something to test live plotting / logging / math features?
+
+
+### Logger tab: per-channel unit scaling
+
+Add a "Scale..." popup dialog (same pattern as the OSC config dialog) letting the user set a scale factor and unit label per channel (e.g. V→mV ×1000, A→mA ×1000). Stores a dict like `{'PS_Vmeas1': (1000, 'mV'), ...}`.
+
+- **`final_plot()` side** — straightforward: multiply each DataFrame column by its scale factor before the `plotter.plot*` call, update the ylabel with the unit label.
+- **Live Dash plot side** — harder: scale config needs to be threaded into `plotter.start_live_plot()` state dict and applied in `_ingest_from_bus()`. Do NOT pre-scale at `_save_data_row()` as that would corrupt the CSV.
+- **X-axis (stimulus mode only)** — same dialog can expose a scale for the stimulus column.
 
 
 ---

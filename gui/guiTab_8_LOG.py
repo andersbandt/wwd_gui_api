@@ -26,12 +26,9 @@ from common import path_helper
 from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math_config, load_math_config
 
 
-# TODO: this is probably very technically challenging but how do I handle multi-logging with equipment where one has a very slow sample rate?
-#   do I have to have sub-threads for each piece of equipment?
 
-# TODO: is it overkill to add unit scaling to the y-axis on this thing?
 
-# TODO: I should see if I can add a simulator mode to test this plotting thing (use np.random() or something)
+
 
 
 

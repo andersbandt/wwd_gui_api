@@ -1,12 +1,31 @@
 """Central controller that holds references to all connected equipment."""
 
+import os
 import xml.etree.ElementTree as ET
 
 from services import DMMService, PSService, FGService, OscService
 
+_PORTS_XML = _PORTS_XML
+
+
+def _write_xml(tree, root):
+    """Strip compounded whitespace nodes, re-indent, and write ports_used.xml."""
+    for elem in root.iter():
+        if elem.text and not elem.text.strip():
+            elem.text = None
+        if elem.tail and not elem.tail.strip():
+            elem.tail = None
+    ET.indent(root, space="    ", level=0)
+    with open(_PORTS_XML, "wb") as f:
+        tree.write(f, encoding="utf-8", xml_declaration=True)
+
 
 class ClassController:
     def __init__(self):
+        # Create ports_used.xml on first run if it doesn't exist
+        if not os.path.exists(_PORTS_XML):
+            root = ET.Element("PortsUsed")
+            _write_xml(ET.ElementTree(root), root)
         self.ser = None
         self.dmm = None
         self.ps = None
@@ -90,7 +109,7 @@ class ClassController:
 
         # Load or create XML tree
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             root = ET.Element("PortsUsed")
@@ -106,24 +125,16 @@ class ClassController:
         # Update or create the element for this usage
         usage_element = root.find(usage)
         if usage_element is not None:
-            # Update existing element
             old_port = usage_element.text
             usage_element.text = str(port)
             if old_port != port:
                 print(f"Updated {usage}: {old_port} -> {port}")
         else:
-            # Create new element for this usage
             usage_element = ET.SubElement(root, usage)
             usage_element.text = str(port)
             print(f"Created new port mapping: {usage} -> {port}")
 
-        # Pretty-print the XML with indentation
-        ET.indent(root, space="    ", level=0)
-
-        # Write back to the XML file
-        with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
-
+        _write_xml(tree, root)
         return True
 
     def set_used_model(self, model, usage):
@@ -137,7 +148,7 @@ class ClassController:
         """
         # Load or create XML tree
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             root = ET.Element("PortsUsed")
@@ -146,11 +157,9 @@ class ClassController:
         # Find or create the usage element
         usage_element = root.find(usage)
         if usage_element is None:
-            # Create new element for this usage if it doesn't exist
             usage_element = ET.SubElement(root, usage)
             usage_element.text = ""
 
-        # Update or create the model attribute
         old_model = usage_element.get("model")
         usage_element.set("model", str(model))
 
@@ -160,13 +169,7 @@ class ClassController:
             else:
                 print(f"Set {usage} model: {model}")
 
-        # Pretty-print the XML with indentation
-        ET.indent(root, space="    ", level=0)
-
-        # Write back to the XML file
-        with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
-
+        _write_xml(tree, root)
         return True
 
     def get_used_model(self, usage):
@@ -180,7 +183,7 @@ class ClassController:
             str: The model name if found, None otherwise
         """
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             return None
@@ -195,7 +198,7 @@ class ClassController:
     def set_used_method(self, method, usage):
         """Save the port detection method for a specific tab/usage as an XML attribute."""
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             root = ET.Element("PortsUsed")
@@ -207,15 +210,12 @@ class ClassController:
             usage_element.text = ""
 
         usage_element.set("method", str(method))
-
-        ET.indent(root, space="    ", level=0)
-        with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
+        _write_xml(tree, root)
 
     def get_used_method(self, usage):
         """Retrieve the saved port detection method for a specific tab/usage."""
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             return None

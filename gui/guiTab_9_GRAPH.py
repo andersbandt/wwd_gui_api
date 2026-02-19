@@ -16,6 +16,7 @@ from tkinter import filedialog
 from common import path_helper
 from common import plotter
 from analysis import data_helper
+from analysis import stats_analysis
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -569,6 +570,21 @@ class TabGraph(guic.ThemedFrame):
                 for col, s in col_stats.items():
                     self.prompt.print(
                         f"  {col}: mean={s['mean']:.4f}, std={s['std']:.4f}, min={s['min']:.4f}, max={s['max']:.4f}")
+
+            # Time-series analysis (requires a 'Time' column written by the logger)
+            if "Time" in df.columns:
+                try:
+                    dtime_arr = stats_analysis.create_datetime(df["Time"].dropna().tolist())
+                    if len(dtime_arr) >= 2:
+                        t = stats_analysis.analyze_time(dtime_arr)
+                        self.prompt.print("\nTime Analysis:")
+                        self.prompt.print(f"  Duration:     {t['dur_sec']:.3f} s  ({t['dur_min']:.2f} min)")
+                        self.prompt.print(f"  Samples:      {t['samples']}")
+                        self.prompt.print(f"  Sample rate:  {t['frequency']:.3f} Hz  ({1000/t['frequency']:.1f} ms/sample)")
+                    else:
+                        self.prompt.print("\nTime Analysis: not enough samples")
+                except Exception as e:
+                    self.prompt.print(f"\nTime Analysis failed: {e}", "warning")
 
         self.prompt.print("\nAnalysis complete!")
         return True

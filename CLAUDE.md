@@ -154,13 +154,9 @@ All log files are written to the `data/` directory with timestamped filenames.
 
 **analysis/** contains data analysis modules:
 
-- `data_helper.py` — CSV/data manipulation utilities
-- `stats_analysis.py` — Statistical analysis
-- `afe_analysis.py` — Analog front-end data analysis
-- `clock_analysis.py` — Clock/timing measurements
-- `temp_analysis.py` — Temperature data analysis
-- `time_analysis.py` — Time-series analysis
-- `least_squares.py` — Least squares fitting
+- `data_helper.py` — CSV/data manipulation and type-conversion utilities
+- `stats_analysis.py` — Statistical analysis, linear regression, accuracy metrics, and time-series helpers (duration, sample rate)
+- `specific/` — Domain-specific analysis scripts (AFE, clock, IMU, least squares)
 
 ### IMU Utilities
 

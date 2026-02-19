@@ -102,3 +102,11 @@ def conv_imu_flash(upper_byte, lower_byte):
     imu_data = (upper_byte >> 8) + lower_byte
     return imu_data
 
+
+
+def analyze_ICM_42670(dig_temp_arr):
+    temp_fahr = []
+    for temp in dig_temp_arr:
+        temp_f = ((temp/128) + 25)*1.8 + 32
+        temp_fahr.append(temp_f)
+    return temp_fahr

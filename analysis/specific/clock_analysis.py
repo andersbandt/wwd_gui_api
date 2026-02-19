@@ -11,9 +11,8 @@ from matplotlib import pyplot as plt
 
 # import user created modules
 from analysis import least_squares, data_helper as datah
-from analysis import time_analysis
 from analysis import stats_analysis
-from analysis import temp_analysis
+from analysis.specific import imu_analysis
 from common import plotter
 from common import logger
 
@@ -88,7 +87,7 @@ def get_total_data(total_file, col_str, float_col, clean_col):
         df = clean_data(df, col)
 
     if "timestamp" in col_str:
-        df["datetime"] = time_analysis.create_datetime(df["timestamp"])
+        df["datetime"] = stats_analysis.create_datetime(df["timestamp"])
         df["dtsecond"] = [date.timestamp() for date in df["datetime"]]
 
     return df
@@ -114,7 +113,7 @@ def create_time_offset(mcu_time_arr, real_time):
 
 def full_create_time_offset(df_tmp):
     time_offset = []
-    dt_tmp = time_analysis.create_datetime(df_tmp["timestamp"])
+    dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
     dt_seconds = [date.timestamp() for date in dt_tmp]
     time_offset.extend(
         create_time_offset(
@@ -132,7 +131,7 @@ def train_model(train_file, ver_file):
         if ".csv" in tr_file:
             print(f"Loading in file: {tr_file}")
             df_tmp = get_total_data(tr_file, ["timestamp", "ms", "temp"], ["temp"], ["ms"])
-            dt_tmp = time_analysis.create_datetime(df_tmp["timestamp"])
+            dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
             dt_seconds = [date.timestamp() for date in dt_tmp]
 
             # extend training time offset array ?
@@ -145,7 +144,7 @@ def train_model(train_file, ver_file):
             # concatenate new DataFrame into training data
             train_df = pd.concat([train_df, df_tmp], ignore_index=True)
 
-    datetime_f_arr = time_analysis.create_datetime(train_df["timestamp"])
+    datetime_f_arr = stats_analysis.create_datetime(train_df["timestamp"])
 
     # VARIABLE SETUP
     A = least_squares.generateA(train_df["ms"], train_df["temp"])
@@ -180,7 +179,7 @@ def train_model(train_file, ver_file):
     plotter.time_plot(index, time_offset, "Datetime", "Training time offset (ms)")
     plotter.time_plot(index, residual, "Data Entry #", "Training residual (ms)")
 
-    temp_f_arr = temp_analysis.analyze_ICM_42670(train_df["temp"])
+    temp_f_arr = imu_analysis.analyze_ICM_42670(train_df["temp"])
     plotter.time_plot(index, temp_f_arr, "Data Entry #", "Training temp", color="purple")
     return train_df
 
@@ -214,7 +213,7 @@ def verify_data(ver_file, columns):
     min_value = df_ver["dtsecond"].min()
     result = df_ver["dtsecond"] - min_value
     df_ver["dtsecond_zero"] = result
-    temp_f_arr = temp_analysis.analyze_ICM_42670(df_ver["temp"])
+    temp_f_arr = imu_analysis.analyze_ICM_42670(df_ver["temp"])
     plotter.time_plot(df_ver["dtsecond_zero"], df_ver["time_offset"], "Datetime seconds",
                       "Verification time offset (ms)", color="red")
     plotter.time_plot(df_ver["datetime"], temp_f_arr, "Datetime", "Verification temp (int16_t)", color="orange")
@@ -253,8 +252,8 @@ if __name__ == "__main__":
 
     ### PERFORM VERIFICATION
     verification_df = verify_data(ver_file_full_path, ["timestamp", "ms", "temp"])
-    time_dict = time_analysis.analyze_time(
-        time_analysis.create_datetime(
+    time_dict = stats_analysis.analyze_time(
+        stats_analysis.create_datetime(
             verification_df["timestamp"]
         ))
     pprint(time_dict)

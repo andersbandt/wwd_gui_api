@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 from services import DMMService, PSService, FGService, OscService
 
-_PORTS_XML = _PORTS_XML
+_PORTS_XML = os.path.join("config", "ports_used.xml")
 
 
 def _write_xml(tree, root):

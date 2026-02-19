@@ -13,7 +13,9 @@
       "Bash(git commit:*)",
       "Bash(git -C /home/anders/Documents/GitHub/wwd_gui_api status)",
       "Bash(git -C /home/anders/Documents/GitHub/wwd_gui_api log --oneline -5)",
-      "Bash(python -m py_compile:*)"
+      "Bash(python -m py_compile:*)",
+      "Bash(pip3 show:*)",
+      "Bash(done)"
     ]
   }
 }

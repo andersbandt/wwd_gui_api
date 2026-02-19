@@ -1,33 +1,36 @@
 # Development TODO and notes
 
-*Generated: 2026-02-03 | Last updated: 2026-02-17*
+*Generated: 2026-02-03 | Last updated: 2026-02-19*
 
 ---
 
 ## Open Tasks
 
+### Near-term / Verify
 
 - [ ] need to give the serial logging a whirl
 - [ ] test the math functions properly
-- [ ] clean up the "About" in the Github project page
-- [x] clean up the "Initialing tab x ... printing message numbering"
+- [ ] get the FUNC2 thing working again or eliminate it (would be nice to read XDM1041 datasheet)
+- [ ] add unit tests for `logger.py`, `plotter.py`, and the `common` utilities (EEequipment drivers already covered in `tests/`)
 - [ ] add some documentation about pyvisa.ResourceManager('@py') in EEequipment
-  - I need to move all the backend discussion to EEequipment ...
+- [ ] clean up the "About" in the Github project page
 
+### UI & Feature Work
 
-### longer-term tasks
+- [ ] Change tab color when something is active (e.g., connection live, recording in progress)
+- [ ] should I add a mini status indicator in ATE tab next to instrument accuracy testing?
+- [ ] add a simulator mode using np.random() or similar to test live plotting / logging / math features
+- [ ] multi-logging with mixed sample rates — how to handle equipment with very slow sample rates? (sub-threads per instrument?)
+- [ ] custom taskbar icon for the app window
 
-- [ ] add units tests. Priority should be on `logger.py`, `plotter,py`, and the `common` utilities
-- [x] consolidate analysis modules. Give a review to what files are being used. Document what each one dose
+### Future / Exploratory
+
 - [ ] Terminal-only API (connect and control instruments on CLI)
 - [ ] Web interface option (Flask/FastAPI backend)
 - [ ] Database storage option (SQLite/PostgreSQL)
-- [ ] Change tab color when something is active (e.g., connection live, recording in progress)
-- [ ] this is probably very technically challenging but how do I handle multi-logging with equipment where one has a very slow sample rate? 
-  - do I have to have sub-threads for each piece of equipment?
-- [ ] add a simulator mode using np.random() or something to test live plotting / logging / math features?
-- [ ] custom taskbar icon for the app window
-- [ ] package into a standalone executable (PyInstaller didn't work previously — investigate alternatives like Nuitka or cx_Freeze)
+- [ ] package into a standalone executable (PyInstaller didn't work previously — investigate Nuitka or cx_Freeze)
+
+
 
 
 ### Logger tab: per-channel unit scaling

@@ -84,7 +84,7 @@ This controller is passed to all tabs, allowing them to share equipment instance
 
 The theming system supports "compact" mode for smaller screens, which scales down padding and button sizes. Theme is selected in `config/master.ini` under `[THEME]`.
 
-### Services Layer (Scaffolding — Not Yet Wired In)
+### Services Layer
 
 **services/** contains per-equipment service classes that encapsulate the connect/disconnect lifecycle and business logic, separating it from GUI code:
 
@@ -94,7 +94,7 @@ The theming system supports "compact" mode for smaller screens, which scales dow
 - `fg_service.py` — `FGService`
 - `osc_service.py` — `OscService`
 
-**Status**: Service classes are created but NOT yet wired into tabs. See `todo.md` for migration plan.
+**Status**: Service layer is fully wired into all relevant tabs (`guiTab_2_DMM`, `guiTab_5_PS`, `guiTab_6_FG`, `guiTab_8_LOG`, `guiTab_10_OSC`). Remaining decoupling work (threading, hardcoded commands) is tracked in `todo.md`.
 
 ### Equipment Control Layer
 
@@ -243,6 +243,11 @@ git submodule update --init
 - **todo.md** — Development task tracker with open issues, refactoring priorities, and architecture improvement plans. This is the primary task/TODO list.
 - **scripting.md** — Design notes for a planned scripting/automation system.
 - **docs/** — Screenshots and documentation assets.
+- **tests/** — pytest test suite (run with `pytest tests/`):
+  - `test_dmm_drivers.py` — AST-based check that each DMM driver's model name matches a `CommandRegistry` entry; no hardware needed
+  - `test_equipment_instantiation.py` — instantiates every `TestEquipment` subclass with connection I/O mocked out; catches unimplemented abstract methods
+  - New drivers are picked up automatically via `equipment_manager.get_instruments`
+- **conftest.py** — Adds project root to `sys.path` so pytest can import `EEequipment` and other packages
 
 ## Development Notes
 
@@ -251,5 +256,4 @@ git submodule update --init
 - The application performs graceful shutdown, turning off power supplies and opening all relays when closing (shutdown logic is in `gui_driver.py` lines 236-271)
 - Serial port detection methods can be changed via dropdown (Auto/Windows/Linux/PyVISA)
 - The GUI adjusts to screen size, using compact mode for smaller displays
-- A services layer (`services/`) has been scaffolded but not yet integrated — see `todo.md` for migration plan
-- Known architectural debt: tabs currently mix view, controller, and business logic; see `todo.md` "GUI / Logic Decoupling" section for details
+- The services layer (`services/`) is wired into all relevant tabs; remaining architectural debt is documented in `todo.md` under "GUI / Logic Decoupling"

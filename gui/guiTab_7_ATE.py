@@ -23,7 +23,6 @@ import numpy as np
 
 
 # TODO: evaluate having the model on this tab. Can't I just connect to a generic instrument?
-# TODO: maybe should add mini status indicator for DMM and PS for the instrument accuracy testing?
 
 
 class TabATE(guic.ThemedFrame):
@@ -127,17 +126,20 @@ class TabATE(guic.ThemedFrame):
                                       )
 
 
-        # MISC CONTROL
-        self.benchmark = tk.Button(fr_m, text="Benchmark",
-                                      command=lambda: self.ate_benchmark()
-                                      )
+        # BENCHMARK CONTROLS
+        self.bench_method_drop = guih.generate_drop_down(fr_m, ["read_value", "test_conn"])
+        self.bench_store_var = tk.BooleanVar()
+        self.bench_store_check = tk.Checkbutton(fr_m, text="Store Values", variable=self.bench_store_var)
+        self.benchmark = tk.Button(fr_m, text="Benchmark", command=self.ate_benchmark)
 
         # place everything on grid
         self.cmd_label.grid(row=1, column=0, padx=10, pady=10)
         self.cmd_entry.grid(row=1, column=1, padx=10, pady=10)
         self.cmd_button.grid(row=1, column=2, padx=10, pady=10)
         self.qry_button.grid(row=1, column=3, padx=10, pady=10)
-        self.benchmark.grid(row=2, column=0, padx=10, pady=10)
+        self.bench_method_drop[0].grid(row=2, column=0, padx=10, pady=10)
+        self.bench_store_check.grid(row=2, column=1, padx=10, pady=10, sticky='w')
+        self.benchmark.grid(row=2, column=2, padx=10, pady=10)
 
     def init_fr_accuracy(self):
         """Initialize the instrument accuracy testing frame"""
@@ -298,15 +300,44 @@ Understanding Results:
             self.prompt.print(f"Got response: {res}")
 
     def ate_benchmark(self):
-        # TODO: should I actually query stuff and store it to "prove" I did it? Could be a checkbox and see how sample rate changes
-        if self.ate is not None:
-            self.prompt.print("Running benchmark with the `test_conn` function")
-            time.sleep(0.2)
-            # TODO: how does this read_value handle equipment differences?
-            # TODO: add a dropdown for *IDN vs read_value selector?
-            bench_result = self.ate.benchmark(100, self.ate.read_value)
-            self.prompt.print(bench_result["string"])
+        if self.ate is None:
+            return
+        method_name = self.bench_method_drop[1].get()
+        method = self.ate.read_value if method_name == "read_value" else self.ate.test_conn
+        store = self.bench_store_var.get()
+
+        self.prompt.print(f"Running benchmark with {method_name} (store={store})...")
+        time.sleep(0.2)
+        bench_result = self.ate.benchmark(100, method, store_values=store)
+        self.prompt.print(bench_result["string"])
+
+        if store and bench_result["values"]:
+            self._show_benchmark_values(bench_result)
+        else:
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")
+
+    def _show_benchmark_values(self, bench_result):
+        win = tk.Toplevel(self)
+        win.title("Benchmark Values")
+        win.geometry("420x500")
+
+        ttk.Label(win, text=bench_result["string"], style="TLabel", justify="left").pack(pady=10, padx=10, anchor='w')
+
+        frame = tk.Frame(win)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        text = tk.Text(frame, yscrollcommand=scrollbar.set, width=50)
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text.yview)
+
+        for i, val in enumerate(bench_result["values"]):
+            text.insert(tk.END, f"{i + 1}: {val}\n")
+        text.config(state=tk.DISABLED)
+
+        tk.Button(win, text="Close", command=win.destroy).pack(pady=10)
 
     def run_accuracy_test(self):
         """Run instrument accuracy test by sweeping PS and measuring with DMM"""

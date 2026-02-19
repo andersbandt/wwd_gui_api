@@ -10,9 +10,6 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: I should think about range setting more (there is another TODO on this I think)
-#   ideas: store the text value of the ranges in a separate section of the `config_ini`. Then just simply populate an array of buttons
-
 
 
 class TabDMM(guic.ThemedFrame):
@@ -120,7 +117,6 @@ class TabDMM(guic.ThemedFrame):
         self.labelMeas2 = ttk.Label(self.fr_info, width=10, text='Meas2', style="TLabel", anchor='w')
 
         # Position the range and measurement labels
-        # TODO: if I can't get this FUNC2 thing working on my XDM1041 it should be removed
         self.labelRange.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelFu1.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelMeas1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
@@ -155,28 +151,30 @@ class TabDMM(guic.ThemedFrame):
         fr_m = self.fr_control
 
         labelInfo = ttk.Label(fr_m, text='DMM_Control', style="TPinkLabel.TLabel", width=15)
-        labelInfo.grid(row=0, column=0, columnspan=2, pady=5)
+        labelInfo.grid(row=0, column=0, columnspan=3, pady=5)
 
         # mode control
+        ttk.Label(fr_m, text='Mode:', style="TLabel", anchor='e').grid(row=1, column=0, padx=5, sticky='E')
         self.mode_drop = guih.generate_drop_down(fr_m,
-                                                   ["VDC", "VAC", "IDC", "IAC", "RES_2WIRE", "RES_4WIRE"],
-                                                   callback_func=self.dmm_set_mode)
+                                                   ["VDC", "VAC", "IDC", "IAC", "RES_2WIRE", "RES_4WIRE"])
+        self.mode_drop[0].grid(row=1, column=1, pady=self.theme_config["size"]["ypad_s"])
+        tk.Button(fr_m, text='Set', command=self.dmm_set_mode).grid(row=1, column=2, padx=5)
 
-        self.range_drop = guih.generate_drop_down(fr_m,
-                                                   ["AUTO", "LOWEST", "HIGHEST"],
-                                                   callback_func=self.dmm_set_range)
+        # range control — dynamic buttons populated after connection
+        self.fr_range = tk.Frame(fr_m, bg=self.theme_config["light_4"])
+        self.btn_range_auto = tk.Button(self.fr_range, text="Auto Range", command=self.dmm_set_range_auto)
+        self.btn_range_auto.grid(row=0, column=0, columnspan=2, pady=2)
+        self.fr_range_buttons = tk.Frame(self.fr_range, bg=self.theme_config["light_4"])
+        self.fr_range_buttons.grid(row=1, column=0, columnspan=2)
+        self._range_entries = []
+        self.fr_range.grid(row=2, column=0, columnspan=3, pady=self.theme_config["size"]["ypad_s"])
 
         # sample rate control
-        self.sample_drop = guih.generate_drop_down(fr_m,
-                                                   ["slow", "medium", "fast"],
-                                                   callback_func=self.dmm_set_sample)
-
-        # Set the default sample speed from config
+        ttk.Label(fr_m, text='Sample:', style="TLabel", anchor='e').grid(row=3, column=0, padx=5, sticky='E')
+        self.sample_drop = guih.generate_drop_down(fr_m, ["slow", "medium", "fast"])
         self.sample_drop[1].set(self.default_sample_speed)
-
-        self.mode_drop[0].grid(row=1 ,column=1, pady=self.theme_config["size"]["ypad_s"])
-        self.range_drop[0].grid(row=2, column=1, pady=self.theme_config["size"]["ypad_s"])
         self.sample_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
+        tk.Button(fr_m, text='Set', command=self.dmm_set_sample).grid(row=3, column=2, padx=5)
 
     def gui_refresh_DMM(self, kind="partial"):
         if not self.fr_port.status:
@@ -220,20 +218,53 @@ class TabDMM(guic.ThemedFrame):
         elif unit == "V":
             self.meas1_scale = 1
 
-    # TODO: do these have to use the services or does the cc. already use that?
     def dmm_set_mode(self):
         if self.cc.dmm is not None:
             mode = self.mode_drop[1].get()
             self.prompt.print(f"Setting DMM mode to {mode}")
             self.cc.dmm.set_mode(mode)
 
-    def dmm_set_range(self):
-        if self.cc.dmm is not None:
-            dmm_range = self.range_drop[1].get()
-            self.prompt.print(f"Setting DMM range to {dmm_range}")
-            self.cc.dmm.set_range(dmm_range)
+    def build_range_controls(self):
+        for widget in self.fr_range_buttons.winfo_children():
+            widget.destroy()
+        self._range_entries = []
 
-    # TODO: for some reason this isn't working (at least on 3478A). I can send commands in ATE control and see changes
+        if self.cc.dmm is None:
+            return
+
+        model = self.cc.dmm.model
+        registry = self.cc.dmm.registry
+        cmds = registry.commands.get(model, {}).get("command", {})
+        range_keys = sorted(
+            [k for k in cmds if k.startswith("range_") and k != "range_auto"],
+            key=lambda x: int(x.split("_")[1])
+        )
+
+        for i, key in enumerate(range_keys):
+            n = int(key.split("_")[1])
+            entry = tk.Entry(self.fr_range_buttons, width=8)
+            entry.insert(0, f"range_{n}")
+            entry.grid(row=i, column=0, padx=3, pady=1)
+            btn = tk.Button(self.fr_range_buttons, text=f"Set R{n}",
+                            command=lambda num=n: self.dmm_set_range_n(num))
+            btn.grid(row=i, column=1, padx=3, pady=1)
+            self._range_entries.append(entry)
+
+    def dmm_set_range_auto(self):
+        if self.cc.dmm is not None:
+            self.prompt.print("Setting DMM range to AUTO")
+            self.cc.dmm.set_range_auto()
+
+    def dmm_set_range_n(self, n):
+        if self.cc.dmm is not None:
+            label = self._range_entries[n - 1].get() if self._range_entries else f"range_{n}"
+            self.prompt.print(f"Setting DMM range: {label}")
+            try:
+                cmd = self.cc.dmm.registry.get_command(self.cc.dmm.model, "command", f"range_{n}")
+                self.cc.dmm.write(cmd)
+            except Exception as e:
+                self.prompt.print(f"Range {n} error: {e}", "error")
+
     def dmm_set_sample(self):
         if self.cc.dmm is not None:
             sample_speed = self.sample_drop[1].get()
@@ -264,6 +295,7 @@ class TabDMM(guic.ThemedFrame):
         self.gui_refresh("call")
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.labelIDValue.config(text=result.device_id)
+        self.build_range_controls()
         self.fr_port.set_status(True)
 
         if result.error:
@@ -275,5 +307,6 @@ class TabDMM(guic.ThemedFrame):
         result = self.cc.dmm_service.disconnect()
         if not result.success:
             guih.alert_user("Can't disconnect DMM", result.error, "warning")
+        self.build_range_controls()
         self.fr_port.set_status(False)
 

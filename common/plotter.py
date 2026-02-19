@@ -417,6 +417,7 @@ def plot_multi_file_data(file_data_list,
 
         x_data = df[x_var]
         y_data = df[y_var]
+        x_is_numeric = np.issubdtype(df[x_var].dtype, np.number)
 
         # Apply labeling strategy
         if labeling_mode == 'filename':
@@ -433,7 +434,7 @@ def plot_multi_file_data(file_data_list,
                 label = Path(filename).stem
             except (ValueError, IndexError, TypeError):
                 label = filename
-            ax.plot(x_data * x_scale, y_data * y_scale,
+            ax.plot(x_data * x_scale if x_is_numeric else x_data, y_data * y_scale,
                    label=label, color=COLORS[color_idx % len(COLORS)],
                    marker=plot_marker, markersize=markersize, linestyle=linestyle)
             color_idx += 1
@@ -457,7 +458,7 @@ def plot_multi_file_data(file_data_list,
                     color_idx_for_value = data_value_to_color.get(label_val, 0)
                     color = COLORS[color_idx_for_value]
 
-                ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
+                ax.plot(df_tmp[x_var] * x_scale if x_is_numeric else df_tmp[x_var], df_tmp[y_var] * y_scale,
                        label=label, color=color,
                        marker=plot_marker, markersize=markersize, linestyle=linestyle)
 
@@ -491,7 +492,7 @@ def plot_multi_file_data(file_data_list,
                     color_idx_for_value = data_value_to_color.get(label_val, 0)
                     color = COLORS[color_idx_for_value]
 
-                ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
+                ax.plot(df_tmp[x_var] * x_scale if x_is_numeric else df_tmp[x_var], df_tmp[y_var] * y_scale,
                        label=label,
                        color=color,
                        marker=plot_marker,
@@ -500,13 +501,9 @@ def plot_multi_file_data(file_data_list,
 
         else:
             # No label
-            # TODO: how can this tihing handle when the x-variable is Time? It's a string?
-            ax.plot(x_data, y_data * y_scale,
+            ax.plot(x_data * x_scale if x_is_numeric else x_data, y_data * y_scale,
                    color=COLORS[color_idx % len(COLORS)],
                    marker=plot_marker, markersize=markersize, linestyle=linestyle)
-            #ax.plot(x_data * x_scale, y_data * y_scale,
-            #       color=COLORS[color_idx % len(COLORS)],
-            #       marker=plot_marker, markersize=markersize, linestyle=linestyle)
             color_idx += 1
 
         # Increment file index for line style assignment
@@ -519,6 +516,31 @@ def plot_multi_file_data(file_data_list,
     plt.tight_layout()
     plt.show()
     return fig, ax
+
+
+def export_recorded_data_html(recorded_data: list, x_key: str, channels: list, title: str, html_path: str):
+    """Export a list-of-dict recording session as a self-contained Plotly HTML file.
+
+    Args:
+        recorded_data: List of row dicts (same format written to CSV during recording).
+        x_key: Column name to use as x-axis (e.g. 'Time' or a stimulus column).
+        channels: List of column names to plot as separate traces.
+        title: Plot title.
+        html_path: Full output path for the .html file.
+    """
+    x_vals = [row.get(x_key) for row in recorded_data]
+    fig = go.Figure()
+    for ch in channels:
+        y_raw = [row.get(ch) for row in recorded_data]
+        y_vals = []
+        for v in y_raw:
+            try:
+                y_vals.append(None if v is None else float(v))
+            except (ValueError, TypeError):
+                y_vals.append(None)
+        fig.add_trace(go.Scatter(x=x_vals, y=y_vals, name=ch, mode='lines'))
+    fig.update_layout(title=title, xaxis_title=x_key)
+    fig.write_html(html_path)
 
 
 ###################################
@@ -585,8 +607,10 @@ def start_live_plot(
                     buf = cur_bufs.get(ch)
                     if buf is not None:
                         v = sample.get(ch)
-                        # TODO: my method of adding 'ERROR' if a reading failed doesn't work here! (can't convert to float)
-                        buf.append(None if v is None else float(v))
+                        try:
+                            buf.append(None if v is None else float(v))
+                        except (ValueError, TypeError):
+                            buf.append(None)
 
 
     # dash app definition

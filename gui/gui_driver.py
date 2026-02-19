@@ -7,7 +7,6 @@ from tkinter import ttk
 import os
 import time
 
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
@@ -182,36 +181,6 @@ def main(autoconnect, force_compact=False):
     # perform shutdown activities
     print("TKINTER is shutting down!")
 
-    # disconnect all active connections in `class_controller.py`
-    if app.controller.ps is not None:
-        print("Disconnect from power supply (and turning outputs off)")
-        try:
-            app.controller.ps.output_off(1)
-            app.controller.ps.output_off(2)
-        except COMMUNICATION_ERRORS:
-            print("Failed to turn off power supply due to IO error")
-        try:
-            app.controller.ps.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            print("Failed to disconnect from power supply due to IO error (see below line)")
-            print(e)
-
-    if app.controller.dmm is not None:
-        print("Disconnect from DMM")
-        app.controller.dmm.disconnect()
-
-    if app.controller.fg is not None:
-        print("Disconnect from FG")
-        app.controller.fg.disconnect()
-
-    if app.controller.osc is not None:
-        print("Disconnect from OSC")
-        try:
-            app.controller.osc.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            print(f"Failed to disconnect from OSC: {e}")
-
-    if app.controller.relay is not None:
-        app.controller.relay.open_all()
+    app.controller.shutdown()
 
     return

@@ -9,10 +9,6 @@ from gui import gui_driver
 
 
 
-# TODO: can I get the little taskbar icon to be custom :)
-# TODO: also ask Claude how I can actually package this thing into an .exe or some executable ... that PyInstaller didn't seem to work for me
-
-
 def main():
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="A description of your script.")

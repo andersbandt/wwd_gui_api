@@ -1,7 +1,6 @@
 """Serial port detection and enumeration utilities."""
 
 # import needed modules
-import time
 import serial
 from serial.tools import list_ports
 import pyvisa
@@ -9,7 +8,8 @@ import glob
 import platform
 
 
-# TODO: evaluate the need for this "auto" (method=None or 0). It's kind of confusing even to me
+# method=None (or 0) = auto: detects OS and picks method 1 (Windows) or 2 (Linux).
+# Explicit int lets callers override, e.g. to force PyVISA (3) regardless of OS.
 def get_ports(method=None, exclude_ports=None):
     if method is None or method == 0:
         os_name = platform.system()
@@ -22,8 +22,8 @@ def get_ports(method=None, exclude_ports=None):
     if method == 1:
         ports = [port.device for port in list_ports.comports()]
 
-    # METHOD 2: trying to get Linux to work. Search for serial ports in /dev/
-    # TODO: shouldn't I bundle the below stuff into show_ports_linux() method?
+    # METHOD 2: glob /dev/tty* and probe each port. Different from show_ports_linux()
+    # which uses lsusb subprocess — that lists USB buses, not tty devices.
     elif method == 2:
         temp_ports = glob.glob('/dev/tty[A-Za-z]*')
 
@@ -43,24 +43,13 @@ def get_ports(method=None, exclude_ports=None):
                 pass  # Port exists but can't be opened (in use or no permission)
 
     elif method == 3:
-        # TODO: do I need to get clever about which one I'm using? At work I need just (), at home I might need @py
-        #   previously this was just () but somehow worked with the ConnectionHandler being @py. Now that behavior is no longer true
-        # rm = pyvisa.ResourceManager('@py')
+        # Default ResourceManager works with NI-VISA backend. Use '@py' for pyvisa-py (no NI-VISA required).
+        # See EEequipment docs for backend selection guidance.
         rm = pyvisa.ResourceManager()
-        # ports = rm.list_resources()
-        # TODO: document that I'm not printing ASRL instruments (what are they even?)
+        # ASRL (serial/RS-232) resources are excluded — we enumerate those via method 1/2 instead.
         ports = [r.replace('\x00', '') for r in rm.list_resources() if not r.startswith('ASRL')]
     else:
         ports = None
-
-    # METHOD 4: output of "lsbusb" command
-    # testing. one last print
-    # devices = show_ports_linux()
-    # ports = []
-    # for device in devices:
-    #     ports.append(device["device"])
-    #
-    # ports = ["/dev/bus/usb/001/029"]
 
     return ports
 
@@ -77,8 +66,7 @@ def show_ports():
 def show_ports_linux():
     import re
     import subprocess
-    # TODO: syntax warning: invalid escape sequence `\s`
-    device_re = re.compile(b"Bus\s+(?P<bus>\d+)\s+Device\s+(?P<device>\d+).+ID\s(?P<id>\w+:\w+)\s(?P<tag>.+)$", re.I)
+    device_re = re.compile(rb"Bus\s+(?P<bus>\d+)\s+Device\s+(?P<device>\d+).+ID\s(?P<id>\w+:\w+)\s(?P<tag>.+)$", re.I)
     df = subprocess.check_output("lsusb")
     devices = []
     for i in df.split(b'\n'):

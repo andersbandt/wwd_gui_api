@@ -4,6 +4,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from services import DMMService, PSService, FGService, OscService
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 _PORTS_XML = os.path.join("config", "ports_used.xml")
 
@@ -276,6 +277,43 @@ class ClassController:
             dict: Copy of active_connections dictionary
         """
         return self.active_connections.copy()
+
+    def shutdown(self):
+        """Gracefully disconnect all active equipment. Called on application close."""
+        print("ClassController: shutting down all equipment...")
+
+        if self.ps is not None:
+            print("Disconnecting power supply (turning outputs off first)")
+            try:
+                self.ps.output_off(1)
+                self.ps.output_off(2)
+            except COMMUNICATION_ERRORS:
+                print("Failed to turn off PS outputs (IO error)")
+            try:
+                self.ps.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                print(f"Failed to disconnect PS: {e}")
+
+        if self.dmm is not None:
+            print("Disconnecting DMM")
+            self.dmm.disconnect()
+
+        if self.fg is not None:
+            print("Disconnecting FG")
+            self.fg.disconnect()
+
+        if self.osc is not None:
+            print("Disconnecting OSC")
+            try:
+                self.osc.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                print(f"Failed to disconnect OSC: {e}")
+
+        if self.relay is not None:
+            print("Opening all relay channels")
+            self.relay.open_all()
+
+        print("ClassController: shutdown complete")
 
 
 

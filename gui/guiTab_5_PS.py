@@ -76,7 +76,7 @@ class TabPS(guic.ThemedFrame):
 
 
     def initTabContent(self):
-        print("Initializing tab 6 (PS) content")
+        print("Initializing tab 5 (PS) content")
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()

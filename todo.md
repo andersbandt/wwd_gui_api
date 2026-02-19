@@ -10,7 +10,7 @@
 - [ ] need to give the serial logging a whirl
 - [ ] test the math functions properly
 - [ ] clean up the "About" in the Github project page
-- [ ] clean up the "Initialing tab x ... printing message numbering"
+- [x] clean up the "Initialing tab x ... printing message numbering"
 - [ ] add some documentation about pyvisa.ResourceManager('@py') in EEequipment
   - I need to move all the backend discussion to EEequipment ...
 
@@ -18,7 +18,7 @@
 ### longer-term tasks
 
 - [ ] add units tests. Priority should be on `logger.py`, `plotter,py`, and the `common` utilities
-- [ ] consolidate analysis modules. Give a review to what files are being used. Document what each one dose
+- [x] consolidate analysis modules. Give a review to what files are being used. Document what each one dose
 - [ ] Terminal-only API (connect and control instruments on CLI)
 - [ ] Web interface option (Flask/FastAPI backend)
 - [ ] Database storage option (SQLite/PostgreSQL)
@@ -26,6 +26,8 @@
 - [ ] this is probably very technically challenging but how do I handle multi-logging with equipment where one has a very slow sample rate? 
   - do I have to have sub-threads for each piece of equipment?
 - [ ] add a simulator mode using np.random() or something to test live plotting / logging / math features?
+- [ ] custom taskbar icon for the app window
+- [ ] package into a standalone executable (PyInstaller didn't work previously — investigate alternatives like Nuitka or cx_Freeze)
 
 
 ### Logger tab: per-channel unit scaling
@@ -36,6 +38,20 @@ Add a "Scale..." popup dialog (same pattern as the OSC config dialog) letting th
 - **Live Dash plot side** — harder: scale config needs to be threaded into `plotter.start_live_plot()` state dict and applied in `_ingest_from_bus()`. Do NOT pre-scale at `_save_data_row()` as that would corrupt the CSV.
 - **X-axis (stimulus mode only)** — same dialog can expose a scale for the stimulus column.
 
+
+### Graph tab: filename labeler text box
+
+The `file_labeler` text box next to "Use Filename Labeler" is present in the UI but currently does nothing — `file_label_idx` is read from it and passed all the way into `plotter.plot_multi_file_data()` via `label_config`, but the plotter always ignores it and uses `Path(filename).stem` as the label.
+
+The intended use case: filenames encode metadata (e.g. `sweep_25C_500Hz_board3.csv`) and the user wants that extracted value to be used as the series label, or to drive color mapping.
+
+Three tiers of implementation:
+
+1. ~~**Index-based** (low effort) — user types an int, label becomes `parts[idx]` from the underscore-split filename stem.~~ **DONE**
+
+2. **Regex capture** (low-medium) — skipping for now. Index-based works fine if the filename parts are clean numeric values; user can rename files if needed.
+
+3. **Color normalization for filename mode** (medium) — allow the index-extracted value to drive the `normalize_colors` colormap pipeline, the same way `'data'` mode does. Currently `normalize_colors` only runs in the `data_value_to_color` preprocessing block which is gated on `labeling_mode in ['data', 'both']`. To support `'filename'` mode: collect the extracted `file_parts[idx]` values across all files in a pre-pass, feed them into `data_value_to_color` using the same normalizer logic, then use that color in the `filename` branch plot call. The `label_config` dict already passes `normalize_colors` through in `'both'` mode; would need to extend it for pure `'filename'` mode too.
 
 ---
 
@@ -100,11 +116,9 @@ Statistical analysis and data manipulation embedded directly in GUI methods.
 
 **Remaining:** `final_plot` in `guiTab_8_LOG.py` (plot orchestration — lower priority).
 
-### Problem 5: Shutdown Logic in GUI Driver
+### ~~Problem 5: Shutdown Logic in GUI Driver~~ DONE
 
-`gui_driver.py:238-268` directly calls `ps.output_off(1)`, `ps.disconnect()`, `relay.open_all()`, etc.
-
-**Recommendation:** Add a `ClassController.shutdown()` method. (`PSService.safe_shutdown()` already exists as a starting point.)
+`ClassController.shutdown()` now handles all equipment disconnection. `gui_driver.py` calls `app.controller.shutdown()` on close.
 
 ### Problem 6: Hardcoded Serial Commands in GUI
 

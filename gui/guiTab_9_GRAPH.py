@@ -41,18 +41,115 @@ def focus_next_widget(event):
     return "break"
 
 
-# TODO: need to determine what the filename labeler text box is doing
 
-# TODO: how crazy do I want to get with graph features? Like giving user control over xticks, graph lines, legend locatoin, etc.
-#   honestly a separate popup like my oscilloscope configuration could be really nice
+class GraphOptionsDialog(tk.Toplevel):
+    """Modal popup for configuring matplotlib graph appearance options."""
 
-# TODO: I should greatly expand the analysis features. I can put a lot with just some extra buttons
-#   time-domain analysis (sample rate, FFT, etc)
-#   IMU analysis
-#   clock analysis
-#   statistics analysis
+    LEGEND_LOCS = [
+        "best", "upper right", "upper left", "lower right", "lower left",
+        "center left", "center right", "lower center", "upper center", "center",
+    ]
 
+    def __init__(self, parent, current_config, on_apply):
+        super().__init__(parent)
+        self.title("Graph Appearance Options")
+        self.resizable(False, False)
+        self.on_apply = on_apply
 
+        cfg = current_config
+        self.var_figsize_w    = tk.DoubleVar(value=cfg.get("figsize_w", 10))
+        self.var_figsize_h    = tk.DoubleVar(value=cfg.get("figsize_h", 6))
+        self.var_show_grid    = tk.BooleanVar(value=cfg.get("show_grid", True))
+        self.var_grid_alpha   = tk.DoubleVar(value=cfg.get("grid_alpha", 0.3))
+        self.var_xtick_rot    = tk.IntVar(value=cfg.get("xtick_rotation", 0))
+        self.var_ytick_rot    = tk.IntVar(value=cfg.get("ytick_rotation", 0))
+        self.var_show_legend  = tk.BooleanVar(value=cfg.get("show_legend", True))
+        self.var_legend_loc   = tk.StringVar(value=cfg.get("legend_loc", "best"))
+        self.var_linewidth    = tk.DoubleVar(value=cfg.get("linewidth", 1.5))
+        self.var_alpha        = tk.DoubleVar(value=cfg.get("alpha", 1.0))
+        self.var_markersize   = tk.IntVar(value=cfg.get("markersize", 3))
+
+        self._build_ui()
+        self.grab_set()
+        self.transient(parent)
+
+    def _build_ui(self):
+        p = {"padx": 8, "pady": 3}
+        row = 0
+
+        def section(label):
+            nonlocal row
+            tk.Label(self, text=label, font=("TkDefaultFont", 9, "bold")).grid(
+                row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(10, 2))
+            row += 1
+
+        def field(label, widget_fn):
+            nonlocal row
+            tk.Label(self, text=label).grid(row=row, column=0, sticky="e", **p)
+            widget_fn(row)
+            row += 1
+
+        def sep():
+            nonlocal row
+            ttk.Separator(self, orient="horizontal").grid(
+                row=row, column=0, columnspan=2, sticky="ew", pady=4)
+            row += 1
+
+        # ── Figure Size ──────────────────────────────────────────────
+        section("Figure Size")
+        field("Width (in)",  lambda r: tk.Spinbox(self, from_=4,  to=30,  increment=1,   textvariable=self.var_figsize_w,  width=7).grid(row=r, column=1, sticky="w", **p))
+        field("Height (in)", lambda r: tk.Spinbox(self, from_=2,  to=20,  increment=1,   textvariable=self.var_figsize_h,  width=7).grid(row=r, column=1, sticky="w", **p))
+        sep()
+
+        # ── Grid ─────────────────────────────────────────────────────
+        section("Grid")
+        ttk.Checkbutton(self, text="Show grid", variable=self.var_show_grid).grid(
+            row=row, column=0, columnspan=2, sticky="w", **p); row += 1
+        field("Grid alpha",  lambda r: tk.Spinbox(self, from_=0.0, to=1.0, increment=0.1, format="%.1f", textvariable=self.var_grid_alpha, width=7).grid(row=r, column=1, sticky="w", **p))
+        sep()
+
+        # ── Tick Rotation ────────────────────────────────────────────
+        section("Tick Rotation")
+        field("X-tick (°)", lambda r: tk.Spinbox(self, from_=0, to=90, increment=15, textvariable=self.var_xtick_rot, width=7).grid(row=r, column=1, sticky="w", **p))
+        field("Y-tick (°)", lambda r: tk.Spinbox(self, from_=0, to=90, increment=15, textvariable=self.var_ytick_rot, width=7).grid(row=r, column=1, sticky="w", **p))
+        sep()
+
+        # ── Legend ───────────────────────────────────────────────────
+        section("Legend")
+        ttk.Checkbutton(self, text="Show legend", variable=self.var_show_legend).grid(
+            row=row, column=0, columnspan=2, sticky="w", **p); row += 1
+        field("Location", lambda r: ttk.Combobox(self, textvariable=self.var_legend_loc,
+            values=self.LEGEND_LOCS, state="readonly", width=14).grid(row=r, column=1, sticky="w", **p))
+        sep()
+
+        # ── Line Appearance ──────────────────────────────────────────
+        section("Line Appearance")
+        field("Line width",  lambda r: tk.Spinbox(self, from_=0.5, to=8.0, increment=0.5, format="%.1f", textvariable=self.var_linewidth,  width=7).grid(row=r, column=1, sticky="w", **p))
+        field("Alpha",       lambda r: tk.Spinbox(self, from_=0.1, to=1.0, increment=0.1, format="%.1f", textvariable=self.var_alpha,       width=7).grid(row=r, column=1, sticky="w", **p))
+        field("Marker size", lambda r: tk.Spinbox(self, from_=1,   to=20,  increment=1,                  textvariable=self.var_markersize,  width=7).grid(row=r, column=1, sticky="w", **p))
+        sep()
+
+        # ── Buttons ──────────────────────────────────────────────────
+        btn_frame = tk.Frame(self)
+        btn_frame.grid(row=row, column=0, columnspan=2, pady=8)
+        tk.Button(btn_frame, text="OK",     width=10, command=self._ok).pack(side="left", padx=4)
+        tk.Button(btn_frame, text="Cancel", width=10, command=self.destroy).pack(side="left", padx=4)
+
+    def _ok(self):
+        self.on_apply({
+            "figsize_w":     self.var_figsize_w.get(),
+            "figsize_h":     self.var_figsize_h.get(),
+            "show_grid":     self.var_show_grid.get(),
+            "grid_alpha":    self.var_grid_alpha.get(),
+            "xtick_rotation": self.var_xtick_rot.get(),
+            "ytick_rotation": self.var_ytick_rot.get(),
+            "show_legend":   self.var_show_legend.get(),
+            "legend_loc":    self.var_legend_loc.get(),
+            "linewidth":     self.var_linewidth.get(),
+            "alpha":         self.var_alpha.get(),
+            "markersize":    self.var_markersize.get(),
+        })
+        self.destroy()
 
 
 class TabGraph(guic.ThemedFrame):
@@ -67,6 +164,21 @@ class TabGraph(guic.ThemedFrame):
         # set up file information
         self.data_dir = path_helper.get_full_data_path()
         self.files = []
+
+        # default appearance options (user can change via the options dialog)
+        self.appearance_config = {
+            "figsize_w":      10,
+            "figsize_h":      6,
+            "show_grid":      True,
+            "grid_alpha":     0.3,
+            "xtick_rotation": 0,
+            "ytick_rotation": 0,
+            "show_legend":    True,
+            "legend_loc":     "best",
+            "linewidth":      1.5,
+            "alpha":          1.0,
+            "markersize":     3,
+        }
 
         # set up preset configuration
         self.preset_dir = os.path.join(self.basefilepath, "config", "graph_presets")
@@ -98,7 +210,7 @@ class TabGraph(guic.ThemedFrame):
         self.refresh_presets()
 
     def initTabContent(self):
-        print("Initializing tab 8 (Graph) content")
+        print("Initializing tab 9 (Graph) content")
 
         # print welcome text_data
         l1 = ttk.Label(self, text="Grapher", style="BW.TLabel",
@@ -221,6 +333,14 @@ class TabGraph(guic.ThemedFrame):
         cb_norm.grid(row=row, column=0, columnspan=2, padx=xpad, pady=ypad, sticky='w')
         row += 1
 
+        btn_appearance = tk.Button(self.fr_setup, text="Appearance Options...",
+                                   command=self.open_appearance_dialog,
+                                   bg=self.theme_config["light_3"],
+                                   fg=self.theme_config["fg_dark"],
+                                   height=1)
+        btn_appearance.grid(row=row, column=0, columnspan=2, padx=xpad, pady=(6, 2), sticky='w')
+        row += 1
+
         # ── Data Configuration ────────────────────────────
         sep2 = ttk.Separator(self.fr_setup, orient='horizontal')
         sep2.grid(row=row, column=0, columnspan=3, sticky='ew', pady=(8, 2))
@@ -268,7 +388,7 @@ class TabGraph(guic.ThemedFrame):
         guic.Tooltip(lbl_x_axis, "Label shown on the X-axis")
         guic.Tooltip(lbl_y_axis, "Label shown on the Y-axis")
         guic.Tooltip(lbl_plot_style, "Line, scatter, or both")
-        guic.Tooltip(cb_file_label, "Color/label each line by its source filename")
+        guic.Tooltip(cb_file_label, "Label each line by a part of its filename.\nLeave the text box empty to use the full filename stem.\nEnter an index (e.g. 3) to use the Nth underscore-delimited part\n(e.g. index 2 on 'AREC_20260204_25C_sweep.csv' gives '25C')")
         guic.Tooltip(cb_data_label, "Color/label each line by a CSV column value")
         guic.Tooltip(cb_norm, "Map label values to a color gradient instead of discrete colors")
         guic.Tooltip(lbl_x_var, "CSV column name to use for X-axis data")
@@ -365,6 +485,13 @@ class TabGraph(guic.ThemedFrame):
 
     def gui_refresh(self, event):
         pass
+
+    def open_appearance_dialog(self):
+        GraphOptionsDialog(self, self.appearance_config, self._apply_appearance)
+
+    def _apply_appearance(self, config):
+        self.appearance_config = config
+        self.prompt.print("Appearance options updated")
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -512,6 +639,7 @@ class TabGraph(guic.ThemedFrame):
         plot_style = self.plot_style_drop[1].get()
 
         # Call abstracted plotting function
+        ac = self.appearance_config
         try:
             plotter.plot_multi_file_data(
                 file_data_list=selected_files,
@@ -525,10 +653,17 @@ class TabGraph(guic.ThemedFrame):
                 labeling_mode=labeling_mode,
                 label_config=label_config,
                 plot_style=plot_style,
-                figsize=(10, 6),
+                figsize=(ac["figsize_w"], ac["figsize_h"]),
                 marker='o',
-                markersize=3,
-                show_grid=True
+                markersize=ac["markersize"],
+                show_grid=ac["show_grid"],
+                grid_alpha=ac["grid_alpha"],
+                xtick_rotation=ac["xtick_rotation"],
+                ytick_rotation=ac["ytick_rotation"],
+                show_legend=ac["show_legend"],
+                legend_loc=ac["legend_loc"],
+                linewidth=ac["linewidth"],
+                alpha=ac["alpha"],
             )
             self.prompt.print("Graph complete!")
             return True

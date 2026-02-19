@@ -12,14 +12,13 @@ from dash import Dash, dcc, html, Output, Input
 # import needed modules
 import threading
 import webbrowser
+from pathlib import Path
 from typing import Mapping, Sequence
 from collections import deque
 from queue import Queue, Empty
 
 
-# consistent color palette for multi-series / multi-subplot plots
-# TODO: overkill to throw this into theme config ???
-
+# Matplotlib default color cycle — shared across all plot types for visual consistency.
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
@@ -266,8 +265,6 @@ def plot_accuracy_with_residuals(setpoints, measured, errors,
 
 
 
-
-# TODO: is there a need to break this function up or no?
 def plot_multi_file_data(file_data_list,
     x_var, y_var,
     x_scale=1, y_scale=1,
@@ -278,7 +275,14 @@ def plot_multi_file_data(file_data_list,
     figsize=(10, 6),
     marker='o',
     markersize=3,
-    show_grid=True):
+    show_grid=True,
+    grid_alpha=0.3,
+    xtick_rotation=0,
+    ytick_rotation=0,
+    show_legend=True,
+    legend_loc='best',
+    linewidth=1.5,
+    alpha=1.0):
     """
     Plot data from multiple files with flexible labeling options.
 
@@ -305,6 +309,13 @@ def plot_multi_file_data(file_data_list,
         marker: Marker style for plot (used when plot_style includes scatter)
         markersize: Size of markers (used when plot_style includes scatter)
         show_grid: Whether to show grid
+        grid_alpha: Opacity of grid lines (0.0–1.0, default 0.3)
+        xtick_rotation: X-axis tick label rotation in degrees
+        ytick_rotation: Y-axis tick label rotation in degrees
+        show_legend: Whether to show the legend (only applies when labeling_mode != 'none')
+        legend_loc: Matplotlib legend location string (e.g. 'best', 'upper right')
+        linewidth: Line width for all plotted series
+        alpha: Opacity of all plotted series (0.0–1.0)
 
     Returns:
         Tuple of (fig, ax) matplotlib objects
@@ -336,16 +347,12 @@ def plot_multi_file_data(file_data_list,
     if title:
         ax.set_title(title)
     if show_grid:
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=grid_alpha)
 
     color_idx = 0
 
     # Preprocessing for 'data' and 'both' modes: color assignment
     data_value_to_color = {}
-    # TODO: should I get the colormap normalizer going? Need to get some cool data to try it out on first I guess
-    #   or is it working because I see `normalize_colors` used down below?
-    colormap = None
-    normalizer = None
     normalize_colors = label_config.get('normalize_colors', False)
 
     if labeling_mode in ['data', 'both']:
@@ -421,22 +428,15 @@ def plot_multi_file_data(file_data_list,
 
         # Apply labeling strategy
         if labeling_mode == 'filename':
-            # Label by filename parts
-            # NOTE: Currently uses full filename stem. Future enhancement could add support for:
-            #       - Single index: file_label_idx to extract parts[idx]
-            #       - Range notation: "3-5" to extract parts[3:5]
-            #       - Multiple indices: "0,3,4" to extract selected parts
-            #       - Slice notation: "3:" to extract parts[3:]
+            file_label_idx = label_config.get('file_label_idx', 0)
             try:
-                file_label_idx = label_config.get('file_label_idx', 0)
-                # Use full filename stem (without .csv extension)
-                from pathlib import Path
+                label = file_parts[file_label_idx] if file_label_idx else Path(filename).stem
+            except (IndexError, TypeError):
                 label = Path(filename).stem
-            except (ValueError, IndexError, TypeError):
-                label = filename
             ax.plot(x_data * x_scale if x_is_numeric else x_data, y_data * y_scale,
                    label=label, color=COLORS[color_idx % len(COLORS)],
-                   marker=plot_marker, markersize=markersize, linestyle=linestyle)
+                   marker=plot_marker, markersize=markersize, linestyle=linestyle,
+                   linewidth=linewidth, alpha=alpha)
             color_idx += 1
 
         elif labeling_mode == 'data':
@@ -460,7 +460,8 @@ def plot_multi_file_data(file_data_list,
 
                 ax.plot(df_tmp[x_var] * x_scale if x_is_numeric else df_tmp[x_var], df_tmp[y_var] * y_scale,
                        label=label, color=color,
-                       marker=plot_marker, markersize=markersize, linestyle=linestyle)
+                       marker=plot_marker, markersize=markersize, linestyle=linestyle,
+                       linewidth=linewidth, alpha=alpha)
 
         elif labeling_mode == 'both':
             # Label by both filename and data column
@@ -473,12 +474,11 @@ def plot_multi_file_data(file_data_list,
             file_linestyle = LINE_STYLES[file_idx % len(LINE_STYLES)]
 
             # Get filename label
+            file_label_idx = label_config.get('file_label_idx', 0)
             try:
-                file_label_idx = label_config.get('file_label_idx', 0)
-                from pathlib import Path
+                file_label = file_parts[file_label_idx] if file_label_idx else Path(filename).stem
+            except (IndexError, TypeError):
                 file_label = Path(filename).stem
-            except (ValueError, IndexError, TypeError):
-                file_label = filename
 
             # Plot each data value with consistent color but file-specific line style
             for label_val in sorted(df[data_label_var].dropna().unique()):
@@ -497,21 +497,30 @@ def plot_multi_file_data(file_data_list,
                        color=color,
                        marker=plot_marker,
                        markersize=markersize,
-                       linestyle=file_linestyle)
+                       linestyle=file_linestyle,
+                       linewidth=linewidth,
+                       alpha=alpha)
 
         else:
             # No label
             ax.plot(x_data * x_scale if x_is_numeric else x_data, y_data * y_scale,
                    color=COLORS[color_idx % len(COLORS)],
-                   marker=plot_marker, markersize=markersize, linestyle=linestyle)
+                   marker=plot_marker, markersize=markersize, linestyle=linestyle,
+                   linewidth=linewidth, alpha=alpha)
             color_idx += 1
 
         # Increment file index for line style assignment
         file_idx += 1
 
-    # Show legend if any labels were added
-    if labeling_mode in ['filename', 'data', 'both']:
-        ax.legend()
+    # Legend
+    if show_legend and labeling_mode in ['filename', 'data', 'both']:
+        ax.legend(loc=legend_loc)
+
+    # Tick rotation
+    if xtick_rotation:
+        ax.tick_params(axis='x', rotation=xtick_rotation)
+    if ytick_rotation:
+        ax.tick_params(axis='y', rotation=ytick_rotation)
 
     plt.tight_layout()
     plt.show()

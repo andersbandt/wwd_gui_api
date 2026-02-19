@@ -103,9 +103,6 @@ class TabATE(guic.ThemedFrame):
         self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
-        self.labelVers = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
-        self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
-
         # Position the device information labels
         self.ate_drop[0].grid(row=1, column=1, columnspan=1, padx=3, pady=1)
         self.labelID.grid(row=2, column=0, sticky='W', padx=5, pady=1)
@@ -305,14 +302,12 @@ Understanding Results:
         if self.ate is not None:
             self.prompt.print("Running benchmark with the `test_conn` function")
             time.sleep(0.2)
-            # bench_result = self.ate.benchmark(100, self.ate.test_conn)
-            # TODO: how does this read_value handle equipment differences (
+            # TODO: how does this read_value handle equipment differences?
             # TODO: add a dropdown for *IDN vs read_value selector?
             bench_result = self.ate.benchmark(100, self.ate.read_value)
             self.prompt.print(bench_result["string"])
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")
 
-    # TODO: the info tab here is unreadable !
     def run_accuracy_test(self):
         """Run instrument accuracy test by sweeping PS and measuring with DMM"""
         # Check that PS and DMM are connected

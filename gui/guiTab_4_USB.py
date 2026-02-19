@@ -19,7 +19,7 @@ TEST_TYPE_COMMANDS = {
     "flash-read":     "FR91",
     "flash-read-all": "FR01",
     "flash-erase":    "FE42",
-    "imu-graph":      "IG85",
+    "specific-graph":      "IG85",
     "clock-test":     "CR81",
 }
 

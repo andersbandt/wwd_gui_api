@@ -573,7 +573,7 @@ class AutoConnFrame(ConnFrame):
 ### THREADS             ##################
 ##########################################
 
-# TODO: this should probably be in `common/threading.py` or something right?
+# Kept here (rather than common/) because it's only used by GUI tabs for background polling.
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""

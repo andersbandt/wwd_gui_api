@@ -71,7 +71,7 @@ class TabFG(guic.ThemedFrame):
         self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
-        print("Initializing tab 9 (FG) content")
+        print("Initializing tab 6 (FG) content")
         self.init_fr_info()
         self.init_fr_control()
 

@@ -73,7 +73,7 @@ class TabDMM(guic.ThemedFrame):
         self.rowconfigure(1, weight=1)
 
     def initTabContent(self):
-        print("Initializing tab 3 (DMM) content")
+        print("Initializing tab 2 (DMM) content")
         self.init_fr_info()
         self.init_fr_control()
 
@@ -210,7 +210,6 @@ class TabDMM(guic.ThemedFrame):
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
 
-    # TODO: move this outside this section because this is not an actual DMM function (GUI / related to tab)
     def set_meas1_unit(self):
         unit = self.unitMeas1_drop[1].get()
         self.prompt.print(f"Setting measurement 1 units to {unit}")
@@ -222,7 +221,6 @@ class TabDMM(guic.ThemedFrame):
             self.meas1_scale = 1
 
     # TODO: do these have to use the services or does the cc. already use that?
-
     def dmm_set_mode(self):
         if self.cc.dmm is not None:
             mode = self.mode_drop[1].get()

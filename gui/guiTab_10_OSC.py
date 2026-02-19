@@ -17,6 +17,40 @@ from gui import gui_class as guic
 
 
 
+# TODO: add a GUI tab here exclusively for acquistion / sampling
+#   options on this equipment are {normal, peak detect, averaging(N), and high resolution
+#   <type> ::= {NORMal | AVERage | HRESolution | PEAK}
+#   check what the DSO1014A is capable of
+
+# NOTE: for above TODO
+# The :ACQuire:TYPE command selects the type of data acquisition that is to take
+# place. The acquisition types are:
+# • NORMal — sets the oscilloscope in the normal mode.
+# • AVERage — sets the oscilloscope in the averaging mode. You can set the count
+# by sending the :ACQuire:COUNt command followed by the number of averages.
+# In this mode, the value for averages is an integer from 1 to 65536. The COUNt
+# value determines the number of averages that must be acquired.
+# The AVERage type is not available when in segmented memory mode
+# (:ACQuire:MODE SEGMented).
+# • HRESolution — sets the oscilloscope in the high-resolution mode (also known
+# as smoothing). This mode is used to reduce noise at slower sweep speeds
+# where the digitizer samples faster than needed to fill memory for the displayed
+# time range.
+# For example, if the digitizer samples at 200 MSa/s, but the effective sample
+# rate is 1 MSa/s (because of a slower sweep speed), only 1 out of every 200
+# samples needs to be stored. Instead of storing one sample (and throwing others
+# away), the 200 samples are averaged together to provide the value for one
+# display point. The slower the sweep speed, the greater the number of samples
+# that are averaged together for each display point.
+# • PEAK — sets the oscilloscope in the peak detect mode. In this mode,
+# :ACQuire:COUNt has no meaning.
+# The AVERage and HRESolution types can give you extra bits of vertical resolution.
+# See the User's Guide for an explanation. When getting waveform data acquired
+# using the AVERage and HRESolution types, be sure to use the WORD or ASCii
+# waveform data formats to get the extra bits of vertical resolution.
+
+
+
 class TabOSC(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)

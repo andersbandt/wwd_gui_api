@@ -301,6 +301,7 @@ Understanding Results:
             self.prompt.print(f"Got response: {res}")
 
     def ate_benchmark(self):
+        # TODO: should I actually query stuff and store it to "prove" I did it? Could be a checkbox and see how sample rate changes
         if self.ate is not None:
             self.prompt.print("Running benchmark with the `test_conn` function")
             time.sleep(0.2)
@@ -311,6 +312,7 @@ Understanding Results:
             self.prompt.print(bench_result["string"])
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")
 
+    # TODO: the info tab here is unreadable !
     def run_accuracy_test(self):
         """Run instrument accuracy test by sweeping PS and measuring with DMM"""
         # Check that PS and DMM are connected

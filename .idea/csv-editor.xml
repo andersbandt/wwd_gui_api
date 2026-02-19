@@ -24,20 +24,6 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\data\AREC_20260205121520.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value=":" />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\data\AREC_20260210150459.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value=":" />
-            </Attribute>
-          </value>
-        </entry>
         <entry key="\data\AREC_20260217151943_osc_testing.csv">
           <value>
             <Attribute>
@@ -45,14 +31,35 @@
             </Attribute>
           </value>
         </entry>
-        <entry key="\data\AREC_20260217152241_osc_testing.csv">
+        <entry key="\data\AREC_20260218160552.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
             </Attribute>
           </value>
         </entry>
-        <entry key="\data\AREC_20260217153224_osc_testing.csv">
+        <entry key="\data\AREC_20260218160854_0p0001.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\AREC_20260218160932.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value=":" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\AREC_20260218162131.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value=":" />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\data\AREC_20260218162219_noavg_4ch.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

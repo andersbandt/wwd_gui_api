@@ -10,8 +10,8 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: if I can't get this FUNC2 thing working on my XDM1041 it should be removed
-
+# TODO: I should think about range setting more (there is another TODO on this I think)
+#   ideas: store the text value of the ranges in a separate section of the `config_ini`. Then just simply populate an array of buttons
 
 
 
@@ -120,6 +120,7 @@ class TabDMM(guic.ThemedFrame):
         self.labelMeas2 = ttk.Label(self.fr_info, width=10, text='Meas2', style="TLabel", anchor='w')
 
         # Position the range and measurement labels
+        # TODO: if I can't get this FUNC2 thing working on my XDM1041 it should be removed
         self.labelRange.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelFu1.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelMeas1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
@@ -209,6 +210,7 @@ class TabDMM(guic.ThemedFrame):
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
 
+    # TODO: move this outside this section because this is not an actual DMM function (GUI / related to tab)
     def set_meas1_unit(self):
         unit = self.unitMeas1_drop[1].get()
         self.prompt.print(f"Setting measurement 1 units to {unit}")
@@ -218,6 +220,8 @@ class TabDMM(guic.ThemedFrame):
             self.meas1_scale = 1e6
         elif unit == "V":
             self.meas1_scale = 1
+
+    # TODO: do these have to use the services or does the cc. already use that?
 
     def dmm_set_mode(self):
         if self.cc.dmm is not None:
@@ -231,6 +235,7 @@ class TabDMM(guic.ThemedFrame):
             self.prompt.print(f"Setting DMM range to {dmm_range}")
             self.cc.dmm.set_range(dmm_range)
 
+    # TODO: for some reason this isn't working (at least on 3478A). I can send commands in ATE control and see changes
     def dmm_set_sample(self):
         if self.cc.dmm is not None:
             sample_speed = self.sample_drop[1].get()

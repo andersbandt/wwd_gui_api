@@ -12,6 +12,7 @@
 - [ ] clean up the "About" in the Github project page
 - [ ] clean up the "Initialing tab x ... printing message numbering"
 - [ ] add some documentation about pyvisa.ResourceManager('@py') in EEequipment
+  - I need to move all the backend discussion to EEequipment ...
 
 
 ### longer-term tasks

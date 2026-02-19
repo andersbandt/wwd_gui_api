@@ -295,7 +295,7 @@ class TabGraph(guic.ThemedFrame):
         listbox_frame.grid(row=1, column=0, rowspan=4, padx=self.theme_config["pad"]["xpad_m"],
                            pady=self.theme_config["pad"]["ypad_m"])
 
-        scrollbar = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
+        scrollbar = tk.Scrollbar(listbox_frame, orient="vertical")
         self.file_listbox = tk.Listbox(
             listbox_frame,
             selectmode=tk.EXTENDED,  # Enable multi-select
@@ -304,8 +304,8 @@ class TabGraph(guic.ThemedFrame):
             yscrollcommand=scrollbar.set
         )
         scrollbar.config(command=self.file_listbox.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.file_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side="right", fill="y")
+        self.file_listbox.pack(side="left", fill="both", expand=True)
 
         # Bind selection event
         self.file_listbox.bind('<<ListboxSelect>>', self.on_file_select)

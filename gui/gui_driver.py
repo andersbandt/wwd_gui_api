@@ -135,6 +135,14 @@ def main(autoconnect, force_compact=False):
     window = tk.Tk()
     window.title("WWD GUI API")
 
+    # Set window/taskbar icon (works on Linux and Windows; Tk 8.6+ PNG support)
+    try:
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'icon.png')
+        _icon_img = tk.PhotoImage(file=icon_path)
+        window.iconphoto(True, _icon_img)
+    except Exception as e:
+        print(f"Could not load app icon: {e}")
+
     # Get screen size
     ws = window.winfo_screenwidth()
     hs = window.winfo_screenheight()

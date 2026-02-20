@@ -1,12 +1,10 @@
 """Entry point for the WWD GUI application."""
 
-# needed modules
 import argparse
+import ctypes
+import sys
 
-
-# import user created modules
 from gui import gui_driver
-
 
 
 def main():
@@ -30,6 +28,11 @@ def main():
     if args.compact:
         print("Compact mode forced.")
         force_compact = True
+
+    # Windows: set explicit App User Model ID so the taskbar uses our icon
+    # rather than the generic Python icon, and allows correct taskbar pinning.
+    if sys.platform == 'win32':
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('wwd.gui.api')
 
     # Call the main function of your GUI driver
     gui_driver.main(autoconnect, force_compact)

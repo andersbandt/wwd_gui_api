@@ -21,7 +21,6 @@
 - [ ] should I add a mini status indicator in ATE tab next to instrument accuracy testing?
 - [ ] add a simulator mode using np.random() or similar to test live plotting / logging / math features
 - [ ] multi-logging with mixed sample rates — how to handle equipment with very slow sample rates? (sub-threads per instrument?)
-- [ ] custom taskbar icon for the app window
 
 ### Future / Exploratory
 

@@ -27,9 +27,8 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 
 
 
-
-
-
+# TODO: Is it possible to have the "export HTML" plot thing be actually on the HTML itself?
+#   and I actually do like having it prompt the user on save location, but default to the corresponding .csv filename (and data folder for location)
 
 
 class TabLog(guic.ThemedFrame):
@@ -743,6 +742,7 @@ class TabLog(guic.ThemedFrame):
                 widget.grid_remove()
 
     # ── Math column actions ───────────────────────────────────────────────────
+    # TODO: SerialData is not an available column to work with. It gets complicated with my manually entered serial parms I guess ...
 
     def _refresh_math_listbox(self):
         """Repopulate the math listbox from self.math_config."""
@@ -890,6 +890,8 @@ class TabLog(guic.ThemedFrame):
         if self.math_evaluator is not None:
             results = self.math_evaluator.evaluate_row(row)
             row.update(results)
+
+    # ── Recording functions ───────────────────────────────────────────────────
 
     def start_record(self):
         # Prevent double-start
@@ -1282,20 +1284,18 @@ class TabLog(guic.ThemedFrame):
 
     def thread_record_serial(self):
         """Serial-triggered data collection: collects test equipment data each time serial line is received"""
+        self.prompt.print("Starting serial recording thread ...")
         while self.record_status:
             try:
                 # Wait for serial data (blocks until \n is received)
-                serial_data = self.cc.ser.read_line()
+                # TODO: see if this is the best spot to do the decoding
+                # TODO: the whole serial logger is not handling my "Serial parameters" input correct
+                #   here we should be splitting up by "," and then storing that in the separate headers
+                serial_data = self.cc.ser.read_line().decode('utf-8').rstrip('\r\n')
 
                 # Collect all data using shared helper
                 row = self._collect_data_row(serial_data=serial_data)
                 self._apply_math_columns(row)
-
-                # Check for PS errors that should stop recording
-                if self.record_config.use_ps and row.get(logger.COL_PS_VMEAS1) == "ERROR":
-                    self.record_status = False
-                    guih.alert_user("Serial logger: PS comm error", "Lost communication with power supply", "error")
-                    break
 
                 # Save row (locally and to sinks)
                 self.recorded_data.append(row)
@@ -1381,7 +1381,7 @@ class TabLog(guic.ThemedFrame):
         row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
 
         # Serial data if requested
-        if self.record_config.use_ser is True:
+        if self.record_config.use_ser:
             row[logger.COL_SERIAL] = serial_data if serial_data is not None else self.cc.ser.read_line()
 
         # DMM data if requested
@@ -1552,6 +1552,9 @@ class TabLog(guic.ThemedFrame):
 
         # Build channels list from record config
         channels = []
+        if self.record_config.use_ser:
+            # TODO: also have to handle the manually entered serial columns here
+            channels.append(logger.COL_SERIAL)
         if self.record_config.use_dmm:
             channels.append(logger.COL_DMM_MEAS1)
         if self.record_config.use_ps:

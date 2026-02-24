@@ -13,5 +13,6 @@ pyvisa-py
 sv_ttk
 dash
 simpleeval
+pytest
 
 

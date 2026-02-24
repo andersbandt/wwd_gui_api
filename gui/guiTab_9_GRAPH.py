@@ -22,14 +22,17 @@ from analysis import stats_analysis
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
-# NOTE: File name labeler currently uses full filename. Future enhancement: add support for
-#       index/range/slice notation to extract specific parts of underscore-delimited filenames.
-#       The file_labeler text field is present but currently not used for this purpose.
 
-# NOTE: Both labeling types can be used together. When both checkboxes are enabled:
-#       - Color represents the data label value (consistent across files)
-#       - Line style represents the file (up to 4 distinct styles)
+# TODO: in graph options add one for like xtick frequency. To prevent really cluttered x-axis
 
+# TODO: add option to maybe start / end data at certain point
+
+# TODO: let's add FFT / frequency analysis in
+
+
+# TODO: when there is a Keyerror, print out --> available columns are blah blah blah in the error message
+
+# TODO: this tab is unusable in compact mode. Need to add dynamic prompt placement
 
 
 # Define named tuple for file data

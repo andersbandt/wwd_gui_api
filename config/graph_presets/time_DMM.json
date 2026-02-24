@@ -1,0 +1,17 @@
+{
+    "title": "",
+    "x_label": "Time",
+    "y_label": "Voltage",
+    "x_scale": "1",
+    "y_scale": "1",
+    "x_var": "Time",
+    "y_var": "DMM_Meas1",
+    "plot_style": "Line + Scatter",
+    "use_file_regex": 0,
+    "file_filter": "",
+    "use_file_labeler": 0,
+    "file_labeler": "",
+    "use_data_labeler": 0,
+    "data_labeler": "",
+    "normalize_colors": 0
+}

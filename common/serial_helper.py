@@ -4,12 +4,14 @@
 import serial
 from datetime import datetime
 import queue
-import time
 import os
 
 # import user created modules
 from common import logger
 from common import csv_helper as csvh
+
+
+# TODO: all of this should just be put into `serial_api.py`
 
 
 
@@ -40,6 +42,10 @@ class SerialGeneral:
 
     def send_data(self, data):
         self.serObj.write(data.encode('utf-8'))
+
+    def read_line(self):
+        line = self.serObj.readline()
+        return line
 
     def close(self):
         self.serObj.close()

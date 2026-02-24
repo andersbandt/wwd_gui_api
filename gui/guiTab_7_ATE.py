@@ -308,7 +308,12 @@ Understanding Results:
 
         self.prompt.print(f"Running benchmark with {method_name} (store={store})...")
         time.sleep(0.2)
-        bench_result = self.ate.benchmark(100, method, store_values=store)
+        try:
+            bench_result = self.ate.benchmark(100, method, store_values=store)
+        except COMMUNICATION_ERRORS as e:
+            self.prompt.print("Communication error: " + str(e), "error")
+            guih.alert("Communication error: " + str(e), "error")
+            return
         self.prompt.print(bench_result["string"])
 
         if store and bench_result["values"]:

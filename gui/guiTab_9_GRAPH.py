@@ -6,6 +6,7 @@ import os
 import json
 from pathlib import Path
 from collections import namedtuple
+import numpy as np
 
 # import needed GUI packages
 import tkinter as tk
@@ -22,17 +23,6 @@ from analysis import stats_analysis
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
-
-# TODO: in graph options add one for like xtick frequency. To prevent really cluttered x-axis
-
-# TODO: add option to maybe start / end data at certain point
-
-# TODO: let's add FFT / frequency analysis in
-
-
-# TODO: when there is a Keyerror, print out --> available columns are blah blah blah in the error message
-
-# TODO: this tab is unusable in compact mode. Need to add dynamic prompt placement
 
 
 # Define named tuple for file data
@@ -66,6 +56,7 @@ class GraphOptionsDialog(tk.Toplevel):
         self.var_grid_alpha   = tk.DoubleVar(value=cfg.get("grid_alpha", 0.3))
         self.var_xtick_rot    = tk.IntVar(value=cfg.get("xtick_rotation", 0))
         self.var_ytick_rot    = tk.IntVar(value=cfg.get("ytick_rotation", 0))
+        self.var_xtick_max    = tk.IntVar(value=cfg.get("xtick_max", 0))
         self.var_show_legend  = tk.BooleanVar(value=cfg.get("show_legend", True))
         self.var_legend_loc   = tk.StringVar(value=cfg.get("legend_loc", "best"))
         self.var_linewidth    = tk.DoubleVar(value=cfg.get("linewidth", 1.5))
@@ -115,6 +106,7 @@ class GraphOptionsDialog(tk.Toplevel):
         section("Tick Rotation")
         field("X-tick (°)", lambda r: tk.Spinbox(self, from_=0, to=90, increment=15, textvariable=self.var_xtick_rot, width=7).grid(row=r, column=1, sticky="w", **p))
         field("Y-tick (°)", lambda r: tk.Spinbox(self, from_=0, to=90, increment=15, textvariable=self.var_ytick_rot, width=7).grid(row=r, column=1, sticky="w", **p))
+        field("Max X-ticks (0=auto)", lambda r: tk.Spinbox(self, from_=0, to=50, increment=5, textvariable=self.var_xtick_max, width=7).grid(row=r, column=1, sticky="w", **p))
         sep()
 
         # ── Legend ───────────────────────────────────────────────────
@@ -146,6 +138,7 @@ class GraphOptionsDialog(tk.Toplevel):
             "grid_alpha":    self.var_grid_alpha.get(),
             "xtick_rotation": self.var_xtick_rot.get(),
             "ytick_rotation": self.var_ytick_rot.get(),
+            "xtick_max":      self.var_xtick_max.get(),
             "show_legend":   self.var_show_legend.get(),
             "legend_loc":    self.var_legend_loc.get(),
             "linewidth":     self.var_linewidth.get(),
@@ -181,6 +174,7 @@ class TabGraph(guic.ThemedFrame):
             "linewidth":      1.5,
             "alpha":          1.0,
             "markersize":     3,
+            "xtick_max":      0,
         }
 
         # set up preset configuration
@@ -199,12 +193,19 @@ class TabGraph(guic.ThemedFrame):
         # place everything in grid
         self.fr_setup.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_files.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=2, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
-        # configure grid weights so prompt expands to fill available space
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
+        compact = self.theme_config.get("compact", False)
+        if compact:
+            # compact: prompt beside fr_files in the same row
+            self.prompt.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+            self.columnconfigure(2, weight=1)
+            self.rowconfigure(1, weight=1)
+        else:
+            # normal: prompt gets its own full-width row at the bottom
+            self.prompt.grid(row=2, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+            self.columnconfigure(0, weight=1)
+            self.columnconfigure(1, weight=1)
+            self.rowconfigure(2, weight=1)
 
         # refresh initial file last
         self.refresh_files()
@@ -386,6 +387,19 @@ class TabGraph(guic.ThemedFrame):
         self.y_scale.grid(row=row, column=1, padx=xpad, pady=ypad)
         row += 1
 
+        lbl_start_row = tk.Label(self.fr_setup, text="Start row")
+        lbl_end_row = tk.Label(self.fr_setup, text="End row")
+        self.entry_start_row = tk.Entry(self.fr_setup, width=10)
+        self.entry_end_row = tk.Entry(self.fr_setup, width=10)
+
+        lbl_start_row.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.entry_start_row.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='w')
+        row += 1
+
+        lbl_end_row.grid(row=row, column=0, padx=5, pady=2, sticky='e')
+        self.entry_end_row.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='w')
+        row += 1
+
         # ── Tooltips ─────────────────────────────────────
         guic.Tooltip(lbl_title, "Graph title displayed above the plot")
         guic.Tooltip(lbl_x_axis, "Label shown on the X-axis")
@@ -398,6 +412,8 @@ class TabGraph(guic.ThemedFrame):
         guic.Tooltip(lbl_y_var, "CSV column name to use for Y-axis data")
         guic.Tooltip(lbl_x_scale, "Multiply all X values by this factor (e.g. 0.001 to convert ms to s)")
         guic.Tooltip(lbl_y_scale, "Multiply all Y values by this factor")
+        guic.Tooltip(lbl_start_row, "First row to include (0-based, leave blank for beginning)")
+        guic.Tooltip(lbl_end_row, "Last row to include (exclusive, leave blank for end)")
 
     def init_fr_files(self):
         fr_m = self.fr_files
@@ -468,7 +484,7 @@ class TabGraph(guic.ThemedFrame):
         btn_disp_fields.grid(row=2, column=1, padx=self.theme_config["pad"]["xpad_s"],
                              pady=self.theme_config["pad"]["ypad_s"])
 
-        # analyze button
+        # analyze button + FFT checkbox
         open_button = tk.Button(fr_m,
                                 text="Analyze Selected Files",
                                 command=self.analyze_files,
@@ -476,6 +492,14 @@ class TabGraph(guic.ThemedFrame):
                                 height=self.theme_config["size"]["h_button"],
                                 width=self.theme_config["size"]["w_button"])
         open_button.grid(row=3, column=1, padx=10, pady=10)
+
+        self.var_analyze_fft = tk.IntVar()
+        ttk.Checkbutton(fr_m,
+                        text="Analyze FFT",
+                        variable=self.var_analyze_fft,
+                        onvalue=1,
+                        offvalue=0).grid(row=3, column=2, padx=self.theme_config["pad"]["xpad_s"],
+                                         pady=self.theme_config["pad"]["ypad_s"], sticky='w')
 
         # plot button
         graph_button = tk.Button(fr_m,
@@ -584,6 +608,21 @@ class TabGraph(guic.ThemedFrame):
             guih.alert_user("No Files Selected", "Please select one or more files to graph", "warning")
             return False
 
+        # Apply row range if specified
+        start_str = self.entry_start_row.get().strip()
+        end_str = self.entry_end_row.get().strip()
+        try:
+            start_row = int(start_str) if start_str else None
+            end_row = int(end_str) if end_str else None
+        except ValueError:
+            guih.alert_user("Invalid Row Range", "Start/end row must be integers.", "error")
+            return False
+        if start_row is not None or end_row is not None:
+            selected_files = [
+                FileData(fd.filename, fd.filepath, fd.parts, fd.df.iloc[start_row:end_row].reset_index(drop=True))
+                for fd in selected_files
+            ]
+
         self.prompt.print(f"Graphing {len(selected_files)} selected file(s)...")
 
         # Parse GUI values
@@ -667,12 +706,16 @@ class TabGraph(guic.ThemedFrame):
                 legend_loc=ac["legend_loc"],
                 linewidth=ac["linewidth"],
                 alpha=ac["alpha"],
+                xtick_max=ac["xtick_max"],
             )
             self.prompt.print("Graph complete!")
             return True
         except KeyError as e:
-            guih.alert_user("Key Error in Data File", str(e), "error")
-            self.prompt.print(f"Error: {str(e)}", "error")
+            col_lines = "\n".join(f"  {fd.filename}: {list(fd.df.columns)}" for fd in selected_files)
+            guih.alert_user("Key Error in Data File", f"{e}\n\nAvailable columns:\n{col_lines}", "error")
+            self.prompt.print(f"Error: column {e} not found. Available columns:", "error")
+            for fd in selected_files:
+                self.prompt.print(f"  {fd.filename}: {list(fd.df.columns)}", "error")
             return False
         except ValueError as e:
             guih.alert_user("Value Error", str(e), "error")
@@ -719,6 +762,26 @@ class TabGraph(guic.ThemedFrame):
                         self.prompt.print(f"  Duration:     {t['dur_sec']:.3f} s  ({t['dur_min']:.2f} min)")
                         self.prompt.print(f"  Samples:      {t['samples']}")
                         self.prompt.print(f"  Sample rate:  {t['frequency']:.3f} Hz  ({1000/t['frequency']:.1f} ms/sample)")
+
+                        # FFT — dominant frequency per numeric column
+                        if self.var_analyze_fft.get():
+                            dt = 1.0 / t['frequency']
+                            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                            fft_channels = []
+                            if numeric_cols:
+                                self.prompt.print(f"\nFFT Analysis (Fs={t['frequency']:.3f} Hz):")
+                                for col in numeric_cols:
+                                    data = pd.to_numeric(df[col], errors='coerce').dropna().values
+                                    if len(data) < 8:
+                                        continue
+                                    fft_mag = np.abs(np.fft.rfft(data - np.mean(data)))
+                                    freqs = np.fft.rfftfreq(len(data), d=dt)
+                                    if len(fft_mag) > 1:
+                                        dom_idx = np.argmax(fft_mag[1:]) + 1
+                                        self.prompt.print(f"  {col}: dominant freq = {freqs[dom_idx]:.4f} Hz")
+                                        fft_channels.append((freqs, fft_mag, col))
+                                if fft_channels:
+                                    plotter.plot_fft(fft_channels, title=f"FFT — {filename}")
                     else:
                         self.prompt.print("\nTime Analysis: not enough samples")
                 except Exception as e:
@@ -779,6 +842,8 @@ class TabGraph(guic.ThemedFrame):
             "use_data_labeler": self.var_use_data_labeler.get(),
             "data_labeler": self.data_labeler.get("1.0", "end").strip("\n"),
             "normalize_colors": self.var_normalize_colors.get(),
+            "start_row": self.entry_start_row.get().strip(),
+            "end_row":   self.entry_end_row.get().strip(),
             # Future use - data source configuration
             # "data_dir": self.data_dir
         }
@@ -849,6 +914,11 @@ class TabGraph(guic.ThemedFrame):
             self.var_use_data_labeler.set(preset_data.get("use_data_labeler", 0))
             self.var_normalize_colors.set(preset_data.get("normalize_colors", 0))
 
+            self.entry_start_row.delete(0, "end")
+            self.entry_start_row.insert(0, preset_data.get("start_row", ""))
+            self.entry_end_row.delete(0, "end")
+            self.entry_end_row.insert(0, preset_data.get("end_row", ""))
+
             # Future: data_dir loading
             # if "data_dir" in preset_data:
             #     self.data_dir = preset_data["data_dir"]
@@ -877,6 +947,8 @@ class TabGraph(guic.ThemedFrame):
         self.file_filter.delete("1.0", "end")
         self.file_labeler.delete("1.0", "end")
         self.data_labeler.delete("1.0", "end")
+        self.entry_start_row.delete(0, "end")
+        self.entry_end_row.delete(0, "end")
 
         # Reset spinbox values to 1
         self.x_scale.delete(0, "end")

@@ -516,12 +516,13 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
     # SETUP CSV HEADER PARAMETERS
     headers = [COL_TIME]
 
-    # Serial/user-entered metadata (if selected)
+    # Serial columns (if selected)
     if record_config.use_ser:
         parts = parse_serial_params(record_config.serial_params)
-        if parts is None:
-            return False
-        headers += parts
+        if parts:
+            headers += parts
+        else:
+            headers += [COL_SERIAL]  # fallback when no column names entered
 
     # DMM selected?
     if record_config.use_dmm:
@@ -531,7 +532,7 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
     if record_config.use_ps:
         ps_params = [COL_PS_VSET1, COL_PS_VMEAS1, COL_PS_IMEAS1]
 
-        if record_config.channels > 1:
+        if record_config.ps_channel > 1:
             ps_params += [COL_PS_VSET2, COL_PS_VMEAS2, COL_PS_IMEAS2]
 
         headers += ps_params

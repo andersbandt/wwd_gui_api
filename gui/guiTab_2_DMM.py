@@ -6,13 +6,11 @@ from tkinter import ttk
 
 # import user defined modules
 from EEequipment import equipment_manager
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-# TODO: unsure if any of the mode settings are working
-
-# TODO: add a reset button here?
 
 
 class TabDMM(guic.ThemedFrame):
@@ -36,6 +34,7 @@ class TabDMM(guic.ThemedFrame):
         self.meas1_scale = 1
         self.dmm_Fu2 = ''
         self.dmm_Meas2 = ''
+        self.dmm_SampleSpeed = ''
 
         # Load DMM configuration
         self.default_sample_speed = self.cc.config_svc.get_dmm_sample_speed()
@@ -146,6 +145,11 @@ class TabDMM(guic.ThemedFrame):
         self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
 
+        self.labelSampleSpeed = ttk.Label(self.fr_info, width=10, text='Sample speed', style="TLabel", anchor='w')
+        self.valueSampleSpeed = tk.Label(self.fr_info, width=18, text='', relief='sunken', anchor='w')
+        self.labelSampleSpeed.grid(row=8, column=0, sticky='W', padx=5, pady=2)
+        self.valueSampleSpeed.grid(row=8, column=1, sticky='W', padx=5, pady=2)
+
         # ADD A REFRESH
         self.btn_update = tk.Button(self.fr_info, text='UPDATE DMM', command=lambda: self.gui_refresh_DMM(kind="full"))
         self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
@@ -169,7 +173,7 @@ class TabDMM(guic.ThemedFrame):
         self.btn_range_auto.grid(row=0, column=0, columnspan=2, pady=2)
         self.fr_range_buttons = tk.Frame(self.fr_range, bg=self.theme_config["light_4"])
         self.fr_range_buttons.grid(row=1, column=0, columnspan=2)
-        self._range_entries = []
+        self._range_labels = {}
         self.fr_range.grid(row=2, column=0, columnspan=3, pady=self.theme_config["size"]["ypad_s"])
 
         # sample rate control
@@ -179,6 +183,12 @@ class TabDMM(guic.ThemedFrame):
         self.sample_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
         tk.Button(fr_m, text='Set', command=self.dmm_set_sample).grid(row=3, column=2, padx=5)
 
+        # reset button
+        tk.Button(fr_m, text='Reset DMM',
+                  command=self.dmm_reset,
+                  bg=self.theme_config["warning"],
+                  fg=self.theme_config["fg_dark"]).grid(row=4, column=0, columnspan=3, pady=(10, 2))
+
     def gui_refresh_DMM(self, kind="partial"):
         if not self.fr_port.status:
             return
@@ -186,7 +196,7 @@ class TabDMM(guic.ThemedFrame):
         # TODO: audit this method of determining port status vs. like that status thing I was going to do in SerialConnFrame
         try:
             self.dmm_Meas1 = self.cc.dmm.read_value()
-        except COMMUNICATION_ERROR:
+        except COMMUNICATION_ERRORS:
             self.fr_port.status = False
             return
         self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
@@ -194,6 +204,12 @@ class TabDMM(guic.ThemedFrame):
         if kind == "full":
             self.dmm_Range = self.cc.dmm.get_range()
             self.dmm_Fu1 = self.cc.dmm.get_mode()
+            if hasattr(self.cc.dmm, 'get_sample_speed'):
+                try:
+                    spd = self.cc.dmm.get_sample_speed()
+                    self.dmm_SampleSpeed = spd if spd is not None else ""
+                except COMMUNICATION_ERRORS:
+                    self.dmm_SampleSpeed = ""
 
         # update Label
         if self.fr_port.status:
@@ -202,14 +218,13 @@ class TabDMM(guic.ThemedFrame):
             self.valueMeas1.config(text=self.dmm_Meas1)
             self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
             self.valueMeas2.config(text=self.dmm_Meas2)
+            self.valueSampleSpeed.config(text=self.dmm_SampleSpeed)
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
 
-        # refresh DMM information
         if self.fr_port.status:
-            if event == "auto":
-                self.gui_refresh_DMM("full")
+            self.gui_refresh_DMM("full")
 
 
     ##############################################################################
@@ -235,7 +250,7 @@ class TabDMM(guic.ThemedFrame):
     def build_range_controls(self):
         for widget in self.fr_range_buttons.winfo_children():
             widget.destroy()
-        self._range_entries = []
+        self._range_labels = {}
 
         if self.cc.dmm is None:
             return
@@ -243,21 +258,22 @@ class TabDMM(guic.ThemedFrame):
         model = self.cc.dmm.model
         registry = self.cc.dmm.registry
         cmds = registry.commands.get(model, {}).get("command", {})
-        # TODO: so I basically want the user to be able to store these ranges in the config file
         range_keys = sorted(
             [k for k in cmds if k.startswith("range_") and k != "range_auto"],
             key=lambda x: int(x.split("_")[1])
         )
 
+        # Load human-readable labels from [range_labels] section if available
+        labels = registry.get_config_section(model, "range_labels")
+
         for i, key in enumerate(range_keys):
             n = int(key.split("_")[1])
-            entry = tk.Entry(self.fr_range_buttons, width=8)
-            entry.insert(0, f"range_{n}")
-            entry.grid(row=i, column=0, padx=3, pady=1)
-            btn = tk.Button(self.fr_range_buttons, text=f"Set R{n}",
+            label = labels.get(key, f"range_{n}")
+            self._range_labels[n] = label
+            btn = tk.Button(self.fr_range_buttons, text=label,
+                            width=20,
                             command=lambda num=n: self.dmm_set_range_n(num))
-            btn.grid(row=i, column=1, padx=3, pady=1)
-            self._range_entries.append(entry)
+            btn.grid(row=i, column=0, padx=3, pady=1)
 
     def dmm_set_range_auto(self):
         if self.cc.dmm is not None:
@@ -266,12 +282,13 @@ class TabDMM(guic.ThemedFrame):
 
     def dmm_set_range_n(self, n):
         if self.cc.dmm is not None:
-            label = self._range_entries[n - 1].get() if self._range_entries else f"range_{n}"
+            label = self._range_labels.get(n, f"range_{n}")
             self.prompt.print(f"Setting DMM range: {label}")
             try:
-                cmd = self.cc.dmm.registry.get_command(self.cc.dmm.model, "command", f"range_{n}")
-                self.cc.dmm.write(cmd)
-            except Exception as e:
+                success = self.cc.dmm.set_range(n)
+                if not success:
+                    self.prompt.print(f"Range {n} not supported by {self.cc.dmm.model}", "warning")
+            except COMMUNICATION_ERRORS as e:
                 self.prompt.print(f"Range {n} error: {e}", "error")
 
     def dmm_set_sample(self):
@@ -279,6 +296,23 @@ class TabDMM(guic.ThemedFrame):
             sample_speed = self.sample_drop[1].get()
             self.prompt.print(f"Setting DMM sample speed to {sample_speed}")
             self.cc.dmm.set_sample_speed(sample_speed)
+
+    def dmm_reset(self):
+        if self.cc.dmm is None:
+            self.prompt.print("Reset failed: no DMM connected", "error")
+            return
+        try:
+            cmd = self.cc.dmm.registry.get_command(self.cc.dmm.model, "command", "reset")
+        except ValueError:
+            self.prompt.print(f"Reset not supported for {self.cc.dmm.model} (no 'reset' entry in config.ini)", "warning")
+            return
+        try:
+            self.cc.dmm.write(cmd)
+            self.prompt.print(f"DMM reset ({cmd})")
+            self.build_range_controls()
+            self.gui_refresh_DMM("full")
+        except COMMUNICATION_ERRORS as e:
+            self.prompt.print(f"Reset command failed: {e}", "error")
 
 
     #################################
@@ -301,11 +335,11 @@ class TabDMM(guic.ThemedFrame):
         self.cc.dmm.set_sample_speed(self.default_sample_speed)
         self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
 
-        self.gui_refresh("call")
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.labelIDValue.config(text=result.device_id)
         self.build_range_controls()
         self.fr_port.set_status(True)
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

@@ -379,7 +379,7 @@ class TabPS(guic.ThemedFrame):
 
         self.ch1_on = 0
         self.ch2_on = 0
-        self.gui_refresh_channel_state()
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

@@ -10,6 +10,7 @@ import time
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
+from EEequipment.TestEquipment import set_visa_backend
 
 # import tab classes
 from common import path_helper
@@ -28,7 +29,6 @@ from gui import guiTab_10_OSC
 
 NUM_TABS = 10 # tag:HARDCODE
 
-# TODO: for all tabs, run the gui_refresh() functions after connection with instrument. Gets latest and greatest measurements
 
 
 class MainApplication(ThemedApp):
@@ -126,6 +126,9 @@ def main(autoconnect, force_compact=False):
     # Create centralized config service and wire into path_helper
     config_svc = ConfigService()
     path_helper.init_config_service(config_svc)
+
+    # Configure PyVISA backend from master.ini before any instrument connections
+    set_visa_backend(config_svc.get_visa_backend())
 
     # tag:HARDCODE
     desired_w = 1350

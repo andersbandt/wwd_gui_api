@@ -27,9 +27,6 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 
 
 
-# TODO: Is it possible to have the "export HTML" plot thing be actually on the HTML itself?
-#   and I actually do like having it prompt the user on save location, but default to the corresponding .csv filename (and data folder for location)
-
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -201,9 +198,9 @@ class TabLog(guic.ThemedFrame):
                                  pady=self.theme_config["pad"]["ypad_s"])
 
         # add serial parameters box
-        self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial parameters")
+        self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial columns (comma-separated):")
         self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
-        self.serial_log_params.insert("1.0", "placeholder")
+        self.serial_log_params.insert("1.0", "col1,col2,col3")
         self.serial_log_params.tag_add("placeholder", "1.0", "end")
         self.serial_log_params.tag_config("placeholder", foreground="gray")
 
@@ -742,7 +739,6 @@ class TabLog(guic.ThemedFrame):
                 widget.grid_remove()
 
     # ── Math column actions ───────────────────────────────────────────────────
-    # TODO: SerialData is not an available column to work with. It gets complicated with my manually entered serial parms I guess ...
 
     def _refresh_math_listbox(self):
         """Repopulate the math listbox from self.math_config."""
@@ -854,6 +850,7 @@ class TabLog(guic.ThemedFrame):
         # Available variables hint
         hint_text = ("Available variables: Time, DMM_Meas1, PS_Vset1, PS_Vmeas1, PS_Imeas1,\n"
                      "PS_Vset2, PS_Vmeas2, PS_Imeas2, FG_Freq, OSC_CH*_*, prior math cols\n"
+                     "Serial columns: use names you entered in 'Serial columns' field (e.g. col1, col2)\n"
                      "Functions: abs, round, min, max, sqrt, log, log10, exp, pow\n"
                      "Constants: pi, e")
         ttk.Label(dialog, text=hint_text, style="TLabel", wraplength=350).grid(
@@ -1050,12 +1047,22 @@ class TabLog(guic.ThemedFrame):
             self.prompt.print("No data to export yet", print_type="warning")
             return
 
-        # Derive HTML path from CSV filename (or fall back to timestamped name)
+        # Default filename derived from CSV name (or timestamped fallback)
         if self.recName:
-            html_name = os.path.splitext(self.recName)[0] + ".html"
+            default_name = os.path.splitext(self.recName)[0] + ".html"
         else:
-            html_name = f"live_plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-        html_path = os.path.join(self.data_dir, html_name)
+            default_name = f"live_plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+
+        filepath = filedialog.asksaveasfilename(
+            initialdir=self.data_dir,
+            initialfile=default_name,
+            title="Export HTML Plot",
+            defaultextension=".html",
+            filetypes=[("HTML files", "*.html"), ("All files", "*.*")]
+        )
+        if not filepath:
+            return
+        html_path = filepath
 
         # Determine x-key and channels matching the live plot config
         if self.stimulus_config and self.stimulus_config.enabled:
@@ -1288,9 +1295,6 @@ class TabLog(guic.ThemedFrame):
         while self.record_status:
             try:
                 # Wait for serial data (blocks until \n is received)
-                # TODO: see if this is the best spot to do the decoding
-                # TODO: the whole serial logger is not handling my "Serial parameters" input correct
-                #   here we should be splitting up by "," and then storing that in the separate headers
                 serial_data = self.cc.ser.read_line().decode('utf-8').rstrip('\r\n')
 
                 # Collect all data using shared helper
@@ -1382,7 +1386,18 @@ class TabLog(guic.ThemedFrame):
 
         # Serial data if requested
         if self.record_config.use_ser:
-            row[logger.COL_SERIAL] = serial_data if serial_data is not None else self.cc.ser.read_line()
+            if serial_data is None:
+                raw = self.cc.ser.read_line()
+                if isinstance(raw, bytes):
+                    raw = raw.decode('utf-8').rstrip('\r\n')
+                serial_data = raw
+            serial_cols = logger.parse_serial_params(self.record_config.serial_params)
+            if serial_cols:
+                parts = serial_data.split(",")
+                for i, col in enumerate(serial_cols):
+                    row[col] = parts[i].strip() if i < len(parts) else ""
+            else:
+                row[logger.COL_SERIAL] = serial_data
 
         # DMM data if requested
         if self.record_config.use_dmm:
@@ -1553,8 +1568,11 @@ class TabLog(guic.ThemedFrame):
         # Build channels list from record config
         channels = []
         if self.record_config.use_ser:
-            # TODO: also have to handle the manually entered serial columns here
-            channels.append(logger.COL_SERIAL)
+            serial_cols = logger.parse_serial_params(self.record_config.serial_params)
+            if serial_cols:
+                channels.extend(serial_cols)
+            else:
+                channels.append(logger.COL_SERIAL)
         if self.record_config.use_dmm:
             channels.append(logger.COL_DMM_MEAS1)
         if self.record_config.use_ps:

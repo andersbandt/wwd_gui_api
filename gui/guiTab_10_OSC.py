@@ -17,17 +17,6 @@ from gui import gui_class as guic
 
 
 
-# TODO: put this into a tooltip on the Acquistion type label
-# NOTE: Acquisition type SCPI reference (:ACQuire:TYPE)
-# NORMal   — standard mode
-# AVERage  — averages N waveforms; N set via :ACQuire:COUNt (1–65536)
-#            not available in segmented memory mode
-# HRESolution — smoothing; averages oversampled points per display point
-#               useful at slower sweep speeds to reduce noise
-# PEAK     — peak detect; :ACQuire:COUNt has no meaning in this mode
-# AVERage and HRESolution yield extra vertical resolution; use WORD or
-# ASCii waveform format when reading data in those modes.
-
 
 
 class TabOSC(guic.ThemedFrame):
@@ -227,7 +216,19 @@ class TabOSC(guic.ThemedFrame):
         cur_row += 1
 
         # --- Acquisition Type ---
-        ttk.Label(fr, text="Type", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        lbl_acq_type = ttk.Label(fr, text="Type", style="TLabel")
+        lbl_acq_type.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        guic.Tooltip(lbl_acq_type,
+                     "Acquisition type (:ACQuire:TYPE)\n\n"
+                     "NORMal      — standard sample mode\n"
+                     "AVERage     — averages N waveforms (N = Avg Count, 1–65536)\n"
+                     "              not available in segmented memory mode\n"
+                     "HRESolution — smoothing; averages oversampled points per\n"
+                     "              display point; useful at slow sweep speeds\n"
+                     "              to reduce noise\n"
+                     "PEAK        — peak detect; Avg Count has no meaning\n\n"
+                     "AVERage and HRESolution yield extra vertical resolution;\n"
+                     "use WORD or ASCii waveform format when reading data.")
         self.acq_type_drop = guih.generate_drop_down(fr, ["NORMal", "AVERage", "HRESolution", "PEAK"])
         self.acq_type_drop[1].set("NORMal")
         self.acq_type_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
@@ -237,7 +238,9 @@ class TabOSC(guic.ThemedFrame):
         cur_row += 1
 
         # Avg Count (only meaningful for AVERage mode)
-        ttk.Label(fr, text="Avg Count", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        lbl_acq_count = ttk.Label(fr, text="Avg Count", style="TLabel")
+        lbl_acq_count.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        guic.Tooltip(lbl_acq_count, "Number of waveforms to average (1–65536).\nOnly applies in AVERage mode.")
         self.acq_count_entry = tk.Entry(fr, width=10)
         self.acq_count_entry.insert(0, "4")
         self.acq_count_entry.grid(row=cur_row, column=1, padx=5, pady=3)
@@ -377,6 +380,8 @@ class TabOSC(guic.ThemedFrame):
     def gui_refresh(self, event):
         if event == "auto":
             self.fr_port.refresh_ports()
+        if self.fr_port.status:
+            self.update_osc()
 
     # =========================================================================
     # Channel Actions
@@ -698,7 +703,7 @@ class TabOSC(guic.ThemedFrame):
         self.labelIDValue.config(text=result.device_id)
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.fr_port.set_status(True)
-        self.update_osc()
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

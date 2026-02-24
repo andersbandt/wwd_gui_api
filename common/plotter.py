@@ -5,9 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib import cm
+from matplotlib.ticker import MaxNLocator
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Output, Input
+from datetime import datetime as _dt
 
 # import needed modules
 import threading
@@ -282,7 +284,8 @@ def plot_multi_file_data(file_data_list,
     show_legend=True,
     legend_loc='best',
     linewidth=1.5,
-    alpha=1.0):
+    alpha=1.0,
+    xtick_max=0):
     """
     Plot data from multiple files with flexible labeling options.
 
@@ -517,6 +520,8 @@ def plot_multi_file_data(file_data_list,
         ax.legend(loc=legend_loc)
 
     # Tick rotation
+    if xtick_max and xtick_max > 0:
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=xtick_max))
     if xtick_rotation:
         ax.tick_params(axis='x', rotation=xtick_rotation)
     if ytick_rotation:
@@ -525,6 +530,30 @@ def plot_multi_file_data(file_data_list,
     plt.tight_layout()
     plt.show()
     return fig, ax
+
+
+def plot_fft(channels, title="FFT Analysis"):
+    """Plot FFT magnitude vs frequency as stacked subplots, one per channel.
+
+    Args:
+        channels: list of (freqs_array, magnitudes_array, label_str) tuples
+        title: overall figure title
+    """
+    n = len(channels)
+    if n == 0:
+        return
+    fig, axes = plt.subplots(n, 1, figsize=(10, 3 * n), sharex=False)
+    if n == 1:
+        axes = [axes]
+    for i, (ax, (freqs, mag, label)) in enumerate(zip(axes, channels)):
+        ax.plot(freqs, mag, color=COLORS[i % len(COLORS)], linewidth=1.0)
+        ax.set_ylabel(f"|{label}|")
+        ax.set_xlabel("Frequency (Hz)")
+        ax.grid(True, alpha=0.3)
+    if title:
+        fig.suptitle(title)
+    plt.tight_layout()
+    plt.show()
 
 
 def export_recorded_data_html(recorded_data: list, x_key: str, channels: list, title: str, html_path: str):
@@ -645,9 +674,12 @@ def start_live_plot(
                 ),
                 html.Button("Clear Data", id="btn-clear", n_clicks=0,
                             style={"display": "inline-block"}),
+                html.Button("Export HTML", id="btn-export-html", n_clicks=0,
+                            style={"display": "inline-block", "marginLeft": "10px"}),
             ], style={"marginBottom": "10px"}),
             dcc.Graph(id="graph"),
             dcc.Interval(id="tick", interval=refresh_ms, n_intervals=0),
+            dcc.Download(id="download-html"),
         ]
     )
 
@@ -732,6 +764,47 @@ def start_live_plot(
         )
         return fig
 
+
+    @app.callback(
+        Output("download-html", "data"),
+        Input("btn-export-html", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def export_html(_):
+        cur_channels = state['channels']
+        cur_bufs = state['bufs']
+        cur_time_buf = state['time_buf']
+        cur_x_label = state.get('x_label', x_label)
+
+        if not cur_time_buf or not cur_channels:
+            return None
+
+        x = list(cur_time_buf)
+        n_ch = len(cur_channels)
+        fig = make_subplots(rows=n_ch, cols=1, shared_xaxes=True, vertical_spacing=0.08)
+        for i, ch in enumerate(cur_channels):
+            buf = cur_bufs.get(ch)
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=list(buf) if buf else [],
+                    mode="lines",
+                    name=ch,
+                    line=dict(color=COLORS[i % len(COLORS)], width=2),
+                ),
+                row=i + 1, col=1,
+            )
+            fig.update_yaxes(title_text=ch, row=i + 1, col=1)
+        fig.update_xaxes(title_text=cur_x_label, row=n_ch, col=1)
+        fig.update_layout(
+            template="plotly_white",
+            margin=dict(l=60, r=40, t=35, b=50),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=300 * n_ch,
+        )
+
+        filename = f"live_export_{_dt.now().strftime('%Y%m%d_%H%M%S')}.html"
+        return dcc.send_string(fig.to_html(full_html=True, include_plotlyjs=True), filename=filename)
 
     # auto-open browser after a short delay (server needs to be up first)
     url = f"http://{host}:{port}"

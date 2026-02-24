@@ -210,7 +210,8 @@ class TabFG(guic.ThemedFrame):
     def gui_refresh(self, event):
         if event == "auto":
             self.fr_port.refresh_ports()
-        # self.gui_refresh_info()
+        if self.fr_port.status:
+            self.update_FG()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -347,6 +348,7 @@ class TabFG(guic.ThemedFrame):
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.fr_port.set_status(True)
         self.output_on = False
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

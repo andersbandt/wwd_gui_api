@@ -124,6 +124,20 @@ class ConfigService:
         return default_prefix
 
     # ------------------------------------------------------------------
+    # VISA
+    # ------------------------------------------------------------------
+
+    def get_visa_backend(self) -> str:
+        """Return the PyVISA backend string.
+
+        Empty string / missing key → NI-VISA default (pyvisa.ResourceManager()).
+        '@py' → pyvisa-py (no NI-VISA installation required).
+        """
+        if "VISA" not in self._config:
+            return ""
+        return self._config["VISA"].get("backend", "").strip()
+
+    # ------------------------------------------------------------------
     # Paths
     # ------------------------------------------------------------------
 

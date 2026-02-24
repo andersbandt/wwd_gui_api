@@ -10,7 +10,7 @@ import subprocess
 
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
-from common.serial_helper import SerialProcessor
+from common.serial_api import SerialProcessor
 
 # import GUI modules
 from gui import gui_class as guic

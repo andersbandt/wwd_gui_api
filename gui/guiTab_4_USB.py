@@ -8,7 +8,7 @@ import threading
 import serial
 from datetime import datetime
 # import user defined modules
-from common.serial_helper import SerialProcessor
+from common.serial_api import SerialProcessor
 from common.path_helper import get_data_dir
 from gui import gui_helper as guih
 from gui import gui_class as guic
@@ -22,12 +22,6 @@ TEST_TYPE_COMMANDS = {
     "specific-graph":      "IG85",
     "clock-test":     "CR81",
 }
-
-
-# TODO: for some reason I can't toggle timestamps here. It always default to ON
-
-# TODO: I need to add an "output mode" = NONE because of usage with the logger (just need a connection)
-
 
 
 class TabUSB(guic.ThemedFrame):
@@ -111,6 +105,11 @@ class TabUSB(guic.ThemedFrame):
         )
         self.output_mode_drop[0].grid(row=3, column=3, padx=15, pady=5)
 
+        self.var_show_timestamp = tk.IntVar(value=1)
+        ttk.Checkbutton(self.fr_state, text="Show timestamps",
+                        variable=self.var_show_timestamp,
+                        onvalue=1, offvalue=0).grid(row=3, column=4, padx=5, pady=5, sticky='w')
+
         # add output file name box
         Label(self.fr_state, text="Output file name").grid(row=4, column=1, padx=5, pady=5)
         self.output_file_name = Text(self.fr_state, height=2, width=20)
@@ -168,22 +167,22 @@ class TabUSB(guic.ThemedFrame):
     #### THREADS    #################
     #################################
 
-    # TODO: hmm timestamp isn't used here?
     def display_serial_data(self, timestamp, data):
         """
         Callback for displaying serial data on GUI prompt.
         Called from SerialProcessor thread, uses tkinter's after() for thread safety.
 
         Args:
-            timestamp: Timestamp string from serial data
+            timestamp: Unused — provided by SerialProcessor callback contract
             data: Serial data string (may contain multiple newline-delimited lines)
         """
+        show_ts = bool(self.var_show_timestamp.get())
         # Split multi-line chunks so each line gets its own timestamp
         lines = data.strip().split('\n')
         for line in lines:
             line = line.strip()
             if line:
-                self.after(0, lambda l=line: self.prompt.print(l, timestamp=True))
+                self.after(0, lambda l=line: self.prompt.print(l, timestamp=show_ts))
 
     def thread_print_display(self):
         # Get selected output mode from dropdown
@@ -241,7 +240,6 @@ class TabUSB(guic.ThemedFrame):
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
-        # TODO: clean up this class_controller implementation
         self.cc.set_ser(self.ser_obj)
         self.thread_print_display()
         self.prompt.print("Init successful!\n")
@@ -258,6 +256,7 @@ class TabUSB(guic.ThemedFrame):
             num_lines = self.ser_obj.stop_process()
             self.prompt.print(f"Port closed: {num_lines} lines wrote\n")
             self.ser_obj = None
+            self.cc.set_ser(None)
         self.fr_port.set_status(False)
 
     def start_process(self, data_subfolder, file_ext, parameters):

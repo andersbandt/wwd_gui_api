@@ -68,7 +68,7 @@ class ClassController:
         if self.ser is None:
             return False
         else:
-            return self.ser.status
+            return self.ser.serStatus
 
     def get_dmm_status(self):
         if self.dmm is None:

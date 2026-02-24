@@ -28,6 +28,8 @@ from gui import guiTab_10_OSC
 
 NUM_TABS = 10 # tag:HARDCODE
 
+# TODO: for all tabs, run the gui_refresh() functions after connection with instrument. Gets latest and greatest measurements
+
 
 class MainApplication(ThemedApp):
     def __init__(self, window, height, width, theme_file, autoconnect, compact, config_svc):

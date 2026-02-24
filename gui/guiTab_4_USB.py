@@ -24,6 +24,12 @@ TEST_TYPE_COMMANDS = {
 }
 
 
+# TODO: for some reason I can't toggle timestamps here. It always default to ON
+
+# TODO: I need to add an "output mode" = NONE because of usage with the logger (just need a connection)
+
+
+
 class TabUSB(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)
@@ -101,7 +107,7 @@ class TabUSB(guic.ThemedFrame):
         Label(self.fr_state, text="Output Mode").grid(row=3, column=1, padx=5, pady=5)
         self.output_mode_drop = guih.generate_drop_down(
             self.fr_state,
-            ["Display on Screen", "Log to File (Raw)", "Log to File (Timestamp)"]
+            ["Display on Screen", "Log to File (Raw)", "Log to File (Timestamp)", "None"]
         )
         self.output_mode_drop[0].grid(row=3, column=3, padx=15, pady=5)
 
@@ -162,6 +168,7 @@ class TabUSB(guic.ThemedFrame):
     #### THREADS    #################
     #################################
 
+    # TODO: hmm timestamp isn't used here?
     def display_serial_data(self, timestamp, data):
         """
         Callback for displaying serial data on GUI prompt.
@@ -179,13 +186,16 @@ class TabUSB(guic.ThemedFrame):
                 self.after(0, lambda l=line: self.prompt.print(l, timestamp=True))
 
     def thread_print_display(self):
+        # Get selected output mode from dropdown
+        output_mode = self.output_mode_drop[1].get()
+        if output_mode == "None":
+            return True
+
+        # start processing thread
         self.t1 = guic.StoppableThread(
             target=self.ser_obj.get_data,
             kwargs={'printmode': False})
         self.t1.start()
-
-        # Get selected output mode from dropdown
-        output_mode = self.output_mode_drop[1].get()
 
         if output_mode == "Display on Screen":
             # GUI display mode
@@ -231,6 +241,8 @@ class TabUSB(guic.ThemedFrame):
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
+        # TODO: clean up this class_controller implementation
+        self.cc.set_ser(self.ser_obj)
         self.thread_print_display()
         self.prompt.print("Init successful!\n")
         return True

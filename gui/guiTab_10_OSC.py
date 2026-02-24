@@ -17,6 +17,7 @@ from gui import gui_class as guic
 
 
 
+# TODO: put this into a tooltip on the Acquistion type label
 # NOTE: Acquisition type SCPI reference (:ACQuire:TYPE)
 # NORMal   — standard mode
 # AVERage  — averages N waveforms; N set via :ACQuire:COUNt (1–65536)

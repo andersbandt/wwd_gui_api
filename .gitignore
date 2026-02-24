@@ -1,8 +1,15 @@
 
 # data folder (user-generated logs and measurements)
 data/*.csv
+data/*.html
 data/*.log
-data/data/*
+
+
+# data subfolders
+data/*/*.csv
+data/*/*.html
+data/*/*.log
+
 
 # Machine-specific config
 config/ports_used.xml

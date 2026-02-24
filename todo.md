@@ -8,11 +8,8 @@
 
 ### Near-term / Verify
 
-- [ ] need to give the serial logging a whirl
-- [ ] test the math functions properly
 - [ ] get the FUNC2 thing working again or eliminate it (would be nice to read XDM1041 datasheet)
 - [ ] add unit tests for `logger.py`, `plotter.py`, and the `common` utilities (EEequipment drivers already covered in `tests/`)
-- [ ] add some documentation about pyvisa.ResourceManager('@py') in EEequipment
 - [ ] clean up the "About" in the Github project page
 
 ### UI & Feature Work

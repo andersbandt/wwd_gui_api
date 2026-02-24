@@ -15,5 +15,7 @@ dash
 simpleeval
 zeroconf
 psutil
+pytest
+
 
 

@@ -10,6 +10,9 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+# TODO: unsure if any of the mode settings are working
+
+# TODO: add a reset button here?
 
 
 class TabDMM(guic.ThemedFrame):
@@ -61,9 +64,9 @@ class TabDMM(guic.ThemedFrame):
 
         # place Frames into grid
         self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='W')
-        self.fr_control.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=0, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_port.grid(row=0, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=1, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='NSEW')
+        self.prompt.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky='NSEW')
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)
@@ -124,10 +127,10 @@ class TabDMM(guic.ThemedFrame):
         self.labelMeas2.grid(row=7, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for range and measurements
-        self.valueRange = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
-        self.valueFu1 = tk.Label(self.fr_info, width=9, text='', relief='sunken', anchor='w')
+        self.valueRange = tk.Label(self.fr_info, width=18, text='', relief='sunken', anchor='w')
+        self.valueFu1 = tk.Label(self.fr_info, width=18, text='', relief='sunken', anchor='w')
         self.valueMeas1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
-        self.valueFu2 = tk.Label(self.fr_info, width=9, text='', relief='sunken', anchor='w')
+        self.valueFu2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueMeas2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
         # add some drop-downs for unit handling
@@ -180,7 +183,12 @@ class TabDMM(guic.ThemedFrame):
         if not self.fr_port.status:
             return
 
-        self.dmm_Meas1 = self.cc.dmm.read_value()
+        # TODO: audit this method of determining port status vs. like that status thing I was going to do in SerialConnFrame
+        try:
+            self.dmm_Meas1 = self.cc.dmm.read_value()
+        except COMMUNICATION_ERROR:
+            self.fr_port.status = False
+            return
         self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
 
         if kind == "full":
@@ -235,6 +243,7 @@ class TabDMM(guic.ThemedFrame):
         model = self.cc.dmm.model
         registry = self.cc.dmm.registry
         cmds = registry.commands.get(model, {}).get("command", {})
+        # TODO: so I basically want the user to be able to store these ranges in the config file
         range_keys = sorted(
             [k for k in cmds if k.startswith("range_") and k != "range_auto"],
             key=lambda x: int(x.split("_")[1])

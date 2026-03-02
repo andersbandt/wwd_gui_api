@@ -24,6 +24,8 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+# TODO: I would love for another graph option to turn the time variable into just duration with first Time entry equal to 0 seconds
+
 
 # Define named tuple for file data
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
@@ -191,13 +193,13 @@ class TabGraph(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_setup.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_setup.grid(row=1, rowspan=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_files.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
         compact = self.theme_config.get("compact", False)
         if compact:
-            # compact: prompt beside fr_files in the same row
-            self.prompt.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+            # compact: prompt goes underneath fr_files
+            self.prompt.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
             self.columnconfigure(2, weight=1)
             self.rowconfigure(1, weight=1)
         else:

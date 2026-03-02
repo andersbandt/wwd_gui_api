@@ -11,6 +11,7 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
+# TODO: settings are still not updated on connection in this tab
 
 
 class TabDMM(guic.ThemedFrame):

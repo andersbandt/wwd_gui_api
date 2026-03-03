@@ -10,8 +10,9 @@ import shutil
 from matplotlib import pyplot as plt
 
 # import user created modules
-from analysis import least_squares, data_helper as datah
 from analysis import stats_analysis
+from analysis import data_helper as datah
+from analysis.specific import least_squares
 from analysis.specific import imu_analysis
 from common import plotter
 from common import logger
@@ -224,7 +225,7 @@ def verify_data(ver_file, columns):
 if __name__ == "__main__":
     # SETTINGS
     print("clearing tmp folder ...")
-    del_folder = "tmp"
+    del_folder = "analysis/tmp"
     for filename in os.listdir(del_folder):
         file_path = os.path.join(del_folder, filename)
         try:
@@ -240,7 +241,7 @@ if __name__ == "__main__":
     training_file = []
     for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
         training_file.append(basefilepath_train + file)
-    training_file = ["/home/anders/Documents/GitHub/wwd_gui_api/data/clock_data/_20240814__170148_clock_test_.csv"]
+    training_file = ["clock_data/_20240814__170148_clock_test_.csv"]
 
     # set up verification data
     # ver_file_full_path = basefilepath + "_20240417__235411_clock_test_.csv" # slope=7.20e-3

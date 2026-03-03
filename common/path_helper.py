@@ -1,7 +1,10 @@
 """Centralized path management for data directories."""
 
+import logging
 import os
 import configparser
+
+logger = logging.getLogger(__name__)
 
 # Module-level reference to the centralized ConfigService (set at startup)
 _config_svc = None
@@ -77,7 +80,7 @@ def get_data_dir(subdir=None, create=True):
     # Create directory if it doesn't exist
     if create and not os.path.exists(full_path):
         os.makedirs(full_path, exist_ok=True)
-        print(f"Created data directory: {full_path}")
+        logger.info(f"Created data directory: {full_path}")
 
     return full_path
 

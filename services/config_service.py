@@ -1,11 +1,14 @@
 """Centralized configuration service for master.ini parsing."""
 
+import logging
 import os
 import configparser
 from dataclasses import dataclass
 from typing import List
 
 from common.path_helper import get_config_path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,7 +35,7 @@ class ConfigService:
         if os.path.exists(self._path):
             self._config.read(self._path)
         else:
-            print(f"ConfigService: {self._path} not found, using defaults.")
+            logger.warning(f"ConfigService: {self._path} not found, using defaults.")
 
     # ------------------------------------------------------------------
     # Theme
@@ -43,7 +46,7 @@ class ConfigService:
         default_theme = "config/darcula.json"
 
         if "THEME" not in self._config:
-            print("Missing [THEME] section in config. Using default theme.")
+            logger.warning("Missing [THEME] section in config. Using default theme.")
             return default_theme
 
         theme_file = self._config["THEME"].get("theme_file", "darcula.json").strip()
@@ -52,10 +55,10 @@ class ConfigService:
             theme_file = f"config/{theme_file}"
 
         if not os.path.exists(theme_file):
-            print(f"Theme file {theme_file} does not exist. Using default theme.")
+            logger.warning(f"Theme file {theme_file} does not exist. Using default theme.")
             return default_theme
 
-        print(f"Using theme: {theme_file}")
+        logger.info(f"Using theme: {theme_file}")
         return theme_file
 
     # ------------------------------------------------------------------
@@ -86,10 +89,10 @@ class ConfigService:
 
         valid_speeds = ["slow", "medium", "fast"]
         if sample_speed not in valid_speeds:
-            print(f"Invalid DMM sample_speed '{sample_speed}' in config. Using 'fast'.")
+            logger.warning(f"Invalid DMM sample_speed '{sample_speed}' in config. Using 'fast'.")
             sample_speed = "fast"
 
-        print(f"DMM default sample speed: {sample_speed}")
+        logger.info(f"DMM default sample speed: {sample_speed}")
         return sample_speed
 
     # ------------------------------------------------------------------
@@ -101,15 +104,15 @@ class ConfigService:
         default_baud = 9600
 
         if "USB" not in self._config:
-            print(f"[USB] section not found in config. Using default baud rate: {default_baud}")
+            logger.warning(f"[USB] section not found in config. Using default baud rate: {default_baud}")
             return default_baud
 
         try:
             baud_rate = self._config["USB"].getint("baud_rate", default_baud)
-            print(f"Using baud rate from config: {baud_rate}")
+            logger.info(f"Using baud rate from config: {baud_rate}")
             return baud_rate
         except ValueError:
-            print(f"Invalid baud rate in config. Using default: {default_baud}")
+            logger.warning(f"Invalid baud rate in config. Using default: {default_baud}")
             return default_baud
 
     # ------------------------------------------------------------------

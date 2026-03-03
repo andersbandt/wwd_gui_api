@@ -1,7 +1,10 @@
 """Least squares regression analysis."""
 
 # import needed modules
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # import user defined modules
@@ -116,6 +119,5 @@ def run_prxgd(A, d):
     lambdas = np.logspace(-6, 20, num=25)
     lambdas = [1]
     w = ista_solve_hot(A, d, lambdas)
-    print("The dimensions of the output weight vectors are...")
-    print(np.shape(w))
+    logger.debug(f"The dimensions of the output weight vectors are: {np.shape(w)}")
     return w

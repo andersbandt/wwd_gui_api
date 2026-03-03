@@ -1,7 +1,10 @@
 """Subprocess wrapper for executing OS commands."""
 
 # import needed modules
+import logging
 import subprocess
+
+logger = logging.getLogger(__name__)
 
 
 class CommandPacket:
@@ -23,14 +26,14 @@ class CommandPacket:
 ##############################################################
 
 def run_os(base_command):
-    print(base_command)
+    logger.info(base_command)
     # os.system(base_command)
     subprocess.call(base_command, shell=True)
 
 
 def execute_command(base_command, flags):
     command = [base_command] + flags
-    print(command)
+    logger.debug(command)
 
     try:
         result = subprocess.run(command,

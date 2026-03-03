@@ -1,10 +1,13 @@
 """Statistical analysis utilities: regression, accuracy metrics, and time-series helpers."""
 
+import logging
 from datetime import datetime
 from scipy.stats import linregress
 import numpy as np
 
 from common import plotter
+
+logger = logging.getLogger(__name__)
 
 
 ##############################################################
@@ -36,7 +39,7 @@ def linear_fit(x_arr, y_arr):
         dict from _linregress_stats.
     """
     stats = _linregress_stats(x_arr, y_arr)
-    print(f"y=mx+b: {stats['slope']}*x + {stats['intercept']}")
+    logger.info(f"y=mx+b: {stats['slope']}*x + {stats['intercept']}")
 
     plotter.time_plot(x_arr, stats["residuals"], "x", "Linear best-fit residuals")
 

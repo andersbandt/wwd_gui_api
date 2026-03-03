@@ -1,10 +1,13 @@
 """Central controller that holds references to all connected equipment."""
 
+import logging
 import os
 import xml.etree.ElementTree as ET
 
 from services import DMMService, PSService, FGService, OscService
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+
+logger = logging.getLogger(__name__)
 
 _PORTS_XML = os.path.join("config", "ports_used.xml")
 
@@ -121,7 +124,7 @@ class ClassController:
         for child in root:
             if child.text == port and child.tag != usage:
                 root.remove(child)
-                print(f"Port {port} reassigned from {child.tag} to {usage}")
+                logger.info(f"Port {port} reassigned from {child.tag} to {usage}")
 
         # Update or create the element for this usage
         usage_element = root.find(usage)
@@ -129,11 +132,11 @@ class ClassController:
             old_port = usage_element.text
             usage_element.text = str(port)
             if old_port != port:
-                print(f"Updated {usage}: {old_port} -> {port}")
+                logger.info(f"Updated {usage}: {old_port} -> {port}")
         else:
             usage_element = ET.SubElement(root, usage)
             usage_element.text = str(port)
-            print(f"Created new port mapping: {usage} -> {port}")
+            logger.info(f"Created new port mapping: {usage} -> {port}")
 
         _write_xml(tree, root)
         return True
@@ -166,9 +169,9 @@ class ClassController:
 
         if old_model != model:
             if old_model:
-                print(f"Updated {usage} model: {old_model} -> {model}")
+                logger.info(f"Updated {usage} model: {old_model} -> {model}")
             else:
-                print(f"Set {usage} model: {model}")
+                logger.info(f"Set {usage} model: {model}")
 
         _write_xml(tree, root)
         return True
@@ -237,7 +240,7 @@ class ClassController:
             usage: The name of the connection (e.g., "DMM", "Serial", "PS")
         """
         self.active_connections[port] = usage
-        print(f"Active connection added: {usage} @ {port}")
+        logger.info(f"Active connection added: {usage} @ {port}")
 
     def remove_active_connection(self, port):
         """
@@ -251,7 +254,7 @@ class ClassController:
         """
         if port in self.active_connections:
             usage = self.active_connections.pop(port)
-            print(f"Active connection removed: {usage} @ {port}")
+            logger.info(f"Active connection removed: {usage} @ {port}")
             return True
         return False
 
@@ -280,40 +283,40 @@ class ClassController:
 
     def shutdown(self):
         """Gracefully disconnect all active equipment. Called on application close."""
-        print("ClassController: shutting down all equipment...")
+        logger.info("ClassController: shutting down all equipment...")
 
         if self.ps is not None:
-            print("Disconnecting power supply (turning outputs off first)")
+            logger.info("Disconnecting power supply (turning outputs off first)")
             try:
                 self.ps.output_off(1)
                 self.ps.output_off(2)
             except COMMUNICATION_ERRORS:
-                print("Failed to turn off PS outputs (IO error)")
+                logger.error("Failed to turn off PS outputs (IO error)")
             try:
                 self.ps.disconnect()
             except COMMUNICATION_ERRORS as e:
-                print(f"Failed to disconnect PS: {e}")
+                logger.error(f"Failed to disconnect PS: {e}")
 
         if self.dmm is not None:
-            print("Disconnecting DMM")
+            logger.info("Disconnecting DMM")
             self.dmm.disconnect()
 
         if self.fg is not None:
-            print("Disconnecting FG")
+            logger.info("Disconnecting FG")
             self.fg.disconnect()
 
         if self.osc is not None:
-            print("Disconnecting OSC")
+            logger.info("Disconnecting OSC")
             try:
                 self.osc.disconnect()
             except COMMUNICATION_ERRORS as e:
-                print(f"Failed to disconnect OSC: {e}")
+                logger.error(f"Failed to disconnect OSC: {e}")
 
         if self.relay is not None:
-            print("Opening all relay channels")
+            logger.info("Opening all relay channels")
             self.relay.open_all()
 
-        print("ClassController: shutdown complete")
+        logger.info("ClassController: shutdown complete")
 
 
 

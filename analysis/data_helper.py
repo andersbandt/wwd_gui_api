@@ -1,10 +1,13 @@
 """General-purpose data loading and type-conversion utilities for offline analysis."""
 
 import csv
+import logging
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+
+logger = logging.getLogger(__name__)
 
 
 ##############################################################
@@ -75,19 +78,19 @@ def load_csv_pandas(filepath, columns=None, read_columns=False):
     if read_columns or columns is None:
         columns = get_first_row_csv(filepath)
 
-    print(f"\nINFO: Attempting to open a .csv using columns: \n\t{columns}")
-    print(f"\tusing path --> {filepath}\n")
+    logger.info(f"Attempting to open a .csv using columns: {columns}")
+    logger.info(f"using path --> {filepath}")
 
     try:
         df = pd.read_csv(filepath)
     except pd.errors.EmptyDataError:
-        print("Pandas says data is empty! No columns to parse from file")
+        logger.error("Pandas says data is empty! No columns to parse from file")
         return None
 
     pandas_data = df[columns]
 
     if len(pandas_data[columns[0]].tolist()) == 0:
-        print("File seems to be .csv but there is no data!")
+        logger.warning("File seems to be .csv but there is no data!")
         return None
 
     return pandas_data

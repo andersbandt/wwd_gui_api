@@ -1,9 +1,10 @@
 """Clock and time-domain analysis."""
 
 # import needed modules
+import logging
 import pandas as pd
 import numpy as np
-from pprint import pprint
+from pprint import pformat
 import subprocess
 import os
 import shutil
@@ -17,10 +18,12 @@ from analysis.specific import imu_analysis
 from common import plotter
 from common import logger
 
+_logger = logging.getLogger(__name__)
+
 
 def clean_data(df, column, column2=None):
-    print("INFO: Cleaning data ....")
-    print(f"\tdata starting with row count: {df.shape[0]}")
+    _logger.info("Cleaning data ....")
+    _logger.debug(f"data starting with row count: {df.shape[0]}")
     # drop out nAn values
     df = df.replace('', np.nan)
     df = df.dropna()
@@ -31,13 +34,13 @@ def clean_data(df, column, column2=None):
     df = df[df[column] >= df[column].shift(1)]
     df = df[df[column] >= df[column].shift(1)]
 
-    print(f"\tfilter on column '{column}' yields row count: {df.shape[0]}")
+    _logger.debug(f"filter on column '{column}' yields row count: {df.shape[0]}")
 
     temp_shift = 10  # max shift between temp samples allowed
     if column2:
         df = df[df[column2] - df[column2].shift(1) <= temp_shift]
         df = df[df[column2] - df[column2].shift(1) <= temp_shift]
-        print(f"\tfilter on column '{column2}' yields row count: {df.shape[0]}")
+        _logger.debug(f"filter on column '{column2}' yields row count: {df.shape[0]}")
 
     # reset the starting value to be at 0
     min_value = df[column].min()
@@ -64,7 +67,7 @@ def get_filtered_data(data_arr, interest_column):
         local_std = np.std(window)
 
         z_score = np.abs((interest_arr[i] - local_mean) / local_std)
-        print(z_score)
+        _logger.debug(z_score)
 
         # If the z-score exceeds the threshold, mark the index for removal
         threshold = 0.01
@@ -130,7 +133,7 @@ def train_model(train_file, ver_file):
     # LOAD IN AND FORMAT TRAIN DATA
     for tr_file in train_file:
         if ".csv" in tr_file:
-            print(f"Loading in file: {tr_file}")
+            _logger.info(f"Loading in file: {tr_file}")
             df_tmp = get_total_data(tr_file, ["timestamp", "ms", "temp"], ["temp"], ["ms"])
             dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
             dt_seconds = [date.timestamp() for date in dt_tmp]
@@ -151,12 +154,10 @@ def train_model(train_file, ver_file):
     A = least_squares.generateA(train_df["ms"], train_df["temp"])
     d = np.array(time_offset)
     d = d.reshape(-1, 1)
-    pprint(A)
-    print("### MATRIX A ABOVE ###")
-    pprint(d)
-    print("\n### MATRIX d ABOVE ###")
-    print(f"\nComputing least squares with A matrix of \nt[shape, {A.shape}]\nt[type, {A.dtype}]")
-    print(f"\tand d of \nt[shape, {d.shape}]\nt[type, {d.dtype}]")
+    _logger.debug("MATRIX A:\n%s", pformat(A))
+    _logger.debug("MATRIX d:\n%s", pformat(d))
+    _logger.debug(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
+    _logger.debug(f"and d of shape={d.shape} dtype={d.dtype}")
 
     # RUN ANALYSIS
     w = least_squares.least_squares(A, d)
@@ -165,13 +166,13 @@ def train_model(train_file, ver_file):
     y = A @ w  # apply A matrix to newly found coefficients
     # w = [0.00744361959822233, 0]
 
-    print(f"\tcoefs w are of shape: {w.shape}")
-    print(f"\tshape of output y is: {y.shape}")
+    _logger.debug(f"coefs w are of shape: {w.shape}")
+    _logger.debug(f"shape of output y is: {y.shape}")
     [residual, e_norm] = least_squares.generate_residual(y, d)  # generate residual
-    print(f"coefficients (w) found from data; computed output values (y) and formed residual")
-    print(f"w: {w}")  # display coefficients
-    # print(f"w2: {w2}")  # display coefficients
-    print(f"Euclidean norm of this training data is: {e_norm}")  # display 2 norm of the residual
+    _logger.info(f"coefficients (w) found from data; computed output values (y) and formed residual")
+    _logger.info(f"w: {w}")  # display coefficients
+    # _logger.debug(f"w2: {w2}")  # display coefficients
+    _logger.info(f"Euclidean norm of this training data is: {e_norm}")  # display 2 norm of the residual
 
     # print out a shit ton of plots
     # plotter.time_plot(datetime_f_arr, mcu_ms, "Datetime", "Raw mcu training time")
@@ -187,9 +188,9 @@ def train_model(train_file, ver_file):
 
 def linear_fit_train(x_arr, y_arr):
     # spit out linear fit
-    print("Creating linear fit ....")
+    _logger.info("Creating linear fit ....")
     stats = stats_analysis.linear_fit(x_arr, y_arr)
-    pprint(stats)
+    _logger.info(pformat(stats))
     return stats
 
 
@@ -207,10 +208,10 @@ def verify_data(ver_file, columns):
 
     df_ver["time_offset"] = ver_toff.reshape(-1, 1)
     [res, ver_e_norm] = least_squares.generate_residual(df_ver["dtsecond"], df_ver["time_offset"])
-    print(f"Euclidean norm of this verification data is: {ver_e_norm}")  # display 2 norm of the residual
+    _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")  # display 2 norm of the residual
 
     # GENERATE VERIFICATION PLOTS
-    print("\n\nGenerating verification plots...\n")
+    _logger.info("Generating verification plots...")
     min_value = df_ver["dtsecond"].min()
     result = df_ver["dtsecond"] - min_value
     df_ver["dtsecond_zero"] = result
@@ -223,8 +224,9 @@ def verify_data(ver_file, columns):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(message)s")
     # SETTINGS
-    print("clearing tmp folder ...")
+    _logger.info("clearing tmp folder ...")
     del_folder = "analysis/tmp"
     for filename in os.listdir(del_folder):
         file_path = os.path.join(del_folder, filename)
@@ -234,7 +236,7 @@ if __name__ == "__main__":
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except Exception as e:
-            print('Failed to delete %s. Reason: %s' % (file_path, e))
+            _logger.error('Failed to delete %s. Reason: %s' % (file_path, e))
 
     # set up training data
     basefilepath_train = os.getcwd() + "/../data/clock_data/"
@@ -257,7 +259,7 @@ if __name__ == "__main__":
         stats_analysis.create_datetime(
             verification_df["timestamp"]
         ))
-    pprint(time_dict)
+    _logger.info(pformat(time_dict))
 
 
     ### LINEAR FIT TRAIN
@@ -267,11 +269,11 @@ if __name__ == "__main__":
     # linear_fit_train(train_dataframe["ms"], train_time_offset)
 
     # SHOW PLOTS
-    print("Plot show!")
+    _logger.info("Plot show!")
     plt.show()
 
     # generate pdf file AND open
-    print("\nGenerating .pdf ...")
+    _logger.info("Generating .pdf ...")
     image_folder = "tmp"
     output_pdf = "tmp/summary_document.pdf"
     logger.generate_summary_pdf(image_folder, output_pdf)

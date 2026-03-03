@@ -1,6 +1,7 @@
 """Automated test equipment sequencing tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -20,6 +21,8 @@ from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from common import logger
 import numpy as np
+
+_logger = logging.getLogger(__name__)
 
 
 # TODO: would be kind of cool feature to print out the IDN of each PyVISA resource (or COM port, etc)
@@ -73,7 +76,7 @@ class TabATE(guic.ThemedFrame):
         self.fr_port.grid(row=0, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
-        print("Initializing tab 7 (ATE) content")
+        _logger.debug("Initializing tab 7 (ATE) content")
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_accuracy()
@@ -93,7 +96,7 @@ class TabATE(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("Generic_ATE")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous ATE model: {previous_model}")
+            _logger.info(f"Restored previous ATE model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')

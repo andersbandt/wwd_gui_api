@@ -1,7 +1,10 @@
 """Analog front-end signal analysis with FFT and spectral tools."""
 
+import logging
 from datetime import datetime
 import matplotlib.pyplot as plt
+
+logger = logging.getLogger(__name__)
 
 from scipy.fft import fft, fftfreq
 from scipy import signal
@@ -22,10 +25,10 @@ from common import plotter
 def calculate_frequency(peak_positions, sampling_rate):
     # Calculate the time between consecutive peaks
     time_between_peaks = np.diff(peak_positions) / sampling_rate
-    print(time_between_peaks)
-    print(len(peak_positions))
-    print(len(time_between_peaks))
-    print(f"sampling rate is: {sampling_rate}")
+    logger.debug(time_between_peaks)
+    logger.debug(f"peak_positions count: {len(peak_positions)}")
+    logger.debug(f"time_between_peaks count: {len(time_between_peaks)}")
+    logger.info(f"sampling rate is: {sampling_rate}")
     # Calculate the average time between peaks
     avg_time_between_peaks = np.mean(time_between_peaks)
     # Calculate frequency (Hz)
@@ -39,8 +42,8 @@ def peak_detect_hr(data_arr, sample_rate, duration, show_plot=True):
                           height=0,
                           threshold=0,
                           distance=8)
-    print(peaks)
-    print("Found peaks above")
+    logger.debug(peaks)
+    logger.debug("Found peaks above")
 
     # Plot the data array along with markers for the identified peaks
     if show_plot:
@@ -92,7 +95,7 @@ def find_transitions(data_array):
     i = 0
     for d in data_array:
         if d_prev != d:
-            print(f"Transition found at: {i} !")
+            logger.debug(f"Transition found at: {i} !")
             trans.append(i)
         d_prev = d
         i += 1
@@ -104,17 +107,16 @@ def find_transitions(data_array):
 ####################################
 
 def compute_fft(data_arr, sr):
-    print("\n### COMPUTING FFT ###")
+    logger.info("### COMPUTING FFT ###")
     # compute sampling interval
     T = 1.0/sr
     tr = np.arange(0, 1, T)
 
     # Number of sample points
     N = len(data_arr)
-    print(f"\tnum samples: {N}")
-
-    print(data_arr)
-    print(type(data_arr))
+    logger.debug(f"num samples: {N}")
+    logger.debug(data_arr)
+    logger.debug(type(data_arr))
 
     # do analysis
     w = blackman(N)
@@ -177,8 +179,8 @@ def plot_fft_with_windowing(data, sample_rate, lowcut, highcut):
     # Find the peak frequency in the filtered FFT
     peak_frequency = find_peak_frequency(fft_freq[:len(fft_freq) // 2], fft_magnitude[:len(fft_magnitude) // 2])
     peak_magnitude = np.max(fft_magnitude)
-    print(f"\tpeak magnitude at freq: {peak_frequency}")
-    print(f"\theart rate of: {peak_frequency*60} BPM")
+    logger.info(f"peak magnitude at freq: {peak_frequency}")
+    logger.info(f"heart rate of: {peak_frequency*60} BPM")
 
     # Take the absolute value of the FFT result to get the magnitude spectrum
     fft_magnitude = np.abs(fft_result)
@@ -242,10 +244,9 @@ def analyze_afe(afe_d):
 #    afe_dict = stats_dict | time_dict # make one master dict by appending the two dict
     afe_dict = dict(stats_dict, **time_dict)
 
-    # Print the results
-    print("\n\n")
+    # Log the results
     for stat, value in afe_dict.items():
-        print(f"{stat}: {value}")
+        logger.info(f"{stat}: {value}")
 
     # apply some filtering
     mov_data_arr = simple_moving_average(data_arr, 1)
@@ -262,7 +263,7 @@ def analyze_afe(afe_d):
                                 afe_dict['frequency'],
                                 afe_dict['duration'].total_seconds(),
                                 show_plot=False)
-    print(f"heart rate: {heart_rate}")
+    logger.info(f"heart rate: {heart_rate}")
     afe_dict["HR (BPM)"] = heart_rate
     afe_dict["HR (Hz)"] = heart_rate/60
 

@@ -1,6 +1,7 @@
 """Main dashboard tab with overview status and system controls."""
 
 # import needed packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 import serial
@@ -15,6 +16,8 @@ from common.serial_api import SerialProcessor
 # import GUI modules
 from gui import gui_class as guic
 from gui import gui_helper as guih
+
+logger = logging.getLogger(__name__)
 
 
 def open_file_cross_platform(file_path):
@@ -41,7 +44,7 @@ def open_file_cross_platform(file_path):
             subprocess.run(["xdg-open", file_path], check=True)
         return True
     except Exception as e:
-        print(f"Error opening file: {e}")
+        logger.error(f"Error opening file: {e}")
         return False
 
 
@@ -100,7 +103,7 @@ class TabMainDashboard(guic.ThemedFrame):
         self.gui_refresh("auto")
 
     def initTabContent(self):
-        print("Initializing tab 1 main dashboard")
+        logger.debug("Initializing tab 1 main dashboard")
         # print welcome text_data
         l1 = ttk.Label(self, text="Welcome to the WWD program!!!!", style="BW.TLabel",
                        font=(self.theme_config["font"]["family"], 16))

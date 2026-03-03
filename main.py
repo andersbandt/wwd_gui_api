@@ -2,13 +2,13 @@
 
 import argparse
 import ctypes
+import logging
 import sys
 
+from common.app_logging import setup_logging
 from gui import gui_driver
 
-
-
-# TODO: can I convert every print statement into a relevant logger method? Would that be worthwhile?
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -18,19 +18,26 @@ def main():
     # Add command-line arguments
     parser.add_argument('-a', '--auto-connect', action='store_true', help='Enable auto-connect mode')
     parser.add_argument('-c', '--compact', action='store_true', help='Force compact mode (overrides automatic screen size detection)')
+    parser.add_argument('--log-level', default='DEBUG',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                        help='Set logging level (default: DEBUG)')
 
     # Parse the arguments
     args = parser.parse_args()
 
+    # Configure logging before anything else
+    numeric_level = getattr(logging, args.log_level.upper(), logging.DEBUG)
+    setup_logging(level=numeric_level)
+
     # Use the arguments to determine behavior
     autoconnect = False
     if args.auto_connect:
-        print("Auto-connect enabled.")
+        logger.info("Auto-connect enabled.")
         autoconnect = True
 
     force_compact = False
     if args.compact:
-        print("Compact mode forced.")
+        logger.info("Compact mode forced.")
         force_compact = True
 
     # Windows: set explicit App User Model ID so the taskbar uses our icon
@@ -42,7 +49,7 @@ def main():
     gui_driver.main(autoconnect, force_compact)
 
     # quit if we reach this point
-    print("calling quit()")
+    logger.info("calling quit()")
     quit()
 
 

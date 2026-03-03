@@ -1,6 +1,7 @@
 """Serial port detection, enumeration, and communication utilities."""
 
 # import needed modules
+import logging
 import serial
 from serial.tools import list_ports
 import pyvisa
@@ -9,6 +10,8 @@ import platform
 from datetime import datetime
 import queue
 import os
+
+logger = logging.getLogger(__name__)
 
 # import user created modules
 from common import logger
@@ -68,7 +71,7 @@ def show_ports():
 
     # Print information about each port
     for port in ports:
-        print(f"Device: {port.device}, Description: {port.description}")
+        logger.info(f"Device: {port.device}, Description: {port.description}")
 
 
 def show_ports_linux():
@@ -104,17 +107,17 @@ class SerialGeneral:
             self.serObj = serial.Serial(self.port, self.baud_rate)
         except serial.serialutil.SerialException:
             self.serStatus = False
-            print(f"Can't reopen port --> {self.port}")
+            logger.error(f"Can't reopen port --> {self.port}")
             return
 
-        print("Opened! Yay!")
+        logger.info(f"Reopened port {self.port}")
         self.serStatus = True
 
     def get_data(self, printmode=False):
         bytes_to_read = self.serObj.inWaiting()
         serStrDat = self.serObj.read(bytes_to_read)
         if printmode:
-            print(serStrDat)
+            logger.debug(serStrDat)
         return serStrDat
 
     def send_data(self, data):
@@ -140,17 +143,17 @@ class SerialProcessor(SerialGeneral):
         self.r_buf = queue.Queue(maxsize=200)  # Thread-safe read buffer
 
     def init_data(self, data_mode, parameters):
-        print("SerialProcessor data initialization")
+        logger.info("SerialProcessor data initialization")
         if data_mode == "data":
             self.logfile = csvh.CSVHelper(self.basefilepath, parameters)
-            print(f"\tpath is at: {self.logfile.file_path}")
+            logger.info(f"path is at: {self.logfile.file_path}")
         elif data_mode == "raw" or data_mode == "timestamp":
             logname = logger.build_log_name("SER", "", "log", date_strf='%Y%m%d')
             self.logfile = os.path.join(self.basefilepath, logname)
             logger.append_text(self.logfile, "\n\n\n===================================\n"
                                              "=======INFO: USB LOG START=========\n"
                                              "===================================\n")
-            print(f"\tpath is at: {self.logfile}")
+            logger.info(f"path is at: {self.logfile}")
         else:
             self.logfile = None
 
@@ -163,12 +166,12 @@ class SerialProcessor(SerialGeneral):
                     ser_bytes = self.serObj.read(bytes_to_read)
 
                     if printmode:
-                        print(ser_bytes)
+                        logger.debug(ser_bytes)
 
                     try:
                         serStrDat = ser_bytes.decode('utf-8')
                     except UnicodeDecodeError:
-                        print(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
+                        logger.error(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                     # Use put_nowait to avoid blocking if queue is full (drops oldest behavior)
@@ -183,12 +186,12 @@ class SerialProcessor(SerialGeneral):
                             pass  # Race condition, queue emptied, skip
             except (serial.serialutil.SerialException, OSError) as e:  # NOTE errors are for (Windows, Linux)
                 self.serStatus = False
-                print(e)
+                logger.error(e)
 
     def process_data(self, basefilepath, data_folder, data_mode, parameters=None, gui_callback=None):
         # If gui_callback is provided, display on GUI instead of logging to file
         if gui_callback:
-            print("Starting to display data on GUI")
+            logger.info("Starting to display data on GUI")
             self.procStatus = True
             self.num_lines = 0
             while self.serStatus and self.procStatus:
@@ -198,14 +201,14 @@ class SerialProcessor(SerialGeneral):
                     gui_callback(data[0], data[1])
                 except queue.Empty:
                     continue
-            print("SerialProcessor finished GUI display")
+            logger.info("SerialProcessor finished GUI display")
             return
 
         # File logging mode
         self.basefilepath = os.path.join(basefilepath, data_folder)
         self.init_data(data_mode, parameters)
 
-        print(f"Starting to process data with mode: {data_mode}")
+        logger.info(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True
         self.num_lines = 0
         while self.serStatus and self.procStatus:
@@ -228,7 +231,7 @@ class SerialProcessor(SerialGeneral):
             else:
                 raise BaseException("ERROR: undefined data mode for SerialReader")
 
-        print("SerialProcessor finished process_data()")
+        logger.info("SerialProcessor finished process_data()")
 
     def stop_process(self):
         if self.procStatus:
@@ -237,7 +240,7 @@ class SerialProcessor(SerialGeneral):
             try:
                 logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
             except TypeError:
-                print("SerialProcessor: logfile not writable (GUI display mode)")
+                logger.debug("SerialProcessor: logfile not writable (GUI display mode)")
             return self.num_lines
         else:
             return 0

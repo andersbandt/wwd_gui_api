@@ -9,9 +9,10 @@
 ### Near-term / Verify
 
 
-- [ ] add unit tests for `logger.py`, `plotter.py`, and the `common` utilities (EEequipment drivers already covered in `tests/`)
+
 - [ ] clean up the "About" in the Github project page
 - [ ] look at `scripting.md` and figure out implementation plan approach
+
 
 
 

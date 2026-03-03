@@ -2,6 +2,7 @@
 
 
 # import modules
+import logging
 import tkinter as tk
 import xml.etree.ElementTree
 from tkinter import ttk
@@ -14,6 +15,8 @@ import concurrent.futures
 import copy
 import xml.etree.ElementTree as ET
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # import user created modules
 from gui import gui_helper as guih
@@ -339,7 +342,7 @@ class ConnFrame(ThemedFrame):
 
     def connect(self):
         self.status = self.connect_cmd()
-        print(f"Connect with {self.port} had status: {self.status} !\n")
+        logger.info(f"Connect with {self.port} had status: {self.status}")
         self.gui_refresh()
         return self.status
 
@@ -441,7 +444,7 @@ class SerialConnFrame(ConnFrame):
         is_active, active_usage = self.cc.is_port_active(self.port)
         if is_active:
             message = f"ERROR: Port {self.port} is already in use by {active_usage}"
-            print(message)
+            logger.error(message)
             guih.alert_user("Port already in use", message, "error")
             self.status = False
             self.gui_refresh()
@@ -497,7 +500,7 @@ class SerialConnFrame(ConnFrame):
                 ports = future.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
                 ports = []
-                print(f"WARNING: Port scan timed out after {timeout}s")
+                logger.warning(f"Port scan timed out after {timeout}s")
 
         if not ports:
             ports = []
@@ -544,7 +547,7 @@ class SerialConnFrame(ConnFrame):
         self.port = self.get_previous_port()
         self.com_drop[1].set(self.port)
         if self.port is not None:
-            print(f"Connect to previous port for {self.name} @ {self.port}")
+            logger.info(f"Connect to previous port for {self.name} @ {self.port}")
             self.connect(set_used_port=False)
         return self.status
 

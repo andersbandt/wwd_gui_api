@@ -1,6 +1,7 @@
 """Graphing tab for plotting saved CSV data."""
 
 # import needed packages
+import logging
 import pandas as pd
 import os
 import json
@@ -23,6 +24,7 @@ from analysis import stats_analysis
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
+logger = logging.getLogger(__name__)
 
 # TODO: I would love for another graph option to turn the time variable into just duration with first Time entry equal to 0 seconds
 
@@ -216,7 +218,7 @@ class TabGraph(guic.ThemedFrame):
         self.refresh_presets()
 
     def initTabContent(self):
-        print("Initializing tab 9 (Graph) content")
+        logger.debug("Initializing tab 9 (Graph) content")
 
         # print welcome text_data
         l1 = ttk.Label(self, text="Grapher", style="BW.TLabel",

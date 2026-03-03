@@ -1,10 +1,13 @@
 """IMU accelerometer and gyroscope data analysis."""
 
 # import needed modules
+import logging
 import pandas as pd
 import pandas.errors
 import numpy as np
 import matplotlib.pyplot as plt
+
+logger = logging.getLogger(__name__)
 
 
 DATABASE_DIRECTORY = "C:/Users/ander/OneDrive/Projects/WWD/sys/imu_data_dir/"
@@ -66,7 +69,7 @@ def analyze_imu(file_path):
     try:
         df = pd.read_csv(file_path)
     except pandas.errors.EmptyDataError as e:
-        print(e)
+        logger.error(e)
         return False
 
     # Extract columns

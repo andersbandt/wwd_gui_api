@@ -1,8 +1,11 @@
 """Butterworth lowpass filter implementation."""
 
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import butter, lfilter, freqz
+
+logger = logging.getLogger(__name__)
 
 
 def butter_lowpass(cutoff, fs, order=5):
@@ -32,7 +35,7 @@ def plot_freq_response():
 
 # Demonstrate the use of the filter.
 def filter_data(data):
-    print("filtering data... ")
+    logger.debug("filtering data... ")
     # First make some data to be filtered.
     T = 5.0  # seconds
     # n = int(T * fs) # total number of samples

@@ -1,6 +1,7 @@
 """XDS110 JTAG debug probe interface tab."""
 
 # import needed packages
+import logging
 import time
 from tkinter import *
 from tkinter import filedialog
@@ -15,6 +16,8 @@ from services.config_service import ConfigService
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
+
+logger = logging.getLogger(__name__)
 
 
 class tabXDS110(guic.ThemedFrame):
@@ -61,7 +64,7 @@ class tabXDS110(guic.ThemedFrame):
         self.parse_target_config(get_config_path())
 
     def initTabContent(self):
-        print("Initializing tab 3 (XDS110) content")
+        logger.debug("Initializing tab 3 (XDS110) content")
         self.init_fr_xds110()
         self.init_fr_target()
         self.init_fr_firmware()
@@ -212,7 +215,7 @@ class tabXDS110(guic.ThemedFrame):
         if self.var_usedmm.get():
             if self.cc.dmm is not None:
                 dmm_voltage = self.cc.dmm.read_voltage()
-                print(f"DMM got this for a measurement: {dmm_voltage}")
+                logger.debug(f"DMM got this for a measurement: {dmm_voltage}")
                 self.lbl_target_v.config(text=f"{dmm_voltage} V")
 
 
@@ -276,7 +279,7 @@ class tabXDS110(guic.ThemedFrame):
             return False
 
     def flash_firmware(self):
-        print("... executing loadti to flash firmware ...")
+        logger.info("... executing loadti to flash firmware ...")
 
         ### BUILD FIRMWARE
         build_status = self.build_firmware()
@@ -340,7 +343,7 @@ class tabXDS110(guic.ThemedFrame):
         """
         Open a configuration file and display its contents in the text widget.
         """
-        print("Loading target configuration")
+        logger.info("Loading target configuration")
         file_path = filedialog.askopenfilename(
             title="Open Configuration File",
             filetypes=(("Config Files", "*.ini *.cfg *.json *.yaml *.yml"), ("All Files", "*.*"))
@@ -354,7 +357,7 @@ class tabXDS110(guic.ThemedFrame):
 
     def autoload_config(self):
         cfg = self.defaultTarget_drop[1].get()
-        print(f"Autoloading with config num: {cfg}")
+        logger.info(f"Autoloading with config num: {cfg}")
         self.parse_target_config(os.path.join("config", f"{cfg}.ini"))
 
 

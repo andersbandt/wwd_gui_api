@@ -1,6 +1,7 @@
 """Oscilloscope control tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
@@ -14,6 +15,8 @@ from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: this thing doesn't properly refresh channel states on connection
@@ -81,7 +84,7 @@ class TabOSC(guic.ThemedFrame):
 
 
     def initTabContent(self):
-        print("Initializing tab 10 (OSC) content")
+        logger.debug("Initializing tab 10 (OSC) content")
         self.init_fr_info()
         self.init_fr_channel()
         self.init_fr_tb_trig()
@@ -107,7 +110,7 @@ class TabOSC(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("OSC_PyVISA")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous OSC model: {previous_model}")
+            logger.info(f"Restored previous OSC model: {previous_model}")
 
         # Device ID
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')

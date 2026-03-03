@@ -1,7 +1,10 @@
 """Real-time and static plotting utilities."""
 
 # import plotter modules
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib import cm
@@ -401,7 +404,7 @@ def plot_multi_file_data(file_data_list,
 
             except (ValueError, TypeError):
                 # If values aren't numeric, fall back to discrete colors
-                print("Warning: Data values are not numeric. Using discrete colors instead.")
+                logger.warning("Data values are not numeric. Using discrete colors instead.")
                 normalize_colors = False
                 for idx, data_val in enumerate(sorted_data_values):
                     data_value_to_color[data_val] = idx % len(COLORS)

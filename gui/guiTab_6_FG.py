@@ -1,6 +1,7 @@
 """Function generator control tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
@@ -15,6 +16,8 @@ from EEequipment import equipment_manager
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
+
+logger = logging.getLogger(__name__)
 
 
 class TabFG(guic.ThemedFrame):
@@ -71,7 +74,7 @@ class TabFG(guic.ThemedFrame):
         self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
-        print("Initializing tab 6 (FG) content")
+        logger.debug("Initializing tab 6 (FG) content")
         self.init_fr_info()
         self.init_fr_control()
 
@@ -92,7 +95,7 @@ class TabFG(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("FG_PyVISA")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous FG model: {previous_model}")
+            logger.info(f"Restored previous FG model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')

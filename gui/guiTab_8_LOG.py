@@ -2,6 +2,7 @@
 
 
 # import needed GUI modules
+import logging
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -24,6 +25,8 @@ from common import logger
 from common import plotter
 from common import path_helper
 from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math_config, load_math_config
+
+_logger = logging.getLogger(__name__)
 
 
 
@@ -100,7 +103,7 @@ class TabLog(guic.ThemedFrame):
         self.initTabContent()
 
     def initTabContent(self):
-        print("Initializing tab 8 (Logger) content")
+        _logger.debug("Initializing tab 8 (Logger) content")
 
         self.init_fr_status()
         self.init_fr_setup()
@@ -1207,7 +1210,7 @@ class TabLog(guic.ThemedFrame):
             use_osc=self.var_use_osc.get(),
             osc_config=self.osc_record_config
         )
-        self.record_config.print()
+        _logger.debug(self.record_config.pretty())
 
         # create stimulus config if enabled
         if self.var_use_stimulus.get():

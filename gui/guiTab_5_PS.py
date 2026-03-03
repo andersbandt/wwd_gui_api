@@ -1,6 +1,7 @@
 """Power supply control tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
@@ -14,6 +15,8 @@ from EEequipment import equipment_manager
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -76,7 +79,7 @@ class TabPS(guic.ThemedFrame):
 
 
     def initTabContent(self):
-        print("Initializing tab 5 (PS) content")
+        logger.debug("Initializing tab 5 (PS) content")
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()
@@ -98,7 +101,7 @@ class TabPS(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("PS_PyVISA")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous PS model: {previous_model}")
+            logger.info(f"Restored previous PS model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -255,13 +258,13 @@ class TabPS(guic.ThemedFrame):
             self.ch2_mode.set_color("black")
 
     def gui_refresh(self, event):
-        print("gui_refresh for PS ...")
+        logger.debug("gui_refresh for PS ...")
         if event == "auto":
             self.fr_port.refresh_ports()
-            print("End of refreshing ports")
+            logger.debug("End of refreshing ports")
         self.gui_refresh_info()
         self.gui_refresh_channel_state()
-        print("end of gui_refresh for PS!")
+        logger.debug("end of gui_refresh for PS!")
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################

@@ -1,10 +1,13 @@
 """CSV file read/write helper utilities."""
 
 # import needed modules
+import logging
 import csv
 from typing import Dict, Any, Optional
 from pathlib import Path
 import os
+
+logger = logging.getLogger(__name__)
 
 
 def init_csvh(data_dir: str, filename: str, headers):
@@ -79,10 +82,10 @@ class CSVHelper:
         return data
 
     def print_data(self):
-        """Print data from the CSV file."""
+        """Log data from the CSV file at DEBUG level."""
         data = self.read_data()
         for row in data:
-            print(row)
+            logger.debug(row)
 
     def delete_file(self):
         """Delete the CSV file."""

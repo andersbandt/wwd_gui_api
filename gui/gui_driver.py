@@ -2,10 +2,13 @@
 
 
 # import needed packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 import os
 import time
+
+logger = logging.getLogger(__name__)
 
 # import ClassController
 from class_controller import ClassController
@@ -45,7 +48,7 @@ class MainApplication(ThemedApp):
         try:  # NOTE: I think I get weird libpath / StopIteration things if I don't have this thing properly installed
             usb_dev = usbrelay_controller.find()
         except Exception as e:
-            print(f"Can't locate USB_RELAY because of {e}")
+            logger.warning(f"Can't locate USB_RELAY because of {e}")
             usb_dev = None
         self.controller.set_relay(
             usbrelay_controller.USBRelayController(usb_dev)
@@ -56,7 +59,7 @@ class MainApplication(ThemedApp):
         self.setTabs()
 
     def setTabs(self):
-        print("Creating tab nav bar and initializing tab content")
+        logger.info("Creating tab nav bar and initializing tab content")
 
         # setup autoconnect array
         if self.autoconnect:
@@ -93,7 +96,7 @@ class MainApplication(ThemedApp):
     def on_tab_changed(self, event):
         # Skip gui_refresh during active recording to prevent crashes
         if self.controller.recording:
-            print("Skipping gui_refresh: recording in progress")
+            logger.debug("Skipping gui_refresh: recording in progress")
             return
 
         selected_tab = event.widget.tab(event.widget.select(), "text")
@@ -121,7 +124,7 @@ class MainApplication(ThemedApp):
 
 # main function
 def main(autoconnect, force_compact=False):
-    print("Executing main function of gui_driver.py")
+    logger.info("Executing main function of gui_driver.py")
 
     # Create centralized config service and wire into path_helper
     config_svc = ConfigService()
@@ -146,7 +149,7 @@ def main(autoconnect, force_compact=False):
         _icon_img = tk.PhotoImage(file=icon_path)
         window.iconphoto(True, _icon_img)
     except Exception as e:
-        print(f"Could not load app icon: {e}")
+        logger.warning(f"Could not load app icon: {e}")
 
     # Get screen size
     ws = window.winfo_screenwidth()
@@ -159,12 +162,12 @@ def main(autoconnect, force_compact=False):
     # dynamic sizing check
     if force_compact:
         compact = True
-        print("Using compact sizing (forced by command-line argument)")
+        logger.info("Using compact sizing (forced by command-line argument)")
     elif (w < 0.8*desired_w) or (h < 0.8*desired_h):
         compact = True
-        print("Using compact sizing (auto-detected from screen size)")
+        logger.info("Using compact sizing (auto-detected from screen size)")
     else:
-        print("Using standard window size")
+        logger.info("Using standard window size")
         compact = False
 
     # Center placement
@@ -192,7 +195,7 @@ def main(autoconnect, force_compact=False):
     #### USER HAS CLOSED APPLICATION WHEN CODE REACHES PAST THIS POINT ####
 
     # perform shutdown activities
-    print("TKINTER is shutting down!")
+    logger.info("TKINTER is shutting down!")
 
     app.controller.shutdown()
 

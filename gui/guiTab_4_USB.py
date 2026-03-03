@@ -1,6 +1,7 @@
 """USB serial communication tab."""
 
 # import needed packages
+import logging
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
@@ -12,6 +13,8 @@ from common.serial_api import SerialProcessor
 from common.path_helper import get_data_dir
 from gui import gui_helper as guih
 from gui import gui_class as guic
+
+logger = logging.getLogger(__name__)
 
 # Target serial commands
 ACTIVATE_TEST_CMD = "DAGA"
@@ -62,7 +65,7 @@ class TabUSB(guic.ThemedFrame):
         self.rowconfigure(1, weight=1)
 
     def initTabContent(self):
-        print("Initializing tab 4 (USB) content")
+        logger.debug("Initializing tab 4 (USB) content")
 
         # add tab header information
         l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel", font=("Arial", 16))
@@ -144,7 +147,7 @@ class TabUSB(guic.ThemedFrame):
 
         command = TEST_TYPE_COMMANDS.get(test_type_command)
         if command is None:
-            print(f"ERROR: Unknown test command: {test_type_command}")
+            logger.error(f"Unknown test command: {test_type_command}")
             self.prompt.print(f"ERROR: Unknown test command: {test_type_command}", "error")
             return False
 

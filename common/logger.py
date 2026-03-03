@@ -1,9 +1,12 @@
 """Data logging configuration and CSV/text file output."""
 
 # import needed modules
+import logging as _logging
 from common import csv_helper as csvh
 from time import strftime, localtime
 from dataclasses import dataclass
+
+_logger = _logging.getLogger(__name__)
 
 from common.csv_helper import CSVHelper
 from enum import Enum
@@ -221,8 +224,8 @@ class RecordConfig:
         return "\n".join(lines)
 
     def print(self) -> None:
-        """Print the pretty summary to stdout."""
-        print(self.pretty())
+        """Log the pretty summary at DEBUG level."""
+        _logger.debug(self.pretty())
 
 
 def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channel, serial_params, make_graph,

@@ -1,6 +1,7 @@
 """Digital multimeter control and data acquisition tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
@@ -10,6 +11,7 @@ from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
+logger = logging.getLogger(__name__)
 
 # TODO: settings are still not updated on connection in this tab
 
@@ -73,7 +75,7 @@ class TabDMM(guic.ThemedFrame):
         self.rowconfigure(1, weight=1)
 
     def initTabContent(self):
-        print("Initializing tab 2 (DMM) content")
+        logger.debug("Initializing tab 2 (DMM) content")
         self.init_fr_info()
         self.init_fr_control()
 
@@ -96,7 +98,7 @@ class TabDMM(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("DMM_Serial")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous DMM model: {previous_model}")
+            logger.info(f"Restored previous DMM model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')

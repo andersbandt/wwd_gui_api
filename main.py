@@ -7,6 +7,10 @@ import sys
 from gui import gui_driver
 
 
+
+# TODO: can I convert every print statement into a relevant logger method? Would that be worthwhile?
+
+
 def main():
     # Create an ArgumentParser object
     parser = argparse.ArgumentParser(description="A description of your script.")

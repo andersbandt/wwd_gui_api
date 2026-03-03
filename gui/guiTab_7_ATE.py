@@ -22,7 +22,7 @@ from common import logger
 import numpy as np
 
 
-# TODO: evaluate having the model on this tab. Can't I just connect to a generic instrument?
+# TODO: would be kind of cool feature to print out the IDN of each PyVISA resource (or COM port, etc)
 
 
 class TabATE(guic.ThemedFrame):
@@ -117,7 +117,7 @@ class TabATE(guic.ThemedFrame):
 
         # GENERAL CONTROLS
         self.cmd_label = ttk.Label(fr_m, text="Command", style="TLabel")
-        self.cmd_entry = tk.Entry(fr_m)
+        self.cmd_entry = tk.Entry(fr_m, width=15)
         self.cmd_button = tk.Button(fr_m, text="Send",
                                       command=lambda: self.ate_command(self.cmd_entry.get())
                                       )
@@ -312,7 +312,7 @@ Understanding Results:
             bench_result = self.ate.benchmark(100, method, store_values=store)
         except COMMUNICATION_ERRORS as e:
             self.prompt.print("Communication error: " + str(e), "error")
-            guih.alert("Communication error: " + str(e), "error")
+            guih.alert_user("Communication error: " + str(e), "error")
             return
         self.prompt.print(bench_result["string"])
 

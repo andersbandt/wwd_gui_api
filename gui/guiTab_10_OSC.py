@@ -16,7 +16,7 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 
 
-
+# TODO: this thing doesn't properly refresh channel states on connection
 
 
 class TabOSC(guic.ThemedFrame):
@@ -286,6 +286,7 @@ class TabOSC(guic.ThemedFrame):
     # =========================================================================
     # fr_tb_trig — Timebase + Trigger
     # =========================================================================
+    # TODO: this frame could benefit from dynamic (compact) padding
     def init_fr_tb_trig(self):
         fr = self.fr_tb_trig
 

@@ -105,8 +105,8 @@ def get_train_data(
     *,
     loop_col="BO", # str: binary 0/1 column for clamp
     volt_col="TP",        # str: continuous voltage column
-    window=20,              # int: pre-activation samples for baseline
-    min_samples=5,          # int: minimum samples to accept baseline
+    window=30,              # int: pre-activation samples for baseline
+    min_samples=10,          # int: minimum samples to accept baseline
     use_median=True         # bool: use median (robust) or mean
 ):
     """
@@ -256,14 +256,16 @@ def train_model(train_file, columns, float_col, clean_col, truth_col):
     # VARIABLE SETUP
     # TODO: I also think I can cleanup the variable mapping to generateA
     #A = least_squares.generateA(train_df["PV"], train_df["MV"], train_df["BO"], train_df["TP"], train_df["_baseline_filled"])
+
     A = np.column_stack((
-        train_df["PV"],
-        train_df["MV"],
-        train_df["BO"],
-        train_df["TP"],
-        train_df["_baseline_filled"],
-        train_df["BO"]*train_df["_baseline_filled"],
-        train_df["BO"]*(train_df["_baseline_filled"] - train_df["TP"])
+        np.ones(len(train_df)),  # 1) intercept
+        train_df["TP"],  # 2) natural measurement (BO=0 useful)
+        train_df["BO"],  # 3) regime indicator
+        train_df["_baseline_filled"],  # 4) baseline (pre-activation)
+        train_df["BO"] * train_df["_baseline_filled"],  # 5) baseline effect only when clamped
+        train_df["BO"] * (train_df["_baseline_filled"] - train_df["TP"]),  # 6) pull distance (delta) only when clamped
+        #train_df["PV"],  # 7) optional extra predictors
+        train_df["MV"]
     ))
 
     d = np.array(truth_df)
@@ -288,9 +290,11 @@ def train_model(train_file, columns, float_col, clean_col, truth_col):
     print(res)
     print(ver_e_norm)
 
+    # TODO: make it so I can somehow make nice subplots here?
     plotter.plot([i for i in range(len(truth_df))], res, show_plot=False)
-    #plotter.plot([i for i in range(len(truth_df))], train_df["MV"], show_plot=False)
-    #plotter.plot([i for i in range(len(truth_df))], train_df["BO"], show_plot=False)
+    plotter.plot([i for i in range(len(truth_df))], train_df["TP_O"], show_plot=False)
+    plotter.plot([i for i in range(len(truth_df))], train_df["TP"], show_plot=False)
+    plotter.plot([i for i in range(len(truth_df))], train_df["BO"], show_plot=False)
     show_plots()
 
     return train_df, y, w
@@ -331,6 +335,8 @@ def verify_data(ver_file, columns, float_col, clean_col, truth_col):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(message)s")
+
+    # TODO: have claude turn this into a separate function too
     # SETTINGS
     _logger.info("clearing tmp folder ...")
     del_folder = "analysis/tmp"
@@ -345,7 +351,7 @@ if __name__ == "__main__":
             _logger.error('Failed to delete %s. Reason: %s' % (file_path, e))
 
     # set up training data
-    basefilepath_train = os.getcwd() + "/data/"
+    basefilepath_train = os.getcwd() + "/data_shared/"
     training_files = []
     for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
         training_files.append(basefilepath_train + file)

@@ -26,6 +26,20 @@ TEST_TYPE_COMMANDS = {
     "clock-test":     "CR81",
 }
 
+# TODO: is my disconnect happening properly here?
+
+# TODO: unsure if log to file is working properly
+
+# TODO: can't change output mode without disconnecting connection?
+#   also, can't like pause/resume data logging without disconnect either
+
+# TODO: the print lines still aren't aligned properly with the \n
+
+# TODO: I need to add back infrastructure to record to .csv file with headers
+#   also would be nice to be able to name these files
+
+
+
 
 class TabUSB(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):

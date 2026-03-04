@@ -4,22 +4,16 @@
 
 ---
 
-## Open Tasks
-
-### Near-term / Verify
-
-
-
-- [ ] clean up the "About" in the Github project page
-- [ ] look at `scripting.md` and figure out implementation plan approach
-
-
 
 
 ### Feature Work
 
+
+- [ ] look at `scripting.md` and figure out implementation plan approach
 - [ ] Change tab color when something is active (e.g., connection live, recording in progress)
 - [ ] should I add a mini status indicator in ATE tab next to instrument accuracy testing?
+- [ ] have to reconcile how I'm naming `logger.py` vs my `logger`
+  - I already did a renaming in `serial_api.py`
 
 
 - [ ] add color normalization to graph feature
@@ -42,10 +36,9 @@ The `label_config` dict already passes `normalize_colors` through in `'both'` mo
 - [ ] Terminal-only API (connect and control instruments on CLI)
 - [ ] Web interface option (Flask/FastAPI backend)
 - [ ] Database storage option (SQLite/PostgreSQL)
+  - my main motiviation for this would mainly be performance (if I can sample faster). Otherwise seems clunky
 - [ ] package into a standalone executable (PyInstaller didn't work previously — investigate Nuitka or cx_Freeze)
 - [ ] add a simulator mode using np.random() or similar to test live plotting / logging / math features
-
-
 
 
 

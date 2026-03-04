@@ -11,7 +11,7 @@ from datetime import datetime
 import queue
 import os
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 # import user created modules
 from common import logger
@@ -143,17 +143,17 @@ class SerialProcessor(SerialGeneral):
         self.r_buf = queue.Queue(maxsize=200)  # Thread-safe read buffer
 
     def init_data(self, data_mode, parameters):
-        logger.info("SerialProcessor data initialization")
+        log.info("SerialProcessor data initialization")
         if data_mode == "data":
             self.logfile = csvh.CSVHelper(self.basefilepath, parameters)
-            logger.info(f"path is at: {self.logfile.file_path}")
+            log.info(f"path is at: {self.logfile.file_path}")
         elif data_mode == "raw" or data_mode == "timestamp":
             logname = logger.build_log_name("SER", "", "log", date_strf='%Y%m%d')
             self.logfile = os.path.join(self.basefilepath, logname)
             logger.append_text(self.logfile, "\n\n\n===================================\n"
                                              "=======INFO: USB LOG START=========\n"
                                              "===================================\n")
-            logger.info(f"path is at: {self.logfile}")
+            log.info(f"path is at: {self.logfile}")
         else:
             self.logfile = None
 
@@ -166,12 +166,12 @@ class SerialProcessor(SerialGeneral):
                     ser_bytes = self.serObj.read(bytes_to_read)
 
                     if printmode:
-                        logger.debug(ser_bytes)
+                        log.debug(ser_bytes)
 
                     try:
                         serStrDat = ser_bytes.decode('utf-8')
                     except UnicodeDecodeError:
-                        logger.error(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
+                        log.error(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                     # Use put_nowait to avoid blocking if queue is full (drops oldest behavior)
@@ -186,12 +186,12 @@ class SerialProcessor(SerialGeneral):
                             pass  # Race condition, queue emptied, skip
             except (serial.serialutil.SerialException, OSError) as e:  # NOTE errors are for (Windows, Linux)
                 self.serStatus = False
-                logger.error(e)
+                log.error(e)
 
     def process_data(self, basefilepath, data_folder, data_mode, parameters=None, gui_callback=None):
         # If gui_callback is provided, display on GUI instead of logging to file
         if gui_callback:
-            logger.info("Starting to display data on GUI")
+            log.info("Starting to display data on GUI")
             self.procStatus = True
             self.num_lines = 0
             while self.serStatus and self.procStatus:
@@ -201,14 +201,14 @@ class SerialProcessor(SerialGeneral):
                     gui_callback(data[0], data[1])
                 except queue.Empty:
                     continue
-            logger.info("SerialProcessor finished GUI display")
+            log.info("SerialProcessor finished GUI display")
             return
 
         # File logging mode
         self.basefilepath = os.path.join(basefilepath, data_folder)
         self.init_data(data_mode, parameters)
 
-        logger.info(f"Starting to process data with mode: {data_mode}")
+        log.info(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True
         self.num_lines = 0
         while self.serStatus and self.procStatus:
@@ -231,7 +231,7 @@ class SerialProcessor(SerialGeneral):
             else:
                 raise BaseException("ERROR: undefined data mode for SerialReader")
 
-        logger.info("SerialProcessor finished process_data()")
+        log.info("SerialProcessor finished process_data()")
 
     def stop_process(self):
         if self.procStatus:
@@ -240,7 +240,7 @@ class SerialProcessor(SerialGeneral):
             try:
                 logger.append_text(self.logfile, "\n\n\n==================== USB LOG ENDED !!!!!  ====================\n")
             except TypeError:
-                logger.debug("SerialProcessor: logfile not writable (GUI display mode)")
+                log.debug("SerialProcessor: logfile not writable (GUI display mode)")
             return self.num_lines
         else:
             return 0

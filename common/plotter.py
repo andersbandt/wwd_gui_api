@@ -35,10 +35,15 @@ COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
 LINE_STYLES = ['-', '--', '-.', ':']  # solid, dashed, dash-dot, dotted
 
 
+def show_plots():
+    plt.show()
+
+
 #################################
 #### generic plotting ###########
 #################################
 
+# TODO: will it mess everything up to have something to disbale showing plot here?
 def plot(
         x_data,
         y_data,
@@ -48,7 +53,8 @@ def plot(
          legend=None,
          color=None,
          vertical_lines=None,
-         figsize=None):
+         figsize=None,
+         show_plot=True):
     if figsize is None:
         plt.figure()
     else:
@@ -74,7 +80,8 @@ def plot(
 
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.show()
+    if show_plot:
+        plt.show()
 
 
 def plot_grouped(df, x_var, y_var, group_var,

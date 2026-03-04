@@ -7,21 +7,21 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-# import user defined modules
 
+# TODO: how can I make this more generic?
 
-def generateA(var1_arr, var2_arr):
+# NOTE: following are example operations you can do on arrays
+# np.sqrt(var1_arr),
+# var2_arr ** 2,
+def generateA(var1_arr, var2_arr, var3_arr, var4_arr, var5_arr):
     A = np.column_stack((
-        # var1_arr ** 2,
         var1_arr,
-        # np.sqrt(var1_arr),
-        # var2_arr ** 2,
-        # var2_arr,
-        np.ones_like(var1_arr)
+        var2_arr,
+        var3_arr,
+        var4_arr,
+        var5_arr,
+        var5_arr * var3_arr,
     ))
-    # A_float = np.vectorize(datah.convert_to_float)(A)
-    # A_float = np.array([[datah.convert_to_float(val) for val in row] for row in A])
-    # A = A_float[~np.isnan(A_float).any(axis=1)] # removes nan values but leaves mismatch with truth values
     A_np = np.array(A)
     return A_np
 
@@ -55,7 +55,9 @@ def generate_residual(calculated, truth):
 # Written by Anders Bandt, August 2021
 def least_squares(A, d):
     # Create matrices and find w from data
-    w = np.linalg.inv(A.transpose() @ A) @ A.transpose() @ d
+    # w = np.linalg.inv(A.transpose() @ A) @ A.transpose() @ d
+
+    w, residuals, rank, s = np.linalg.lstsq(A.astype(np.float64), d.astype(np.float64), rcond=None)
 
     return w
 

@@ -14,11 +14,12 @@ from matplotlib import pyplot as plt
 from analysis import stats_analysis
 from analysis import data_helper as datah
 from analysis.specific import least_squares
-from analysis.specific import imu_analysis
 from common import plotter
-from common import logger
+from common.plotter import show_plots
+
 
 _logger = logging.getLogger(__name__)
+_logger.setLevel(logging.INFO)
 
 
 def clean_data(df, column, column2=None):
@@ -81,20 +82,125 @@ def get_filtered_data(data_arr, interest_column):
     return data_arr_f
 
 
-def get_total_data(total_file, col_str, float_col, clean_col):
-    df = datah.load_csv_pandas(total_file, columns=col_str)
+def get_train_data_old(file, col_str, float_col, clean_col):
+    df = datah.load_csv_pandas(file, columns=col_str)
 
-    for col in float_col:
-        df = datah.df_float(df, col)
+    if float_col is not None:
+        for col in float_col:
+            df = datah.df_float(df, col)
 
-    for col in clean_col:
-        df = clean_data(df, col)
-
-    if "timestamp" in col_str:
-        df["datetime"] = stats_analysis.create_datetime(df["timestamp"])
-        df["dtsecond"] = [date.timestamp() for date in df["datetime"]]
+    if clean_col is not None:
+        for col in clean_col:
+            df = clean_data(df, col)
 
     return df
+
+
+
+def get_train_data(
+    file,
+    col_str,                # list[str]: columns to load
+    float_cols=None,        # list[str] to cast to float
+    clean_cols=None,        # list[str] to clean with your clean_data()
+    *,
+    loop_col="BO", # str: binary 0/1 column for clamp
+    volt_col="TP",        # str: continuous voltage column
+    window=20,              # int: pre-activation samples for baseline
+    min_samples=5,          # int: minimum samples to accept baseline
+    use_median=True         # bool: use median (robust) or mean
+):
+    """
+    Load and prepare a DataFrame with baseline features for a clamp loop.
+
+    Adds columns:
+      _baseline          : baseline computed from pre-activation window (NaN if not active/insufficient)
+      _baseline_filled   : baseline filled with var4 when NaN
+      _baseline_valid    : 1 if baseline valid for that row, else 0
+      _delta             : _baseline_filled - var4
+      _rising_idx        : 1 at 0->1 rising edge rows, else 0
+    """
+    # 0) Load & prep
+    df = datah.load_csv_pandas(file, columns=col_str)
+
+    if float_cols:
+        for col in float_cols:
+            df = datah.df_float(df, col)
+
+    if clean_cols:
+        for col in clean_cols:
+            df = clean_data(df, col)
+
+    # 1) Sanity checks
+    for col in (loop_col, volt_col):
+        if col not in df.columns:
+            raise KeyError(f"Column '{col}' not found. Available: {list(df.columns)}")
+
+    # 2) Extract arrays
+    loop = df[loop_col].to_numpy().astype(np.int8)        # (N,)
+    var4 = df[volt_col].to_numpy().astype(np.float64)     # (N,)
+    N = len(df)
+
+    # 3) Rising edges: indices where loop changes 0 -> 1
+    rising = np.flatnonzero((loop[1:] == 1) & (loop[:-1] == 0)) + 1
+
+    # 4) Compute baseline per active episode
+    baseline = np.full(N, np.nan, dtype=np.float64)
+
+    for idx in rising:
+        start = max(0, idx - window)
+        window_vals = var4[start:idx]
+        if window_vals.size >= min_samples:
+            base = np.median(window_vals) if use_median else np.mean(window_vals)
+            # forward-fill while loop is active
+            end = idx
+            while end < N and loop[end] == 1:
+                end += 1
+            baseline[idx:end] = base
+        # else: leave as NaN (insufficient pre-samples)
+
+    # 5) Fill/flags/derived
+    baseline_valid = (~np.isnan(baseline)).astype(np.float64)
+    baseline_filled = np.where(np.isnan(baseline), var4, baseline)
+    delta = baseline_filled - var4
+
+    # 6) Attach to df
+    df["_baseline"] = baseline
+    df["_baseline_filled"] = baseline_filled
+    df["_baseline_valid"] = baseline_valid
+    df["_delta"] = delta
+    df["_rising_idx"] = 0
+    if len(rising) > 0:
+        df.loc[rising, "_rising_idx"] = 1
+
+    return df
+
+
+
+# TODO: somehow add some usage notes that we need any time variables to be called `timestamp`
+#if "timestamp" in col_str:
+#    df["datetime"] = stats_analysis.create_datetime(df["timestamp"])
+#    df["dtsecond"] = [date.timestamp() for date in df["datetime"]]
+
+
+def get_truth_data(file, col_str):
+    df = datah.load_csv_pandas(file, columns=col_str)
+    truth = df[col_str]
+    return truth
+
+
+# TODO: have Claude fix this specialized function. Can follow the custom function I have for training data
+def get_clock_truth_data():
+    # dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
+    # dt_seconds = [date.timestamp() for date in dt_tmp]
+    #
+    # extend training time offset array ?
+    # time_offset.extend(
+    #     create_time_offset(
+    #         np.array(df_tmp["ms"]),
+    #         dt_seconds)
+    # )
+    pass
+
 
 
 #####################################
@@ -127,63 +233,67 @@ def full_create_time_offset(df_tmp):
     return time_offset
 
 
-def train_model(train_file, ver_file):
+# TODO: I think I can clean up the argument passing in here
+# TODO: all the time stuff needs to be removed away, but still accessible
+def train_model(train_file, columns, float_col, clean_col, truth_col):
     train_df = pd.DataFrame()
-    time_offset = []
+    truth_df = pd.DataFrame()
+
     # LOAD IN AND FORMAT TRAIN DATA
     for tr_file in train_file:
         if ".csv" in tr_file:
             _logger.info(f"Loading in file: {tr_file}")
-            df_tmp = get_total_data(tr_file, ["timestamp", "ms", "temp"], ["temp"], ["ms"])
-            dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
-            dt_seconds = [date.timestamp() for date in dt_tmp]
-
-            # extend training time offset array ?
-            time_offset.extend(
-                create_time_offset(
-                    np.array(df_tmp["ms"]),
-                    dt_seconds)
-            )
+            df_train_tmp = get_train_data(tr_file, columns, float_col, clean_col)
+            df_truth_tmp = get_truth_data(tr_file, truth_col)
 
             # concatenate new DataFrame into training data
-            train_df = pd.concat([train_df, df_tmp], ignore_index=True)
+            train_df = pd.concat([train_df, df_train_tmp], ignore_index=True)
+            truth_df = pd.concat([truth_df, df_truth_tmp], ignore_index=True)
 
-    datetime_f_arr = stats_analysis.create_datetime(train_df["timestamp"])
+    print(list(train_df.columns))
+    train_df.info()
 
     # VARIABLE SETUP
-    A = least_squares.generateA(train_df["ms"], train_df["temp"])
-    d = np.array(time_offset)
+    # TODO: I also think I can cleanup the variable mapping to generateA
+    #A = least_squares.generateA(train_df["PV"], train_df["MV"], train_df["BO"], train_df["TP"], train_df["_baseline_filled"])
+    A = np.column_stack((
+        train_df["PV"],
+        train_df["MV"],
+        train_df["BO"],
+        train_df["TP"],
+        train_df["_baseline_filled"],
+        train_df["BO"]*train_df["_baseline_filled"],
+        train_df["BO"]*(train_df["_baseline_filled"] - train_df["TP"])
+    ))
+
+    d = np.array(truth_df)
     d = d.reshape(-1, 1)
-    _logger.debug("MATRIX A:\n%s", pformat(A))
-    _logger.debug("MATRIX d:\n%s", pformat(d))
-    _logger.debug(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
-    _logger.debug(f"and d of shape={d.shape} dtype={d.dtype}")
+    print("MATRIX A:\n%s", pformat(A))
+    print("MATRIX d:\n%s", pformat(d))
+    _logger.info(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
+    _logger.info(f"and d of shape={d.shape} dtype={d.dtype}")
 
     # RUN ANALYSIS
     w = least_squares.least_squares(A, d)
     w = np.array(w)
-    # w = least_squares.run_prxgd(A, d)
     y = A @ w  # apply A matrix to newly found coefficients
-    # w = [0.00744361959822233, 0]
 
-    _logger.debug(f"coefs w are of shape: {w.shape}")
-    _logger.debug(f"shape of output y is: {y.shape}")
-    [residual, e_norm] = least_squares.generate_residual(y, d)  # generate residual
-    _logger.info(f"coefficients (w) found from data; computed output values (y) and formed residual")
-    _logger.info(f"w: {w}")  # display coefficients
-    # _logger.debug(f"w2: {w2}")  # display coefficients
-    _logger.info(f"Euclidean norm of this training data is: {e_norm}")  # display 2 norm of the residual
+    print(f"coefs w are of shape: {w.shape}")
+    print(f"shape of output y is: {y.shape}")
+    print(f"coefficients (w) found from data; computed output values (y) and formed residual")
+    print(f"w: {w}")  # display coefficients
 
-    # print out a shit ton of plots
-    # plotter.time_plot(datetime_f_arr, mcu_ms, "Datetime", "Raw mcu training time")
-    index = list(range(1, len(datetime_f_arr) + 1))
-    # scaled_temp = datah.scale_array(A[:, 2], -1, 1)
-    plotter.time_plot(index, time_offset, "Datetime", "Training time offset (ms)")
-    plotter.time_plot(index, residual, "Data Entry #", "Training residual (ms)")
+    # TODO: move this stuff to a separate verification function
+    [res, ver_e_norm] = least_squares.generate_residual(y, d)
+    print(res)
+    print(ver_e_norm)
 
-    temp_f_arr = imu_analysis.analyze_ICM_42670(train_df["temp"])
-    plotter.time_plot(index, temp_f_arr, "Data Entry #", "Training temp", color="purple")
-    return train_df
+    plotter.plot([i for i in range(len(truth_df))], res, show_plot=False)
+    #plotter.plot([i for i in range(len(truth_df))], train_df["MV"], show_plot=False)
+    #plotter.plot([i for i in range(len(truth_df))], train_df["BO"], show_plot=False)
+    show_plots()
+
+    return train_df, y, w
 
 
 def linear_fit_train(x_arr, y_arr):
@@ -194,19 +304,14 @@ def linear_fit_train(x_arr, y_arr):
     return stats
 
 
-def verify_data(ver_file, columns):
+def verify_data(ver_file, columns, float_col, clean_col, truth_col):
     #####################################
     ### VERIFICATION SECTION  ###########
     #####################################
-    df_ver = get_total_data(ver_file, columns, ["temp"], ["ms"])
-    # df_ver = df_ver.head(480) # take first 100 samples only (useful for comparing drifts ...)
-    ver_toff = np.array(
-        create_time_offset(
-            np.array(df_ver["ms"]),
-            df_ver["dtsecond"].tolist())
-    )
+    df_ver = get_train_data(ver_file, columns, float_col, clean_col)
+    df_truth = get_truth_data(ver_file, truth_col)
 
-    df_ver["time_offset"] = ver_toff.reshape(-1, 1)
+
     [res, ver_e_norm] = least_squares.generate_residual(df_ver["dtsecond"], df_ver["time_offset"])
     _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")  # display 2 norm of the residual
 
@@ -215,12 +320,13 @@ def verify_data(ver_file, columns):
     min_value = df_ver["dtsecond"].min()
     result = df_ver["dtsecond"] - min_value
     df_ver["dtsecond_zero"] = result
-    temp_f_arr = imu_analysis.analyze_ICM_42670(df_ver["temp"])
+
     plotter.time_plot(df_ver["dtsecond_zero"], df_ver["time_offset"], "Datetime seconds",
                       "Verification time offset (ms)", color="red")
     plotter.time_plot(df_ver["datetime"], temp_f_arr, "Datetime", "Verification temp (int16_t)", color="orange")
     plotter.time_plot(df_ver["datetime"], res, "Datetime", "Verification residual (ms)", color="red")
     return df_ver
+
 
 
 if __name__ == "__main__":
@@ -239,27 +345,25 @@ if __name__ == "__main__":
             _logger.error('Failed to delete %s. Reason: %s' % (file_path, e))
 
     # set up training data
-    basefilepath_train = os.getcwd() + "/../data/clock_data/"
-    training_file = []
+    basefilepath_train = os.getcwd() + "/data/"
+    training_files = []
     for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
-        training_file.append(basefilepath_train + file)
-    training_file = ["clock_data/_20240814__170148_clock_test_.csv"]
+        training_files.append(basefilepath_train + file)
 
     # set up verification data
-    # ver_file_full_path = basefilepath + "_20240417__235411_clock_test_.csv" # slope=7.20e-3
-    # ver_file_full_path = basefilepath + "_20240418__000513_clock_test_.csv" # slope=7.193e-3
-    ver_file_full_path = training_file[0]
+    ver_file_full_path = training_files[0]
 
     ### TRAIN MODEL
-    train_dataframe = train_model(training_file, ver_file_full_path)
+    headers = ["PV", "MV", "BO", "TP", "TP_O"]
+    train_dataframe, train_y, train_w = train_model(training_files, headers, None, None, ["TP_O"])
 
     ### PERFORM VERIFICATION
-    verification_df = verify_data(ver_file_full_path, ["timestamp", "ms", "temp"])
-    time_dict = stats_analysis.analyze_time(
-        stats_analysis.create_datetime(
-            verification_df["timestamp"]
-        ))
-    _logger.info(pformat(time_dict))
+    # verification_df = verify_data(ver_file_full_path, headers, None, None, ["TP_O"])
+    # time_dict = stats_analysis.analyze_time(
+    #     stats_analysis.create_datetime(
+    #         verification_df["timestamp"]
+    #     ))
+    # _logger.info(pformat(time_dict))
 
 
     ### LINEAR FIT TRAIN
@@ -270,12 +374,12 @@ if __name__ == "__main__":
 
     # SHOW PLOTS
     _logger.info("Plot show!")
-    plt.show()
-
-    # generate pdf file AND open
-    _logger.info("Generating .pdf ...")
-    image_folder = "tmp"
-    output_pdf = "tmp/summary_document.pdf"
-    logger.generate_summary_pdf(image_folder, output_pdf)
-
-    subprocess.Popen([basefilepath_train + output_pdf], shell=True)
+    # plt.show()
+    #
+    # # generate pdf file AND open
+    # _logger.info("Generating .pdf ...")
+    # image_folder = "tmp"
+    # output_pdf = "tmp/summary_document.pdf"
+    # logger.generate_summary_pdf(image_folder, output_pdf)
+    #
+    # subprocess.Popen([basefilepath_train + output_pdf], shell=True)

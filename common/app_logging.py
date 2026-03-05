@@ -38,3 +38,6 @@ def setup_logging(level=logging.DEBUG, log_dir: str = "logs"):
     )
     fh.setFormatter(fmt_file)
     root.addHandler(fh)
+
+    logging.getLogger("pyvisa").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)

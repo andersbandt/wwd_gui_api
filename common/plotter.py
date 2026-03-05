@@ -23,10 +23,6 @@ from collections import deque
 from queue import Queue, Empty
 
 
-# TODO: can the plotter have large y-axis when there is only like one of them?
-
-
-# TODO: store this in config.ini darcula theme?
 # Matplotlib default color cycle — shared across all plot types for visual consistency.
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -43,7 +39,6 @@ def show_plots():
 #### generic plotting ###########
 #################################
 
-# TODO: will it mess everything up to have something to disbale showing plot here?
 def plot(
         x_data,
         y_data,
@@ -629,6 +624,7 @@ def start_live_plot(
         port=8050,
         debug=False,
         state: dict = None,
+        row_height: int = 300,
 ):
     # Initialize shared state dict (read by callback on every tick,
     # can be mutated from outside via update_live_plot_state())
@@ -776,7 +772,7 @@ def start_live_plot(
             template="plotly_white",
             margin=dict(l=60, r=40, t=35, b=50),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=300 * n_ch,
+            height=row_height * n_ch,
         )
         return fig
 
@@ -816,7 +812,7 @@ def start_live_plot(
             template="plotly_white",
             margin=dict(l=60, r=40, t=35, b=50),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=300 * n_ch,
+            height=row_height * n_ch,
         )
 
         filename = f"live_export_{_dt.now().strftime('%Y%m%d_%H%M%S')}.html"

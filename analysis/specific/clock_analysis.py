@@ -179,9 +179,10 @@ def _plot_clamp_results(df, res, phase):
         idx,
         channels=[
             (res,         "Residual"),
-            (df["TP_O"],  "TP_O"),
-            (df["TP"],    "TP (V)"),
+            (df["TP"],  "TP ADC reading"),
+            #(df["TP"],    "TP (V)"),
             (df["BO"],    "BO (0/1)"),
+            (df["MV"], "main valve")
         ],
         xlabel="Sample",
         title=f"{phase}: Clamp Loop Results",

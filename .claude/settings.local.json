@@ -15,7 +15,8 @@
       "Bash(git -C /home/anders/Documents/GitHub/wwd_gui_api log --oneline -5)",
       "Bash(python -m py_compile:*)",
       "Bash(pip3 show:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(/mnt/c/Users/ander/AppData/Local/Programs/Python/Python312/python.exe:*)"
     ]
   }
 }

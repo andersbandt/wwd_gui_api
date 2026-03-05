@@ -228,7 +228,10 @@ class ClassController:
         if usage_element is not None:
             method = usage_element.get("method")
             if method is not None:
-                return int(method)
+                try:
+                    return int(method)
+                except ValueError:
+                    return None
         return None
 
     def add_active_connection(self, port, usage):

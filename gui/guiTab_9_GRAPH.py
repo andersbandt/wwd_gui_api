@@ -26,8 +26,6 @@ from gui import gui_class as guic
 
 logger = logging.getLogger(__name__)
 
-# TODO: I would love for another graph option to turn the time variable into just duration with first Time entry equal to 0 seconds
-
 
 # Define named tuple for file data
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
@@ -379,6 +377,12 @@ class TabGraph(guic.ThemedFrame):
         self.x_var.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
         row += 1
 
+        self.var_recenter_time = tk.IntVar()
+        cb_recenter = ttk.Checkbutton(self.fr_setup, text="Recenter x to 0",
+                                      variable=self.var_recenter_time, onvalue=1, offvalue=0)
+        cb_recenter.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='w')
+        row += 1
+
         lbl_y_var.grid(row=row, column=0, padx=5, pady=2, sticky='e')
         self.y_var.grid(row=row, column=1, padx=xpad, pady=ypad, sticky='ew')
         row += 1
@@ -413,6 +417,7 @@ class TabGraph(guic.ThemedFrame):
         guic.Tooltip(cb_data_label, "Color/label each line by a CSV column value")
         guic.Tooltip(cb_norm, "Map label values to a color gradient instead of discrete colors")
         guic.Tooltip(lbl_x_var, "CSV column name to use for X-axis data")
+        guic.Tooltip(cb_recenter, "Shift x values so each file starts at 0.\nWorks for numeric columns and datetime strings (converts to elapsed seconds).")
         guic.Tooltip(lbl_y_var, "CSV column name to use for Y-axis data")
         guic.Tooltip(lbl_x_scale, "Multiply all X values by this factor (e.g. 0.001 to convert ms to s)")
         guic.Tooltip(lbl_y_scale, "Multiply all Y values by this factor")
@@ -626,6 +631,24 @@ class TabGraph(guic.ThemedFrame):
                 FileData(fd.filename, fd.filepath, fd.parts, fd.df.iloc[start_row:end_row].reset_index(drop=True))
                 for fd in selected_files
             ]
+
+        # Recenter x to 0 if requested
+        if self.var_recenter_time.get():
+            x_var_name = self.x_var.get("1.0", "end").strip("\n")
+            recentered = []
+            for fd in selected_files:
+                df = fd.df.copy()
+                col = df[x_var_name]
+                if np.issubdtype(col.dtype, np.number):
+                    df[x_var_name] = col - col.iloc[0]
+                else:
+                    try:
+                        t = pd.to_datetime(col)
+                        df[x_var_name] = (t - t.iloc[0]).dt.total_seconds()
+                    except Exception:
+                        pass  # leave as-is if conversion fails
+                recentered.append(FileData(fd.filename, fd.filepath, fd.parts, df))
+            selected_files = recentered
 
         self.prompt.print(f"Graphing {len(selected_files)} selected file(s)...")
 
@@ -846,6 +869,7 @@ class TabGraph(guic.ThemedFrame):
             "use_data_labeler": self.var_use_data_labeler.get(),
             "data_labeler": self.data_labeler.get("1.0", "end").strip("\n"),
             "normalize_colors": self.var_normalize_colors.get(),
+            "recenter_time": self.var_recenter_time.get(),
             "start_row": self.entry_start_row.get().strip(),
             "end_row":   self.entry_end_row.get().strip(),
             # Future use - data source configuration
@@ -917,6 +941,7 @@ class TabGraph(guic.ThemedFrame):
             self.var_use_file_labeler.set(preset_data.get("use_file_labeler", 0))
             self.var_use_data_labeler.set(preset_data.get("use_data_labeler", 0))
             self.var_normalize_colors.set(preset_data.get("normalize_colors", 0))
+            self.var_recenter_time.set(preset_data.get("recenter_time", 0))
 
             self.entry_start_row.delete(0, "end")
             self.entry_start_row.insert(0, preset_data.get("start_row", ""))
@@ -968,6 +993,7 @@ class TabGraph(guic.ThemedFrame):
         self.var_use_file_labeler.set(0)
         self.var_use_data_labeler.set(0)
         self.var_normalize_colors.set(0)
+        self.var_recenter_time.set(0)
 
         # Clear preset selection
         self.preset_combo.set('')

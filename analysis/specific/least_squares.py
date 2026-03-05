@@ -8,8 +8,6 @@ _logger = logging.getLogger(__name__)
 
 
 
-# TODO: how can I make this more generic?
-
 # NOTE: following are example operations you can do on arrays
 # np.sqrt(var1_arr),
 # var2_arr ** 2,

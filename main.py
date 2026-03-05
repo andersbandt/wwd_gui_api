@@ -11,9 +11,6 @@ from gui import gui_driver
 logger = logging.getLogger(__name__)
 
 
-# TODO: can we make the icon application more bright and purple and FUN !
-
-
 
 def main():
     # Create an ArgumentParser object

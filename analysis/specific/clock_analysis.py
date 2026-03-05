@@ -5,7 +5,6 @@ from __future__ import annotations
 # import needed modules
 import logging
 import os
-import shutil
 from dataclasses import dataclass
 from pprint import pformat
 
@@ -17,6 +16,7 @@ from analysis import data_helper as datah
 from analysis import stats_analysis
 from analysis.specific import imu_analysis
 from analysis.specific import least_squares
+from analysis.specific import filter_analysis
 from common import plotter
 from common.plotter import show_plots
 
@@ -96,9 +96,8 @@ def get_train_data(
     *,
     loop_col="BO",          # str: binary 0/1 column for clamp
     volt_col="TP",          # str: continuous voltage column
-    window=30,              # int: pre-activation samples for baseline
-    min_samples=10,         # int: minimum samples to accept baseline
-    use_median=True         # bool: use median (robust) or mean
+    window=5,              # int: pre-activation samples for baseline
+    min_samples=3,         # int: minimum samples to accept baseline
 ):
     """
     Load and prepare a DataFrame with baseline features for a clamp loop.
@@ -129,39 +128,25 @@ def get_train_data(
     # 2) Extract arrays
     loop = df[loop_col].to_numpy().astype(np.int8)        # (N,)
     var4 = df[volt_col].to_numpy().astype(np.float64)     # (N,)
-    N = len(df)
 
     # 3) Rising edges: indices where loop changes 0 -> 1
     rising = np.flatnonzero((loop[1:] == 1) & (loop[:-1] == 0)) + 1
-
-    # 4) Compute baseline per active episode
-    baseline = np.full(N, np.nan, dtype=np.float64)
-
-    for idx in rising:
-        start = max(0, idx - window)
-        window_vals = var4[start:idx]
-        if window_vals.size >= min_samples:
-            base = np.median(window_vals) if use_median else np.mean(window_vals)
-            # forward-fill while loop is active
-            end = idx
-            while end < N and loop[end] == 1:
-                end += 1
-            baseline[idx:end] = base
-        # else: leave as NaN (insufficient pre-samples)
-
-    # 5) Fill/flags/derived
-    baseline_valid = (~np.isnan(baseline)).astype(np.float64)
-    baseline_filled = np.where(np.isnan(baseline), var4, baseline)
-    delta = baseline_filled - var4
-
-    # 6) Attach to df
-    df["_baseline"] = baseline
-    df["_baseline_filled"] = baseline_filled
-    df["_baseline_valid"] = baseline_valid
-    df["_delta"] = delta
     df["_rising_idx"] = 0
     if len(rising) > 0:
         df.loc[rising, "_rising_idx"] = 1
+
+    # Existing arrays
+    loop = df["BO"].to_numpy()  # boost flag
+
+    # Choose ONE:
+    #baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ma_freeze(var4, loop, window=window, min_samples=min_samples)
+    baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ema_freeze(var4, loop, alpha=1)
+
+    # Attach to df
+    df["_baseline"] = baseline
+    df["_baseline_valid"] = baseline_valid
+    df["_baseline_filled"] = baseline_filled
+    df["_delta"] = delta
 
     return df
 
@@ -180,9 +165,11 @@ def _plot_clamp_results(df, res, phase):
         channels=[
             (res,         "Residual"),
             (df["TP"],  "TP ADC reading"),
-            #(df["TP"],    "TP (V)"),
+            (df["TP_O"],    "TP (V)"),
             (df["BO"],    "BO (0/1)"),
-            (df["MV"], "main valve")
+            (df["MV"], "main valve"),
+            #(df["MO"], "motor"),
+            #(df["_baseline_filled"], "TP_baseline")
         ],
         xlabel="Sample",
         title=f"{phase}: Clamp Loop Results",
@@ -265,6 +252,7 @@ class AnalysisPreset:
 PRESETS = {
     "clamp_loop": AnalysisPreset(
         name="clamp_loop",
+        #columns=["PV", "MV", "BO", "TP", "MO", "TP_O"],
         columns=["PV", "MV", "BO", "TP", "TP_O"],
         float_cols=None,
         clean_cols=None,
@@ -307,10 +295,13 @@ def _train_model_clamp_loop(train_file, columns, float_col, clean_col, truth_col
     A = np.column_stack((
         np.ones(len(train_df)),                                    # 1) intercept
         train_df["TP"],                                            # 2) loaded voltage (primary predictor for BO=0)
-        train_df["MV"] * train_df["TP"],                          # 3) MV resistive load: scales with TP, not additive
+        train_df["TP"] ** 2,
+        train_df["MV"],
+        train_df["MV"] * train_df["TP"],  # 3) MV resistive load: scales with TP, not additive
         train_df["BO"] * train_df["_baseline_filled"],            # 4) pre-activation TP as proxy for TP_O during clamping
+        #train_df["MV"] * train_df["_baseline_filled"],            # 4) pre-activation TP as proxy for TP_O during clamping
         train_df["BO"],                                            # 5) constant current offset from boost converter
-        train_df["BO"] * train_df["MV"],                          # 6) MV interaction during clamping
+        #train_df["MO"], # motor voltage
     ))
 
     d = np.array(truth_df)
@@ -322,8 +313,13 @@ def _train_model_clamp_loop(train_file, columns, float_col, clean_col, truth_col
 
     # RUN ANALYSIS
     w = least_squares.least_squares(A, d)
+    #w = least_squares.run_prxgd(A, d)
     w = np.array(w)
     y = A @ w  # apply A matrix to newly found coefficients
+
+    mov_average_window = 15
+    y = filter_analysis.moving_average_causal(y, mov_average_window)
+    #y = filter_analysis.ema_causal(y, 0.2)
 
     _logger.info(f"coefs w are of shape: {w.shape}")
     _logger.info(f"shape of output y is: {y.shape}")
@@ -331,6 +327,10 @@ def _train_model_clamp_loop(train_file, columns, float_col, clean_col, truth_col
     _logger.info(f"w: {w}")
 
     [res, ver_e_norm] = least_squares.generate_residual(y, d)
+
+    res[0:mov_average_window] = 0 # tag:HARDCODE to manually set first value to 0. Otherwise moving average will cause havoc
+
+
     _logger.info(f"Euclidean norm: {ver_e_norm}")
     _logger.debug("residual:\n%s", pformat(res))
 
@@ -352,6 +352,8 @@ def _verify_clamp_loop(ver_file, columns, float_col, clean_col, truth_col, w):
         df_ver["BO"] * df_ver["_baseline_filled"],
         df_ver["BO"],
         df_ver["BO"] * df_ver["MV"],
+        df_ver["BO"] * df_ver["MO"],  # motor voltage
+        (1 - df_ver["BO"]) * df_ver["MO"]
     ))
 
     y_ver = A_ver @ w
@@ -463,34 +465,18 @@ def _verify_clock_drift(ver_file, columns):
     return df_ver
 
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
-def _clear_folder(folder):
-    """Remove all files and subdirectories within folder."""
-    _logger.info(f"clearing {folder} ...")
-    for filename in os.listdir(folder):
-        file_path = os.path.join(folder, filename)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        except Exception as e:
-            _logger.error('Failed to delete %s. Reason: %s', file_path, e)
-
 
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
 def run(preset_name: str):
+    # get cfg
     cfg = PRESETS[preset_name]
-    #_clear_folder("analysis/tmp")
 
     # set up training data
-    basefilepath_train = os.getcwd() + "/../../data_shared/"
+    basefilepath_train = os.getcwd() + "/data_shared/"
+    # basefilepath_train = os.getcwd() + "/data/clock_data/"
     training_files = []
     for file in os.listdir(basefilepath_train):  # NOTE: don't need file extension check here because training function handles it
         training_files.append(basefilepath_train + file)
@@ -500,7 +486,7 @@ def run(preset_name: str):
 
     if preset_name == "clamp_loop":
         df, y, w = _train_model_clamp_loop(training_files, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col)
-        _verify_clamp_loop(ver_file, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col, w)
+        #_verify_clamp_loop(ver_file, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col, w)
     elif preset_name == "clock_drift":
         df = _train_model_clock_drift(training_files)
         _verify_clock_drift(ver_file, cfg.columns)
@@ -514,5 +500,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(message)s")
     logging.getLogger("PIL").setLevel(logging.WARNING)  # suppress PIL/Pillow image chunk noise
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
-    PRESET = "clamp_loop"  # change to "clock_drift" for clock drift analysis
+
+    # TODO: I actually prefer if when I select the PRESET we also have the data folder bundled into that preset
+    PRESET = "clamp_loop" # tag:HARDCODE
+    # PRESET = "clock_drift"
     run(PRESET)

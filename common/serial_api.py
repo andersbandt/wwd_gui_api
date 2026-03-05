@@ -188,6 +188,7 @@ class SerialProcessor(SerialGeneral):
                 self.serStatus = False
                 _logger.error(e)
 
+    # TODO: need to add back allowing a certain filename
     def process_data(self, basefilepath, data_folder, data_mode, parameters=None, gui_callback=None):
         # If gui_callback is provided, display on GUI instead of logging to file
         if gui_callback:

@@ -6,8 +6,24 @@ import logging
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+import os
+import shutil
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
+
+
+def _clear_folder(folder):
+    """Remove all files and subdirectories within folder."""
+    _logger.info(f"clearing {folder} ...")
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            _logger.error('Failed to delete %s. Reason: %s', file_path, e)
 
 
 ##############################################################
@@ -78,19 +94,19 @@ def load_csv_pandas(filepath, columns=None, read_columns=False):
     if read_columns or columns is None:
         columns = get_first_row_csv(filepath)
 
-    logger.info(f"Attempting to open a .csv using columns: {columns}")
-    logger.info(f"using path --> {filepath}")
+    _logger.info(f"Attempting to open a .csv using columns: {columns}")
+    _logger.info(f"using path --> {filepath}")
 
     try:
         df = pd.read_csv(filepath)
     except pd.errors.EmptyDataError:
-        logger.error("Pandas says data is empty! No columns to parse from file")
+        _logger.error("Pandas says data is empty! No columns to parse from file")
         return None
 
     pandas_data = df[columns]
 
     if len(pandas_data[columns[0]].tolist()) == 0:
-        logger.warning("File seems to be .csv but there is no data!")
+        _logger.warning("File seems to be .csv but there is no data!")
         return None
 
     return pandas_data

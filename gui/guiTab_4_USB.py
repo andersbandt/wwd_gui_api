@@ -5,9 +5,9 @@ import logging
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
-import threading
 import serial
 from datetime import datetime
+
 # import user defined modules
 from common.serial_api import SerialProcessor
 from common.path_helper import get_data_dir
@@ -25,6 +25,13 @@ TEST_TYPE_COMMANDS = {
     "specific-graph":      "IG85",
     "clock-test":     "CR81",
 }
+
+
+# TODO: I don't think switching to log to file actually removes the display mode
+#   do we want to have a button that makes it explicit we are changing mode? Or does the dropdown just update on switch now?
+
+
+# TODO: yeah the stop recording button does not work
 
 
 
@@ -309,9 +316,9 @@ class TabUSB(guic.ThemedFrame):
 
         self.t3 = guic.StoppableThread(
             target=lambda: self.ser_obj.process_data(self.basefilepath,
-                                                     f"{formatted_datetime}_{file_ext}_{file_str_ext}",
-                                                     "data",
+                                                     #f"{formatted_datetime}_{file_ext}_{file_str_ext}",
                                                      data_subfolder,
+                                                     "data",
                                                      parameters=parameters)
         )
         self.t3.start()

@@ -22,6 +22,9 @@ from typing import Mapping, Sequence
 from collections import deque
 from queue import Queue, Empty
 
+# import user created modules
+from analysis.specific import filter_analysis
+
 
 # Matplotlib default color cycle — shared across all plot types for visual consistency.
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
@@ -567,6 +570,25 @@ def plot_fft(channels, title="FFT Analysis"):
     plt.show()
 
 
+def plot_freq_response(b, a, cutoff, fs):
+    # Plot the frequency response.
+    w, h = filter_analysis.freq_response(b, a, fs=fs)
+    plt.subplot(2, 1, 1)
+    plt.plot(w, np.abs(h), 'b')
+    plt.plot(cutoff, 0.5 * np.sqrt(2), 'ko')
+    plt.axvline(cutoff, color='k')
+    plt.xlim(0, 0.5 * fs)
+    plt.title("Lowpass Filter Frequency Response")
+    plt.xlabel('Frequency [Hz]')
+    plt.grid()
+
+
+
+
+###################################
+### PLOTLY LIVE PLOTTING    #######
+###################################
+
 def export_recorded_data_html(recorded_data: list, x_key: str, channels: list, title: str, html_path: str):
     """Export a list-of-dict recording session as a self-contained Plotly HTML file.
 
@@ -590,11 +612,6 @@ def export_recorded_data_html(recorded_data: list, x_key: str, channels: list, t
         fig.add_trace(go.Scatter(x=x_vals, y=y_vals, name=ch, mode='lines'))
     fig.update_layout(title=title, xaxis_title=x_key)
     fig.write_html(html_path)
-
-
-###################################
-### PLOTLY LIVE PLOTTING    #######
-###################################
 
 
 def update_live_plot_state(state, data_bus, x_key, channels, buffer_size, x_label):

@@ -1,18 +1,21 @@
 """Clock and time-domain analysis."""
 
+from __future__ import annotations
+
 # import needed modules
 import logging
-import pandas as pd
-import numpy as np
-from pprint import pformat
-import subprocess
 import os
 import shutil
-from matplotlib import pyplot as plt
+from dataclasses import dataclass
+from pprint import pformat
+
+import numpy as np
+import pandas as pd
 
 # import user created modules
-from analysis import stats_analysis
 from analysis import data_helper as datah
+from analysis import stats_analysis
+from analysis.specific import imu_analysis
 from analysis.specific import least_squares
 from common import plotter
 from common.plotter import show_plots
@@ -21,6 +24,10 @@ from common.plotter import show_plots
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
+
+# ---------------------------------------------------------------------------
+# Data cleaning / loading helpers
+# ---------------------------------------------------------------------------
 
 def clean_data(df, column, column2=None):
     _logger.info("Cleaning data ....")
@@ -76,25 +83,9 @@ def get_filtered_data(data_arr, interest_column):
             filtered_indices.append(i)
 
     # Remove rows with filtered indices
-    # data_arr_f = np.delete(data_arr, filtered_indices, axis=0)
     data_arr_f = data_arr.drop(filtered_indices)
 
     return data_arr_f
-
-
-def get_train_data_old(file, col_str, float_col, clean_col):
-    df = datah.load_csv_pandas(file, columns=col_str)
-
-    if float_col is not None:
-        for col in float_col:
-            df = datah.df_float(df, col)
-
-    if clean_col is not None:
-        for col in clean_col:
-            df = clean_data(df, col)
-
-    return df
-
 
 
 def get_train_data(
@@ -103,10 +94,10 @@ def get_train_data(
     float_cols=None,        # list[str] to cast to float
     clean_cols=None,        # list[str] to clean with your clean_data()
     *,
-    loop_col="BO", # str: binary 0/1 column for clamp
-    volt_col="TP",        # str: continuous voltage column
+    loop_col="BO",          # str: binary 0/1 column for clamp
+    volt_col="TP",          # str: continuous voltage column
     window=30,              # int: pre-activation samples for baseline
-    min_samples=10,          # int: minimum samples to accept baseline
+    min_samples=10,         # int: minimum samples to accept baseline
     use_median=True         # bool: use median (robust) or mean
 ):
     """
@@ -175,37 +166,53 @@ def get_train_data(
     return df
 
 
-
-# TODO: somehow add some usage notes that we need any time variables to be called `timestamp`
-#if "timestamp" in col_str:
-#    df["datetime"] = stats_analysis.create_datetime(df["timestamp"])
-#    df["dtsecond"] = [date.timestamp() for date in df["datetime"]]
-
-
 def get_truth_data(file, col_str):
     df = datah.load_csv_pandas(file, columns=col_str)
     truth = df[col_str]
     return truth
 
 
-# TODO: have Claude fix this specialized function. Can follow the custom function I have for training data
-def get_clock_truth_data():
-    # dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
-    # dt_seconds = [date.timestamp() for date in dt_tmp]
-    #
-    # extend training time offset array ?
-    # time_offset.extend(
-    #     create_time_offset(
-    #         np.array(df_tmp["ms"]),
-    #         dt_seconds)
-    # )
-    pass
+def _plot_clamp_results(df, res, phase):
+    """Shared plot helper for clamp loop — call with phase='Train' or 'Verify'."""
+    idx = list(range(len(df)))
+    plotter.plot_subplots(
+        idx,
+        channels=[
+            (res,         "Residual"),
+            (df["TP_O"],  "TP_O"),
+            (df["TP"],    "TP (V)"),
+            (df["BO"],    "BO (0/1)"),
+        ],
+        xlabel="Sample",
+        title=f"{phase}: Clamp Loop Results",
+        show_plot=False,
+    )
 
 
+def _plot_clock_drift_results(df, time_offset_arr, residual, phase):
+    """Shared plot helper for clock drift — call with phase='Train' or 'Verify'.
 
-#####################################
-### END OF GETTING DATA SECTION  ####
-#####################################
+    Uses datetime x-axis when available (verify), falls back to sample index (train).
+    """
+    temp_f_arr = imu_analysis.analyze_ICM_42670(df["temp"])
+
+    if "dtsecond_zero" in df.columns:
+        x_offset, xlabel_offset = df["dtsecond_zero"], "Datetime seconds"
+    else:
+        x_offset, xlabel_offset = list(range(len(df))), "Sample"
+
+    if "datetime" in df.columns:
+        x_dt, xlabel_dt = df["datetime"], "Datetime"
+    else:
+        x_dt, xlabel_dt = list(range(len(df))), "Sample"
+
+    color      = "red"    if phase == "Verify" else None
+    temp_color = "orange" if phase == "Verify" else "purple"
+
+    plotter.plot(x_offset, time_offset_arr, xlabel=xlabel_offset, ylabel="Offset (ms)",    title=f"{phase}: Time offset (MCU vs wall clock)", color=color,      show_plot=False)
+    plotter.plot(x_dt,     temp_f_arr,      xlabel=xlabel_dt,     ylabel="Temp (°F)",      title=f"{phase}: Temperature (ICM-42670)",         color=temp_color, show_plot=False)
+    plotter.plot(x_dt,     residual,        xlabel=xlabel_dt,     ylabel="Residual (ms)",  title=f"{phase}: Residual (ms)",                   color=color,      show_plot=False)
+
 
 def create_time_offset(mcu_time_arr, real_time):
     # calculate offset for x=0 to be y=0
@@ -233,9 +240,50 @@ def full_create_time_offset(df_tmp):
     return time_offset
 
 
-# TODO: I think I can clean up the argument passing in here
-# TODO: all the time stuff needs to be removed away, but still accessible
-def train_model(train_file, columns, float_col, clean_col, truth_col):
+def linear_fit_train(x_arr, y_arr):
+    # spit out linear fit
+    _logger.info("Creating linear fit ....")
+    stats = stats_analysis.linear_fit(x_arr, y_arr)
+    _logger.info(pformat(stats))
+    return stats
+
+
+# ---------------------------------------------------------------------------
+# Preset system
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AnalysisPreset:
+    name: str
+    columns: list
+    float_cols: list | None
+    clean_cols: list | None
+    truth_col: list | None  # None for clock_drift (truth is computed, not a column)
+
+
+PRESETS = {
+    "clamp_loop": AnalysisPreset(
+        name="clamp_loop",
+        columns=["PV", "MV", "BO", "TP", "TP_O"],
+        float_cols=None,
+        clean_cols=None,
+        truth_col=["TP_O"],
+    ),
+    "clock_drift": AnalysisPreset(
+        name="clock_drift",
+        columns=["timestamp", "ms", "temp"],
+        float_cols=["temp"],
+        clean_cols=["ms"],
+        truth_col=None,  # truth is computed from timestamp vs ms
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# Clamp loop analysis
+# ---------------------------------------------------------------------------
+
+def _train_model_clamp_loop(train_file, columns, float_col, clean_col, truth_col):
     train_df = pd.DataFrame()
     truth_df = pd.DataFrame()
 
@@ -250,28 +298,24 @@ def train_model(train_file, columns, float_col, clean_col, truth_col):
             train_df = pd.concat([train_df, df_train_tmp], ignore_index=True)
             truth_df = pd.concat([truth_df, df_truth_tmp], ignore_index=True)
 
-    print(list(train_df.columns))
-    train_df.info()
+    _logger.info(f"Loaded columns: {list(train_df.columns)}")
+    if _logger.isEnabledFor(logging.DEBUG):
+        train_df.info()
 
     # VARIABLE SETUP
-    # TODO: I also think I can cleanup the variable mapping to generateA
-    #A = least_squares.generateA(train_df["PV"], train_df["MV"], train_df["BO"], train_df["TP"], train_df["_baseline_filled"])
-
     A = np.column_stack((
-        np.ones(len(train_df)),  # 1) intercept
-        train_df["TP"],  # 2) natural measurement (BO=0 useful)
-        train_df["BO"],  # 3) regime indicator
-        train_df["_baseline_filled"],  # 4) baseline (pre-activation)
-        train_df["BO"] * train_df["_baseline_filled"],  # 5) baseline effect only when clamped
-        train_df["BO"] * (train_df["_baseline_filled"] - train_df["TP"]),  # 6) pull distance (delta) only when clamped
-        #train_df["PV"],  # 7) optional extra predictors
-        train_df["MV"]
+        np.ones(len(train_df)),                                    # 1) intercept
+        train_df["TP"],                                            # 2) loaded voltage (primary predictor for BO=0)
+        train_df["MV"] * train_df["TP"],                          # 3) MV resistive load: scales with TP, not additive
+        train_df["BO"] * train_df["_baseline_filled"],            # 4) pre-activation TP as proxy for TP_O during clamping
+        train_df["BO"],                                            # 5) constant current offset from boost converter
+        train_df["BO"] * train_df["MV"],                          # 6) MV interaction during clamping
     ))
 
     d = np.array(truth_df)
     d = d.reshape(-1, 1)
-    print("MATRIX A:\n%s", pformat(A))
-    print("MATRIX d:\n%s", pformat(d))
+    _logger.debug("MATRIX A:\n%s", pformat(A))
+    _logger.debug("MATRIX d:\n%s", pformat(d))
     _logger.info(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
     _logger.info(f"and d of shape={d.shape} dtype={d.dtype}")
 
@@ -280,112 +324,194 @@ def train_model(train_file, columns, float_col, clean_col, truth_col):
     w = np.array(w)
     y = A @ w  # apply A matrix to newly found coefficients
 
-    print(f"coefs w are of shape: {w.shape}")
-    print(f"shape of output y is: {y.shape}")
-    print(f"coefficients (w) found from data; computed output values (y) and formed residual")
-    print(f"w: {w}")  # display coefficients
+    _logger.info(f"coefs w are of shape: {w.shape}")
+    _logger.info(f"shape of output y is: {y.shape}")
+    _logger.info(f"coefficients (w) found from data; computed output values (y) and formed residual")
+    _logger.info(f"w: {w}")
 
-    # TODO: move this stuff to a separate verification function
     [res, ver_e_norm] = least_squares.generate_residual(y, d)
-    print(res)
-    print(ver_e_norm)
+    _logger.info(f"Euclidean norm: {ver_e_norm}")
+    _logger.debug("residual:\n%s", pformat(res))
 
-    # TODO: make it so I can somehow make nice subplots here?
-    plotter.plot([i for i in range(len(truth_df))], res, show_plot=False)
-    plotter.plot([i for i in range(len(truth_df))], train_df["TP_O"], show_plot=False)
-    plotter.plot([i for i in range(len(truth_df))], train_df["TP"], show_plot=False)
-    plotter.plot([i for i in range(len(truth_df))], train_df["BO"], show_plot=False)
-    show_plots()
+    _plot_clamp_results(train_df, res, "Train")
 
     return train_df, y, w
 
 
-def linear_fit_train(x_arr, y_arr):
-    # spit out linear fit
-    _logger.info("Creating linear fit ....")
-    stats = stats_analysis.linear_fit(x_arr, y_arr)
-    _logger.info(pformat(stats))
-    return stats
-
-
-def verify_data(ver_file, columns, float_col, clean_col, truth_col):
+def _verify_clamp_loop(ver_file, columns, float_col, clean_col, truth_col, w):
     #####################################
     ### VERIFICATION SECTION  ###########
     #####################################
     df_ver = get_train_data(ver_file, columns, float_col, clean_col)
-    df_truth = get_truth_data(ver_file, truth_col)
 
+    A_ver = np.column_stack((
+        np.ones(len(df_ver)),
+        df_ver["TP"],
+        df_ver["MV"] * df_ver["TP"],
+        df_ver["BO"] * df_ver["_baseline_filled"],
+        df_ver["BO"],
+        df_ver["BO"] * df_ver["MV"],
+    ))
 
-    [res, ver_e_norm] = least_squares.generate_residual(df_ver["dtsecond"], df_ver["time_offset"])
-    _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")  # display 2 norm of the residual
+    y_ver = A_ver @ w
+    d_ver = df_ver[truth_col].to_numpy().reshape(-1, 1)
+
+    [res, ver_e_norm] = least_squares.generate_residual(y_ver, d_ver)
+    _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")
 
     # GENERATE VERIFICATION PLOTS
     _logger.info("Generating verification plots...")
-    min_value = df_ver["dtsecond"].min()
-    result = df_ver["dtsecond"] - min_value
-    df_ver["dtsecond_zero"] = result
+    _plot_clamp_results(df_ver, res, "Verify")
 
-    plotter.time_plot(df_ver["dtsecond_zero"], df_ver["time_offset"], "Datetime seconds",
-                      "Verification time offset (ms)", color="red")
-    plotter.time_plot(df_ver["datetime"], temp_f_arr, "Datetime", "Verification temp (int16_t)", color="orange")
-    plotter.time_plot(df_ver["datetime"], res, "Datetime", "Verification residual (ms)", color="red")
     return df_ver
 
 
+# ---------------------------------------------------------------------------
+# Clock drift analysis (merged from clock_analysis_old.py)
+# ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(message)s")
+def _get_clock_drift_data(file, col_str, float_col, clean_col):
+    """Load timestamp/ms/temp data for clock drift analysis."""
+    df = datah.load_csv_pandas(file, columns=col_str)
 
-    # TODO: have claude turn this into a separate function too
-    # SETTINGS
-    _logger.info("clearing tmp folder ...")
-    del_folder = "analysis/tmp"
-    for filename in os.listdir(del_folder):
-        file_path = os.path.join(del_folder, filename)
+    for col in float_col:
+        df = datah.df_float(df, col)
+
+    for col in clean_col:
+        df = clean_data(df, col)
+
+    if "timestamp" in col_str:
+        df["datetime"] = stats_analysis.create_datetime(df["timestamp"])
+        df["dtsecond"] = [date.timestamp() for date in df["datetime"]]
+
+    return df
+
+
+def _train_model_clock_drift(train_file):
+    train_df = pd.DataFrame()
+    time_offset = []
+
+    # LOAD IN AND FORMAT TRAIN DATA
+    for tr_file in train_file:
+        if ".csv" in tr_file:
+            _logger.info(f"Loading in file: {tr_file}")
+            df_tmp = _get_clock_drift_data(tr_file, ["timestamp", "ms", "temp"], ["temp"], ["ms"])
+            dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
+            dt_seconds = [date.timestamp() for date in dt_tmp]
+
+            # extend training time offset array
+            time_offset.extend(
+                create_time_offset(
+                    np.array(df_tmp["ms"]),
+                    dt_seconds)
+            )
+
+            # concatenate new DataFrame into training data
+            train_df = pd.concat([train_df, df_tmp], ignore_index=True)
+
+    # VARIABLE SETUP
+    A = np.column_stack((
+        np.ones(len(train_df)),
+        train_df["ms"],
+        train_df["temp"],
+    ))
+    d = np.array(time_offset)
+    d = d.reshape(-1, 1)
+    _logger.debug("MATRIX A:\n%s", pformat(A))
+    _logger.debug("MATRIX d:\n%s", pformat(d))
+    _logger.info(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
+    _logger.info(f"and d of shape={d.shape} dtype={d.dtype}")
+
+    # RUN ANALYSIS
+    w = least_squares.least_squares(A, d)
+    w = np.array(w)
+    y = A @ w  # apply A matrix to newly found coefficients
+
+    _logger.info(f"coefs w are of shape: {w.shape}")
+    _logger.info(f"shape of output y is: {y.shape}")
+    [residual, e_norm] = least_squares.generate_residual(y, d)
+    _logger.info(f"coefficients (w) found from data; computed output values (y) and formed residual")
+    _logger.info(f"w: {w}")
+    _logger.info(f"Euclidean norm of this training data is: {e_norm}")
+
+    _plot_clock_drift_results(train_df, time_offset, residual, "Train")
+
+    return train_df
+
+
+def _verify_clock_drift(ver_file, columns):
+    #####################################
+    ### VERIFICATION SECTION  ###########
+    #####################################
+    df_ver = _get_clock_drift_data(ver_file, columns, ["temp"], ["ms"])
+    ver_toff = np.array(
+        create_time_offset(
+            np.array(df_ver["ms"]),
+            df_ver["dtsecond"].tolist())
+    )
+
+    df_ver["time_offset"] = ver_toff.reshape(-1, 1)
+    [res, ver_e_norm] = least_squares.generate_residual(df_ver["dtsecond"], df_ver["time_offset"])
+    _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")
+
+    # GENERATE VERIFICATION PLOTS
+    _logger.info("Generating verification plots...")
+    df_ver["dtsecond_zero"] = df_ver["dtsecond"] - df_ver["dtsecond"].min()
+    _plot_clock_drift_results(df_ver, df_ver["time_offset"], res, "Verify")
+
+    return df_ver
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+def _clear_folder(folder):
+    """Remove all files and subdirectories within folder."""
+    _logger.info(f"clearing {folder} ...")
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
         try:
             if os.path.isfile(file_path) or os.path.islink(file_path):
                 os.unlink(file_path)
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except Exception as e:
-            _logger.error('Failed to delete %s. Reason: %s' % (file_path, e))
+            _logger.error('Failed to delete %s. Reason: %s', file_path, e)
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
+
+def run(preset_name: str):
+    cfg = PRESETS[preset_name]
+    #_clear_folder("analysis/tmp")
 
     # set up training data
-    basefilepath_train = os.getcwd() + "/data_shared/"
+    basefilepath_train = os.getcwd() + "/../../data_shared/"
     training_files = []
-    for file in os.listdir(basefilepath_train): # NOTE: don't need file extension check here because training function handles it
+    for file in os.listdir(basefilepath_train):  # NOTE: don't need file extension check here because training function handles it
         training_files.append(basefilepath_train + file)
 
     # set up verification data
-    ver_file_full_path = training_files[0]
+    ver_file = training_files[0]
 
-    ### TRAIN MODEL
-    headers = ["PV", "MV", "BO", "TP", "TP_O"]
-    train_dataframe, train_y, train_w = train_model(training_files, headers, None, None, ["TP_O"])
+    if preset_name == "clamp_loop":
+        df, y, w = _train_model_clamp_loop(training_files, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col)
+        _verify_clamp_loop(ver_file, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col, w)
+    elif preset_name == "clock_drift":
+        df = _train_model_clock_drift(training_files)
+        _verify_clock_drift(ver_file, cfg.columns)
+        time_dict = stats_analysis.analyze_time(stats_analysis.create_datetime(df["timestamp"]))
+        _logger.info(pformat(time_dict))
 
-    ### PERFORM VERIFICATION
-    # verification_df = verify_data(ver_file_full_path, headers, None, None, ["TP_O"])
-    # time_dict = stats_analysis.analyze_time(
-    #     stats_analysis.create_datetime(
-    #         verification_df["timestamp"]
-    #     ))
-    # _logger.info(pformat(time_dict))
+    show_plots()
 
 
-    ### LINEAR FIT TRAIN
-    # NOTE: the end slope is wildly different than least squares analysis
-    #  HINT: (ONLY WHEN I USE AN ARRAY OF TRAINING DATA) one for one training / verification works ...!!!
-    # train_time_offset = full_create_time_offset(train_dataframe)
-    # linear_fit_train(train_dataframe["ms"], train_time_offset)
-
-    # SHOW PLOTS
-    _logger.info("Plot show!")
-    # plt.show()
-    #
-    # # generate pdf file AND open
-    # _logger.info("Generating .pdf ...")
-    # image_folder = "tmp"
-    # output_pdf = "tmp/summary_document.pdf"
-    # logger.generate_summary_pdf(image_folder, output_pdf)
-    #
-    # subprocess.Popen([basefilepath_train + output_pdf], shell=True)
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(message)s")
+    logging.getLogger("PIL").setLevel(logging.WARNING)  # suppress PIL/Pillow image chunk noise
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    PRESET = "clamp_loop"  # change to "clock_drift" for clock drift analysis
+    run(PRESET)

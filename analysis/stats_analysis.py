@@ -41,7 +41,7 @@ def linear_fit(x_arr, y_arr):
     stats = _linregress_stats(x_arr, y_arr)
     logger.info(f"y=mx+b: {stats['slope']}*x + {stats['intercept']}")
 
-    plotter.time_plot(x_arr, stats["residuals"], "x", "Linear best-fit residuals")
+    plotter.plot(x_arr, stats["residuals"], xlabel="x", ylabel="Residual", title="Linear best-fit residuals")
 
     return stats
 

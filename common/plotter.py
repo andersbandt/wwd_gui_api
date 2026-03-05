@@ -118,7 +118,7 @@ def plot_grouped(df, x_var, y_var, group_var,
     return fig, ax
 
 
-def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
+def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4, show_plot=True):
     """
     Stacked subplots with shared x-axis, one subplot per channel.
 
@@ -128,6 +128,7 @@ def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
         xlabel: Label for the shared x-axis (bottom only)
         title: Overall figure title
         figsize_per_row: Height per subplot row in inches
+        show_plot: If True, call plt.show() immediately
     """
     n = len(channels)
     fig, axes = plt.subplots(n, 1, figsize=(10, figsize_per_row * n),
@@ -144,7 +145,8 @@ def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
     if title:
         fig.suptitle(title)
     plt.tight_layout()
-    plt.show()
+    if show_plot:
+        plt.show()
     return fig, axes
 
 

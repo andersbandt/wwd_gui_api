@@ -26,19 +26,8 @@ TEST_TYPE_COMMANDS = {
     "clock-test":     "CR81",
 }
 
-# TODO: is my disconnect happening properly here?
 
-# TODO: unsure if log to file is working properly
-
-# TODO: can't change output mode without disconnecting connection?
-#   also, can't like pause/resume data logging without disconnect either
-
-# TODO: the print lines still aren't aligned properly with the \n
-
-# TODO: I need to add back infrastructure to record to .csv file with headers
-#   also would be nice to be able to name these files
-
-
+# TODO: would be nice to add pause/resume data logging buttons (stop/start t2 without disconnect)
 
 
 class TabUSB(guic.ThemedFrame):
@@ -110,8 +99,8 @@ class TabUSB(guic.ThemedFrame):
         )
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
 
-        var2 = tk.IntVar()
-        c1 = tk.Checkbutton(self.fr_state, text='Record?', variable=var2, onvalue=1, offvalue=0)
+        self.var2 = tk.IntVar()
+        c1 = tk.Checkbutton(self.fr_state, text='Record?', variable=self.var2, onvalue=1, offvalue=0)
         c1.grid(row=2, column=4, padx=2)
 
         # add output mode selector
@@ -121,6 +110,11 @@ class TabUSB(guic.ThemedFrame):
             ["Display on Screen", "Log to File (Raw)", "Log to File (Timestamp)", "None"]
         )
         self.output_mode_drop[0].grid(row=3, column=3, padx=15, pady=5)
+
+        Button(self.fr_state, text="Apply Mode",
+               command=self._start_processor,
+               fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+               height=1, width=10).grid(row=3, column=2, padx=5, pady=5)
 
         self.var_show_timestamp = tk.IntVar(value=1)
         ttk.Checkbutton(self.fr_state, text="Show timestamps",
@@ -148,11 +142,10 @@ class TabUSB(guic.ThemedFrame):
             if self.ser_obj.serStatus:
                 # send the TEST MODE command for ACTIVATION
                 self.ser_obj.send_data(command)
-                self.prompt.print(f"Issued command!\n")
+                self.prompt.print(f"Issued command!")
                 self.test_status_circ.set_color(self.theme_config["success"])
         else:
-            self.prompt.print("ERROR: can't issue command, no serial connection\n", print_type="error")
-            self.test_status_circ.set_color(self.theme_config["error"])
+            self.prompt.print("ERROR: can't issue command, no serial connection", print_type="error")
             self.test_status_circ.set_color(self.theme_config["error"])
 
     def set_test_type(self):
@@ -165,19 +158,19 @@ class TabUSB(guic.ThemedFrame):
             self.prompt.print(f"ERROR: Unknown test command: {test_type_command}", "error")
             return False
 
-        if test_type_command == "clock-test":
+        if test_type_command == "clock-test" and self.var2.get():
             self.start_process("clock_data", "clock_test", ["timestamp", "ms", "temp"])
 
         self.prompt.print(f"INFO: issuing command {command} ...")
         if self.ser_obj is not None:
             if self.ser_obj.serStatus:
                 self.ser_obj.send_data(command)
-                self.prompt.print(f"INFO: issued command!\n")
+                self.prompt.print(f"INFO: issued command!")
                 return True
-            self.prompt.print("ERROR: can't issue command, no serial connection\n")
+            self.prompt.print("ERROR: can't issue command, no serial connection")
             return False
         else:
-            self.prompt.print("ERROR: can't issue command, no serial connection\n")
+            self.prompt.print("ERROR: can't issue command, no serial connection")
             return False
 
     #################################
@@ -201,33 +194,33 @@ class TabUSB(guic.ThemedFrame):
             if line:
                 self.after(0, lambda l=line: self.prompt.print(l, timestamp=show_ts))
 
-    def thread_print_display(self):
-        # Get selected output mode from dropdown
+    def _start_processor(self):
+        """Stop and restart t2 (data processor) based on current output mode.
+        Safe to call while connected — does not touch t1 (serial reader)."""
+        if self.ser_obj is None or not self.ser_obj.serStatus:
+            self.prompt.print("ERROR: not connected, can't apply mode", "error")
+            return False
+
+        if self.t2 is not None:
+            self.t2.stop()
+            self.t2 = None
+
         output_mode = self.output_mode_drop[1].get()
         if output_mode == "None":
             return True
 
-        # start processing thread
-        self.t1 = guic.StoppableThread(
-            target=self.ser_obj.get_data,
-            kwargs={'printmode': False})
-        self.t1.start()
-
         if output_mode == "Display on Screen":
-            # GUI display mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(None, None, None, None),
                 kwargs={'gui_callback': self.display_serial_data}
             )
         elif output_mode == "Log to File (Raw)":
-            # File logging - raw mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(self.basefilepath, get_data_dir("text_data"), "raw")
             )
         elif output_mode == "Log to File (Timestamp)":
-            # File logging - timestamp mode
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(self.basefilepath, get_data_dir("text_data"), "timestamp")
@@ -238,6 +231,19 @@ class TabUSB(guic.ThemedFrame):
 
         self.t2.start()
         return True
+
+    def thread_print_display(self):
+        """Start serial reader (t1) then processor (t2). Called once on connect."""
+        output_mode = self.output_mode_drop[1].get()
+        if output_mode == "None":
+            return True
+
+        self.t1 = guic.StoppableThread(
+            target=self.ser_obj.get_data,
+            kwargs={'printmode': False})
+        self.t1.start()
+
+        return self._start_processor()
 
     #################################
     #### SERIAL (COM)  ##############
@@ -253,25 +259,27 @@ class TabUSB(guic.ThemedFrame):
             self.ser_obj = SerialProcessor(port, baud_rate)
         except serial.serialutil.SerialException as e:
             self.prompt.print(f"ERROR: {e}")
-            self.prompt.print(f"Can't init with port\n")
+            self.prompt.print(f"Can't init with port")
             guih.alert_user("Can't start COM port", e, "error")
             return False
 
         self.cc.set_ser(self.ser_obj)
         self.thread_print_display()
-        self.prompt.print("Init successful!\n")
+        self.prompt.print("Init successful!")
         return True
 
     def port_close(self):
         if self.ser_obj is not None:
-            self.t1.stop()
-            self.t2.stop()
+            if self.t1 is not None:
+                self.t1.stop()
+            if self.t2 is not None:
+                self.t2.stop()
             if self.t3 is not None:
                 self.t3.stop()
                 self.t3 = None
             self.prompt.print("Serial close!")
             num_lines = self.ser_obj.stop_process()
-            self.prompt.print(f"Port closed: {num_lines} lines wrote\n")
+            self.prompt.print(f"Port closed: {num_lines} lines wrote")
             self.ser_obj = None
             self.cc.set_ser(None)
         self.fr_port.set_status(False)

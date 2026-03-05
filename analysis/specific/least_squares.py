@@ -4,7 +4,7 @@
 import logging
 import numpy as np
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 
@@ -121,5 +121,5 @@ def run_prxgd(A, d):
     lambdas = np.logspace(-6, 20, num=25)
     lambdas = [1]
     w = ista_solve_hot(A, d, lambdas)
-    logger.debug(f"The dimensions of the output weight vectors are: {np.shape(w)}")
+    _logger.debug(f"The dimensions of the output weight vectors are: {np.shape(w)}")
     return w

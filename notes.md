@@ -3,13 +3,12 @@
 
 ## Threading
 
-Tabs spawn `threading.Thread` directly in button callbacks with no lifecycle management.
+**Status: resolved / acceptable.**
 
-- `guiTab_3_XDS110.py:75-127` -- 5 separate `threading.Thread(...).start()` calls, one per button
-- `guiTab_4_USB.py:267,292` -- thread creation in `port_init` and `start_process`
-- `guiTab_8_LOG.py:967` -- recording thread with busy-wait `time.sleep` loops
-
-**Recommendation:** Use `StoppableThread` (already in `gui_class.py`) consistently, and move long-running work into service-layer methods that accept progress/completion callbacks.
+- `guiTab_3_XDS110.py` -- uses bare `threading.Thread` via a `_run_in_thread(func, button)` helper. Correct for fire-and-forget one-shot actions (build/flash/check/toggle). `StoppableThread` would add no value here since the tasks complete naturally and don't loop.
+- `guiTab_4_USB.py` -- all `StoppableThread` (t1/t2/t3), properly stopped in `port_close()`. Clean.
+- `guiTab_8_LOG.py` -- `_record_thread` uses `StoppableThread`. `_dash_thread` uses bare `threading.Thread(daemon=True)`, which is correct since Dash's `app.run()` blocks with no external stop mechanism; daemon=True ensures it dies with the process.
+- `thread_record_timed` uses deadline-based sleep (`time.monotonic()`) — no busy-wait.
 
 
 

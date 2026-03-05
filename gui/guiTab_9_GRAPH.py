@@ -565,49 +565,58 @@ class TabGraph(guic.ThemedFrame):
         return selected_files
 
     def refresh_files(self):
-        files = []  # list of FileData named tuples
+        files = []
 
-        def grab_files():
-            for filename in os.listdir(self.data_dir):
-                # check if CSV file
-                if not filename.endswith(".csv"):
+        for filename in os.listdir(self.data_dir):
+            if not filename.endswith(".csv"):
+                continue
+
+            if self.var_use_file_regex.get():
+                sr_str = "_" + self.file_filter.get("1.0", "end").strip("\n") + "_"
+                if sr_str not in filename:
                     continue
 
-                # filename filtering
-                if self.var_use_file_regex.get():
-                    sr_str = "_" + self.file_filter.get("1.0", "end").strip("\n") + "_"
-                    if sr_str not in filename:
-                        continue
+            stem = Path(filename).stem
+            filepath = os.path.join(self.data_dir, filename)
+            files.append(FileData(
+                filename=filename,
+                filepath=filepath,
+                parts=stem.split('_'),
+                df=pd.read_csv(filepath)))
 
-                # extract vars_dict from filename (may contain things like board number, temperature, etc)
-                stem = Path(filename).stem
-                parts = stem.split('_')
-
-                # extract Pandas df
-                filepath = os.path.join(self.data_dir, filename)
-                df = pd.read_csv(filepath)
-
-                # append to running list of files
-                files.append(FileData(
-                    filename=filename,
-                    filepath=filepath,
-                    parts=parts,
-                    df=df))
-            return files
-
-        # update file list
-        self.files = grab_files()
-
+        self.files = files
         self.file_listbox.delete(0, tk.END)
         for file in self.files:
             self.file_listbox.insert(tk.END, file[0])
-
         self.prompt.print(f"Loaded {len(self.files)} files")
 
     def disp_fields(self):
         selected_files = self.get_selected_files()
         for filename, _, _, df in selected_files:
             self.prompt.print(f"Filename: {filename} --> {list(df.columns)}")
+
+    def _build_label_config(self):
+        """Read labeling widget state and return (labeling_mode, label_config) for the plotter."""
+        use_file = self.var_use_file_labeler.get()
+        use_data = self.var_use_data_labeler.get()
+        try:
+            file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
+        except ValueError:
+            file_label_idx = 0
+        data_label_var = self.data_labeler.get("1.0", "end").strip("\n")
+        normalize = self.var_normalize_colors.get()
+
+        if use_file and use_data:
+            return 'both', {
+                'file_label_idx': file_label_idx,
+                'data_label_var': data_label_var,
+                'normalize_colors': normalize,
+            }
+        if use_file:
+            return 'filename', {'file_label_idx': file_label_idx}
+        if use_data:
+            return 'data', {'data_label_var': data_label_var, 'normalize_colors': normalize}
+        return 'none', {}
 
     def graph_files(self):
         # Get selected files
@@ -673,36 +682,7 @@ class TabGraph(guic.ThemedFrame):
             return False
 
         # Determine labeling mode and configuration
-        if self.var_use_file_labeler.get() and self.var_use_data_labeler.get():
-            # Both checkboxes checked - use combined mode
-            labeling_mode = 'both'
-            try:
-                file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
-            except ValueError:
-                file_label_idx = 0
-            data_label_var = self.data_labeler.get("1.0", "end").strip("\n")
-            label_config = {
-                'file_label_idx': file_label_idx,
-                'data_label_var': data_label_var,
-                'normalize_colors': self.var_normalize_colors.get()
-            }
-        elif self.var_use_file_labeler.get():
-            labeling_mode = 'filename'
-            try:
-                file_label_idx = int(self.file_labeler.get("1.0", "end").strip("\n"))
-            except ValueError:
-                file_label_idx = 0
-            label_config = {'file_label_idx': file_label_idx}
-        elif self.var_use_data_labeler.get():
-            labeling_mode = 'data'
-            data_label_var = self.data_labeler.get("1.0", "end").strip("\n")
-            label_config = {
-                'data_label_var': data_label_var,
-                'normalize_colors': self.var_normalize_colors.get()
-            }
-        else:
-            labeling_mode = 'none'
-            label_config = {}
+        labeling_mode, label_config = self._build_label_config()
 
         # Get plot style
         plot_style = self.plot_style_drop[1].get()

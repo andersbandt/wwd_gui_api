@@ -4,16 +4,12 @@
 
 ---
 
-
-
 ### Feature Work
 
 
 - [ ] look at `scripting.md` and figure out implementation plan approach
 - [ ] Change tab color when something is active (e.g., connection live, recording in progress)
 - [ ] should I add a mini status indicator in ATE tab next to instrument accuracy testing?
-- [ ] have to reconcile how I'm naming `logger.py` vs my `logger`
-  - I already did a renaming in `serial_api.py`
 
 
 - [ ] add color normalization to graph feature
@@ -24,9 +20,7 @@ To support `'filename'` mode: collect the extracted `file_parts[idx]` values acr
 The `label_config` dict already passes `normalize_colors` through in `'both'` mode; would need to extend it for pure `'filename'` mode too.
 
 
-- [ ] add more GUI decoupling to my `final_plot` and other functions in the graphing/analysis tab
 - [ ] `guiTab_4_USB.py:124` has `"DAGA"`, and lines 141-149 map test names to codes like `"FR91"`, `"FR01"`, `"FE42"`.
-- [ ] give threading logic another review (details in notes.md)
 - [ ] get the FUNC2 thing working again or eliminate it (would be nice to read XDM1041 datasheet)
 
 

@@ -1,124 +1,128 @@
-# Scripting and Automation Approach
-
-Based on your codebase, I'd recommend a **hybrid approach** that balances flexibility with safety and ease of use. Here's my analysis:
+# Scripting and Automation Plan
 
 ## Current State
 
-Your `StimulusConfig` system (common/logger.py:111-144) currently supports:
+The `StimulusConfig` system (`common/logger.py`) already supports:
 - Linear and logarithmic sweeps
-- PS voltage, FG frequency, and FG duty cycle stimulus
+- Dual-stimulus (nested loops)
+- PS voltage, FG frequency, FG duty cycle stimulus types
 - Basic parameter validation
-- Good integration with the Logger tab
+- Full integration with the Logger tab (Tab 8)
+
+The ATE tab (Tab 7) already has accuracy test automation and stimulus integration.
+Scripting would extend this with user-defined sequences beyond what the GUI can configure.
+
+---
 
 ## Recommended Approach: Three-Tier System
 
-### **Tier 1: Expand StimulusConfig (for common patterns)**
+### Tier 1 — Expand StimulusConfig (quick win, no scripting needed)
 
-Add a few more predefined patterns to `StimulusType`:
-- `RAMP_UP_DOWN` - Triangle wave pattern
-- `STEP_HOLD` - Step pattern with configurable hold times
-- `CUSTOM_POINTS` - User-defined list of values (entered as comma-separated)
+Add predefined patterns to `StimulusType` in `common/logger.py`:
+- `CUSTOM_POINTS` — comma-separated list of values entered in the GUI (no fixed step size)
+- `STEP_HOLD` — step-and-hold with a configurable hold time per step (separate from settling time)
 
-**Pros**: Safe, validated, easy GUI integration, covers 80% of use cases
+These cover a large portion of real test patterns without requiring a script.
+`CUSTOM_POINTS` fits naturally into the existing Logger tab sweep UI.
 
-### **Tier 2: Script Mode (for complex sequences)**
+### Tier 2 — Script Mode (complex/reusable sequences)
 
-Create a new scripting system that loads Python files:
+Load and execute a user Python file from `data/scripts/`. Run in a `StoppableThread`
+so the emergency stop button can interrupt it cleanly.
+
+**Equipment access:** Scripts receive a wrapper around `ClassController` that exposes
+the **services layer**, not raw drivers. The services already have safety logic (limits,
+state checks). This is the correct boundary — don't expose raw equipment objects.
 
 ```python
-# Example user script: data/scripts/power_ramp_test.py
-def execute(equipment, logger, config):
-    """
-    Custom power supply ramp test
+# Example: data/scripts/power_ramp_test.py
 
+def execute(cc, log, config):
+    """
     Args:
-        equipment: Equipment controller with .ps, .dmm, .fg, .ser
-        logger: Data logger for recording measurements
-        config: Dict with user parameters from GUI
+        cc:     Equipment wrapper (exposes cc.ps_service, cc.dmm_service, etc.)
+        log:    Callable to print to the GUI prompt
+        config: Dict of user parameters from the GUI (e.g. settling_time, samples_per_step)
     """
-    ps = equipment.ps
-    dmm = equipment.dmm
+    ps  = cc.ps_service
+    dmm = cc.dmm_service
 
-    # Custom ramp pattern
     for voltage in [1.0, 1.5, 2.0, 2.5, 3.0]:
-        ps.set_voltage(voltage, channel=1)
+        ps.set_voltage(1, voltage)          # channel, voltage
         time.sleep(config['settling_time'])
 
-        # Take multiple measurements at each step
         for i in range(config['samples_per_step']):
-            measurement = dmm.read_value()
-            logger.log_row({
-                'Voltage': voltage,
-                'Measurement': measurement,
-                'Sample': i
-            })
+            meas = dmm.read_value()
+            log({'Voltage': voltage, 'Measurement': meas, 'Sample': i})
             time.sleep(0.1)
 
-    return "Test complete!"
+    return "Test complete"
 ```
 
-**Implementation details**:
-- Store scripts in `data/scripts/` directory
-- Add "Load Script" button in Logger or ATE tab
-- Execute in sandboxed environment with timeout
-- Provide equipment API wrapper with safety checks
-- Show script output in prompt window
+**Implementation notes:**
+- `ScriptRunner` class lives in `common/script_runner.py`
+- Loads the script with `importlib`, calls `execute(cc_wrapper, log_cb, config)`
+- Runs inside a `StoppableThread`; the thread's `stopped()` flag should be checked
+  periodically (pass it in, or have the wrapper check it on each equipment call)
+- Script output goes to the ATE tab's prompt via the `log` callback (thread-safe `after(0, ...)`)
+- On completion or exception, restore equipment to a safe state (PS off, etc.)
+- Store user scripts in `data/scripts/`, ship examples in `data/scripts/examples/`
 
-**Pros**: Maximum flexibility, reusable, shareable, keeps core code simple
+**On "sandboxing":** Python `exec()`-based sandboxing with restricted builtins is
+not meaningfully secure. Don't rely on it. The real protection is:
+1. The equipment wrapper only exposes service methods (no raw serial/VISA objects)
+2. Services enforce voltage/current limits before applying them
+3. An emergency stop button calls `StoppableThread.stop()` and triggers safe shutdown
 
-**Cons**: Requires Python knowledge, potential security concerns
+### Tier 3 — Visual Sequence Builder (future, significant effort)
 
-### **Tier 3: Visual Sequence Builder (future enhancement)**
+GUI drag-and-drop sequence builder (LabVIEW-style):
+- Set voltage/frequency blocks, wait blocks, measurement blocks, conditionals
+- Serializes to JSON/YAML for save/load
+- No Python knowledge required
 
-A GUI-based sequence builder where users drag-and-drop actions (similar to LabVIEW):
-- Set voltage/frequency blocks
-- Wait/delay blocks
-- Measurement blocks
-- Conditional branches
-- Save as JSON/YAML
+Not worth planning in detail until Tier 2 is proven useful.
 
-This would be the most user-friendly but requires significant development.
+---
 
-## Recommended Implementation Order
+## Implementation Order
 
-**Phase 1** (Quick win):
-1. Add `CUSTOM_POINTS` to `StimulusType` - allows comma-separated list of values
-2. Add `hold_time` parameter for step-and-hold patterns
+**Phase 1 — StimulusConfig expansion** (small, self-contained):
+1. Add `CUSTOM_POINTS` to `StimulusType` with a text entry in the Logger tab sweep UI
+2. Add `hold_time` field to `StimulusConfig` for step-and-hold patterns
 
-**Phase 2** (Maximum flexibility):
-1. Create `ScriptRunner` class in `common/script_runner.py`
-2. Add script loader to ATE tab (Tab 7) - makes sense since it's for automated testing
-3. Define equipment API wrapper with safety limits
-4. Create example scripts in `data/scripts/examples/`
+**Phase 2 — Script runner**:
+1. `common/script_runner.py` — `ScriptRunner` class (load, validate, execute, stop)
+2. Equipment wrapper class — thin wrapper around `cc` exposing only service methods
+3. ATE tab (Tab 7) — add script loader UI: file picker, config entry, Run/Stop buttons
+4. `data/scripts/examples/` — 2-3 example scripts covering common patterns
 
-**Phase 3** (Polish):
-1. Add script editor with syntax highlighting
-2. Add dry-run/validation mode
-3. Create script template generator
+**Phase 3 — Polish** (after Phase 2 is working):
+1. Script parameter UI — let scripts declare expected config keys with types/defaults
+2. Dry-run / validation mode — check equipment is connected before starting
+3. Script output saved alongside CSV data
 
-## Where to Put It?
+---
 
-Given your architecture, I'd suggest:
+## Where Things Live
 
-1. **Expand StimulusConfig** → Keep in `common/logger.py`, add to Logger tab (Tab 2)
-2. **Script execution** → Add to **ATE tab (Tab 7)** since it's designed for automated test equipment sequencing
-   - Currently Tab 7 is quite basic (just command/query)
-   - Perfect place for scripted automation
-   - Separates data logging (Tab 2) from test automation (Tab 7)
+| Concern              | Location                          |
+|----------------------|-----------------------------------|
+| StimulusConfig types | `common/logger.py`                |
+| Sweep UI             | `gui/guiTab_8_LOG.py` (Tab 8)    |
+| ScriptRunner         | `common/script_runner.py`         |
+| Script loader UI     | `gui/guiTab_7_ATE.py` (Tab 7)    |
+| User scripts         | `data/scripts/`                   |
+| Example scripts      | `data/scripts/examples/`          |
+| Equipment wrapper    | `common/script_runner.py` or `common/equipment_wrapper.py` |
 
-## Safety Considerations
+---
 
-For script execution, implement:
-- **Voltage/current limits** - Check against equipment max ratings before applying
-- **Timeout protection** - Kill script if it runs too long
-- **Emergency stop** - Big red STOP button
-- **Validation mode** - Dry run that shows what would happen without executing
-- **Restricted imports** - Only allow safe modules (time, math, numpy), block os, subprocess
-- **Equipment state restore** - Return to safe state after script completes/errors
+## Safety Checklist (Phase 2)
 
-## Next Steps
-
-Would you like to implement:
-- Phase 1 (expanding StimulusConfig with more patterns)
-- Phase 2 (adding script execution to the ATE tab)
-- Both?
+- [ ] Equipment wrapper enforces service-layer limits (no raw driver access)
+- [ ] Scripts run in `StoppableThread`; stop flag propagates to equipment calls
+- [ ] Emergency stop button triggers `StoppableThread.stop()` + safe shutdown sequence
+- [ ] Unhandled exceptions in script are caught, logged to prompt, safe state restored
+- [ ] Timeout: kill thread after configurable max duration
+- [ ] PS output turned off after script ends (success or failure)

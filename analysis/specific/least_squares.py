@@ -8,10 +8,8 @@ _logger = logging.getLogger(__name__)
 
 
 
-# NOTE: following are example operations you can do on arrays
-# np.sqrt(var1_arr),
-# var2_arr ** 2,
 def generateA(var1_arr, var2_arr, var3_arr, var4_arr, var5_arr):
+    """Build a design matrix A by column-stacking input arrays (template/example)."""
     A = np.column_stack((
         var1_arr,
         var2_arr,
@@ -24,12 +22,14 @@ def generateA(var1_arr, var2_arr, var3_arr, var4_arr, var5_arr):
     return A_np
 
 
-# GenerateResidual: Generates a residual along with some statistics
-# @param[out] residual: calculated as (calculated - true)
-# @param[out] euclidean_norm: Euclidean (or '2') norm of the residual
-# @param[out] fullscale_error: Full scale error
-# Written by Anders Bandt, August 2021
 def generate_residual(calculated, truth):
+    """Compute residual (calculated - truth) and its Euclidean norm.
+
+    Written by Anders Bandt, August 2021.
+
+    Returns:
+        [residual, euclidean_norm]
+    """
     residual = (calculated - truth)  # compute residual
     euclidean_norm = np.linalg.norm(residual)
     # min_res = min(residual)
@@ -43,15 +43,18 @@ def generate_residual(calculated, truth):
     return [residual, euclidean_norm]
 
 
-#LeastSquares: Compute Least Squares Matrix Regression
-#       This function computes the least squares regression of Aw=d where
-# A = matrix of input values according to predefined equation
-# d = input truth values to train with
-# @param[out]     w          output vector of coefficients
-# @param[out]     y          new calculated truth pressures with w
-# @param[out]     residual   difference between y - d (calculated truth vs input truth)
-# Written by Anders Bandt, August 2021
 def least_squares(A, d):
+    """Solve the least-squares problem Aw = d via numpy.linalg.lstsq.
+
+    Written by Anders Bandt, August 2021.
+
+    Args:
+        A: Design matrix (m x n).
+        d: Observation vector (m x 1).
+
+    Returns:
+        w: Coefficient vector (n x 1).
+    """
     # Create matrices and find w from data
     # w = np.linalg.inv(A.transpose() @ A) @ A.transpose() @ d
 
@@ -64,13 +67,12 @@ def least_squares(A, d):
 ######### ECE 532    #########
 ##############################
 
-# ista_solve_hot: Iterative soft-thresholding for multiple values of
-# lambda with hot start for each case - the converged value for the previous
-# value of lambda is used as an initial condition for the current lambda.
-# this function solves the minimization problem
-# Minimize |Ax-d|_2^2 + lambda*|x|_1 (Lasso regression)
-# using iterative soft-thresholding.
 def ista_solve_hot(A, d, la_array):
+    """Iterative soft-thresholding (ISTA) with hot start for LASSO regression.
+
+    Solves: minimize |Ax - d|_2^2 + lambda * |x|_1
+    Uses the converged solution for each lambda as the initial condition for the next.
+    """
     max_iter = 10 ** 4
     tol = 10 ** (-3)
     tau = 1 / np.linalg.norm(A, 2) ** 2
@@ -89,10 +91,8 @@ def ista_solve_hot(A, d, la_array):
     return X
 
 
-## compute it iterations of L2 proximal gradient descent starting at w1
-## w_{k+1}= (w_k - tau*X'*(X*w_k - y)/(1+lam*tau)
-## step size tau
 def prxgraddescent_l2(A, d, la_array):
+    """L2-regularized proximal gradient descent: w_{k+1} = (w_k - tau*A'*(A*w_k - d)) / (1 + lam*tau)."""
     max_iter = 10 ** 4
     tol = 10 ** (-3)
     tau = 1 / np.linalg.norm(A, 2) ** 2
@@ -114,8 +114,8 @@ def prxgraddescent_l2(A, d, la_array):
     return X
 
 
-# implements soft iterative thresholding via proximal gradient descent to solve the LASSO problem
 def run_prxgd(A, d):
+    """Run ISTA/LASSO solver with a default lambda schedule."""
     lambdas = np.logspace(-6, 20, num=25)
     lambdas = [1]
     w = ista_solve_hot(A, d, lambdas)

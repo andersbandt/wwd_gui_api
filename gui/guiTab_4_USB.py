@@ -6,7 +6,6 @@ import tkinter as tk
 from tkinter import *
 from tkinter import ttk
 import serial
-from datetime import datetime
 
 # import user defined modules
 from common.serial_api import SerialProcessor
@@ -25,14 +24,6 @@ TEST_TYPE_COMMANDS = {
     "specific-graph":      "IG85",
     "clock-test":     "CR81",
 }
-
-
-# TODO: I don't think switching to log to file actually removes the display mode
-#   do we want to have a button that makes it explicit we are changing mode? Or does the dropdown just update on switch now?
-
-
-# TODO: yeah the stop recording button does not work
-
 
 
 class TabUSB(guic.ThemedFrame):
@@ -203,6 +194,8 @@ class TabUSB(guic.ThemedFrame):
 
     def _toggle_recording(self):
         if self._recording:
+            if self.ser_obj:
+                self.ser_obj.procStatus = False
             if self.t2 is not None:
                 self.t2.stop()
                 self.t2 = None
@@ -226,7 +219,7 @@ class TabUSB(guic.ThemedFrame):
         if output_mode == "Log to File (CSV)":
             headers_raw = self.csv_headers.get("1.0", "end").strip("\n").strip()
             parameters = [h.strip() for h in headers_raw.split(",") if h.strip()]
-            self.start_process("serial_data", "log", parameters)
+            self.start_process("serial_data", parameters)
         elif output_mode == "Display on Screen":
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
@@ -302,24 +295,20 @@ class TabUSB(guic.ThemedFrame):
         self.btn_record.config(text="Start Recording", bg=self.theme_config["light_3"])
         self.fr_port.set_status(False)
 
-    def start_process(self, data_subfolder, file_ext, parameters):
+    def start_process(self, data_subfolder, parameters):
         if self.t3 is not None:
             self.t3.stop()
 
-        current_datetime = datetime.now()
-        formatted_datetime = current_datetime.strftime("_%H%M%S")
-        file_str_ext = self.output_file_name.get("1.0", "end").strip(
-            "\n")  # I THINK THIS CATEGORY NAME IS GETTING STRIPPED WRONG
-        # if file_str_ext == "":
-        #     self.prompt1.print("Detected blank file name, going to use default")
-        #     file_str_ext = None
+        filename = self.output_file_name.get("1.0", "end").strip().strip("\n")
+        if not filename:
+            filename = None
 
         self.t3 = guic.StoppableThread(
             target=lambda: self.ser_obj.process_data(self.basefilepath,
-                                                     #f"{formatted_datetime}_{file_ext}_{file_str_ext}",
                                                      data_subfolder,
                                                      "data",
-                                                     parameters=parameters)
+                                                     parameters=parameters,
+                                                     filename=filename)
         )
         self.t3.start()
 

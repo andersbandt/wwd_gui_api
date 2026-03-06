@@ -1,4 +1,4 @@
-"""Butterworth lowpass filter implementation."""
+"""Digital filter utilities: Butterworth lowpass, moving average, EMA, and baseline-freeze filters."""
 
 import logging
 import numpy as np
@@ -11,23 +11,32 @@ from collections import deque
 logger = logging.getLogger(__name__)
 
 
-# compute the frequency response of a digital filter
-# returns
-#   w: frequencies at which h was computed, in the same units as fs
-#   h: frequency response, as complex numbers
 def freq_response(b, a, fs, worN=8000):
+    """Compute the frequency response of a digital filter.
+
+    Returns:
+        (w, h) — frequencies (same units as fs) and complex frequency response.
+    """
     w, h = freqz(b, a, fs=fs, worN=worN)
     return w, h
 
 
-#     cutoff  : desired cutoff frequency of the filter, Hz
-#     fs      : sample rate, Hz (estimated this based on a period of 0.11 seconds between samples)
-#     order   : ???
 def butter_filter(cutoff, fs, order=5):
+    """Design a Butterworth lowpass filter.
+
+    Args:
+        cutoff: Desired cutoff frequency in Hz.
+        fs: Sample rate in Hz.
+        order: Filter order (default 5).
+
+    Returns:
+        (b, a) — numerator and denominator polynomial coefficients.
+    """
     return butter(order, cutoff, fs=fs, btype='low', analog=False)
 
 
 def lowpass_filter(b, a, data):
+    """Apply a lowpass filter defined by (b, a) coefficients to data."""
     y = lfilter(b, a, data)
     return y
 
@@ -111,9 +120,10 @@ def baseline_ma_freeze(var4, loop, window=20, min_samples=5, skip_first_after_fa
 
 
 
-def baseline_ema_freeze(var4, loop, alpha=0.1):
+def baseline_ema_freeze(var4, loop, alpha=0.1, skip_first_after_fall=True):
     """
     Baseline = EMA of var4 while loop==0; frozen during loop==1.
+    Matches MCU BaselineEMA_Update() logic including skip_first_after_fall.
     Returns (baseline, baseline_valid, baseline_filled, delta).
     """
     var4 = np.asarray(var4, dtype=np.float64).reshape(-1)
@@ -121,18 +131,32 @@ def baseline_ema_freeze(var4, loop, alpha=0.1):
     N = len(var4)
 
     baseline = np.full(N, np.nan, dtype=np.float64)
-    ema_val = var4[0]
+    ema_val = 0.0
     have_ema = False
+    prev_loop = 0
+    cooldown = 0
 
     for i in range(N):
-        if loop[i] == 0:
-            # update EMA
-            ema_val = alpha * var4[i] + (1.0 - alpha) * ema_val
-            have_ema = True
-            # keep baseline NaN while inactive (we only "use" it during active)
+        cur = int(loop[i])
+
+        # Detect falling edge: 1 -> 0
+        if skip_first_after_fall and prev_loop == 1 and cur == 0:
+            cooldown = 1
+
+        if cur == 0:
+            if cooldown > 0:
+                cooldown -= 1
+            else:
+                if not have_ema:
+                    ema_val = var4[i]  # seed
+                    have_ema = True
+                else:
+                    ema_val = alpha * var4[i] + (1.0 - alpha) * ema_val
         else:
             if have_ema:
                 baseline[i] = ema_val   # freeze the last EMA while active
+
+        prev_loop = cur
 
     baseline_valid  = (~np.isnan(baseline)).astype(np.float64)
     baseline_filled = np.where(np.isnan(baseline), var4, baseline)

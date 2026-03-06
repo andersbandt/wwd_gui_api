@@ -142,10 +142,13 @@ class SerialProcessor(SerialGeneral):
         # Previously used collections.deque(maxlen=200) but it wasn't fully thread-safe
         self.r_buf = queue.Queue(maxsize=200)  # Thread-safe read buffer
 
-    def init_data(self, data_mode, parameters):
+    def init_data(self, data_mode, parameters, filename=None):
         _logger.info("SerialProcessor data initialization")
         if data_mode == "data":
-            self.logfile = csvh.CSVHelper(self.basefilepath, parameters)
+            logname = logger.build_log_name("SER", filename, "csv")
+            filepath = os.path.join(self.basefilepath, logname)
+            self.logfile = csvh.CSVHelper(filepath, parameters)
+            self.logfile.initialize_file()
             _logger.info(f"path is at: {self.logfile.file_path}")
         elif data_mode == "raw" or data_mode == "timestamp":
             logname = logger.build_log_name("SER", "", "log", date_strf='%Y%m%d')
@@ -188,8 +191,7 @@ class SerialProcessor(SerialGeneral):
                 self.serStatus = False
                 _logger.error(e)
 
-    # TODO: need to add back allowing a certain filename
-    def process_data(self, basefilepath, data_folder, data_mode, parameters=None, gui_callback=None):
+    def process_data(self, basefilepath, data_folder, data_mode, parameters=None, gui_callback=None, filename=None):
         # If gui_callback is provided, display on GUI instead of logging to file
         if gui_callback:
             _logger.info("Starting to display data on GUI")
@@ -207,7 +209,7 @@ class SerialProcessor(SerialGeneral):
 
         # File logging mode
         self.basefilepath = os.path.join(basefilepath, data_folder)
-        self.init_data(data_mode, parameters)
+        self.init_data(data_mode, parameters, filename=filename)
 
         _logger.info(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True

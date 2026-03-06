@@ -14,7 +14,7 @@ DATABASE_DIRECTORY = "C:/Users/ander/OneDrive/Projects/WWD/sys/imu_data_dir/"
 
 
 def graph_accel_gyro(a_dat, g_dat):
-    # Plot accelerometer data
+    """Plot accelerometer (top) and gyroscope (bottom) data as subplots."""
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 1, 1)
     plt.plot(a_dat)
@@ -35,7 +35,7 @@ def graph_accel_gyro(a_dat, g_dat):
 
 
 def graph_filter_unfilter(data, filtered_data, num_plot, subplot_num):
-    # set up time-series axis
+    """Plot raw vs filtered data on a subplot grid."""
     T = 5.0
     n = len(data)
     t = np.linspace(0, T, n, endpoint=False)
@@ -50,8 +50,8 @@ def graph_filter_unfilter(data, filtered_data, num_plot, subplot_num):
 
 
 
-# C compatible implementation of a simple lowpass filter
 def c_lowpass(x, xm1, a):
+    """C-compatible simple lowpass filter: y[i] = (1-a)*y[i-1] + a*x[i]."""
     y = [x[0] + xm1]
 
     for i in range(1, len(x)):
@@ -65,7 +65,7 @@ def c_lowpass(x, xm1, a):
 
 
 def analyze_imu(file_path):
-    # Load data from CSV file
+    """Load IMU CSV data, plot accel/gyro, and demonstrate lowpass filtering at various alphas."""
     try:
         df = pd.read_csv(file_path)
     except pandas.errors.EmptyDataError as e:
@@ -102,12 +102,14 @@ def analyze_imu(file_path):
 
 
 def conv_imu_flash(upper_byte, lower_byte):
+    """Convert two flash memory bytes into a 16-bit IMU reading."""
     imu_data = (upper_byte >> 8) + lower_byte
     return imu_data
 
 
 
 def analyze_ICM_42670(dig_temp_arr):
+    """Convert ICM-42670 digital temperature readings to Fahrenheit."""
     temp_fahr = []
     for temp in dig_temp_arr:
         temp_f = ((temp/128) + 25)*1.8 + 32

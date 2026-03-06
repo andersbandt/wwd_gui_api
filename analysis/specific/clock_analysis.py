@@ -1,22 +1,18 @@
-"""Clock and time-domain analysis."""
+"""Clock drift analysis — least-squares model of MCU timer drift vs wall clock."""
 
 from __future__ import annotations
 
-# import needed modules
 import logging
 import os
-from dataclasses import dataclass
 from pprint import pformat
 
 import numpy as np
 import pandas as pd
 
-# import user created modules
 from analysis import data_helper as datah
 from analysis import stats_analysis
 from analysis.specific import imu_analysis
 from analysis.specific import least_squares
-from analysis.specific import filter_analysis
 from common import plotter
 from common.plotter import show_plots
 
@@ -26,10 +22,15 @@ _logger.setLevel(logging.INFO)
 
 
 # ---------------------------------------------------------------------------
-# Data cleaning / loading helpers
+# Data cleaning / loading helpers (shared with clamp_analysis)
 # ---------------------------------------------------------------------------
 
 def clean_data(df, column, column2=None):
+    """Drop NaN rows, filter out non-monotonic decreases in column, and zero-base the column.
+
+    Applies the monotonic filter three times to handle consecutive outliers.
+    If column2 is provided, also removes rows where column2 jumps by more than 10 between samples.
+    """
     _logger.info("Cleaning data ....")
     _logger.debug(f"data starting with row count: {df.shape[0]}")
     # drop out nAn values
@@ -59,6 +60,7 @@ def clean_data(df, column, column2=None):
 
 
 def get_filtered_data(data_arr, interest_column):
+    """Remove rows whose local z-score exceeds a threshold (rolling window outlier filter)."""
     interest_arr = data_arr[interest_column]
     interest_arr = np.array(interest_arr)
 
@@ -88,94 +90,48 @@ def get_filtered_data(data_arr, interest_column):
     return data_arr_f
 
 
-def get_train_data(
-    file,
-    col_str,                # list[str]: columns to load
-    float_cols=None,        # list[str] to cast to float
-    clean_cols=None,        # list[str] to clean with your clean_data()
-    *,
-    loop_col="BO",          # str: binary 0/1 column for clamp
-    volt_col="TP",          # str: continuous voltage column
-    window=5,              # int: pre-activation samples for baseline
-    min_samples=3,         # int: minimum samples to accept baseline
-):
-    """
-    Load and prepare a DataFrame with baseline features for a clamp loop.
+# ---------------------------------------------------------------------------
+# Clock drift helpers
+# ---------------------------------------------------------------------------
 
-    Adds columns:
-      _baseline          : baseline computed from pre-activation window (NaN if not active/insufficient)
-      _baseline_filled   : baseline filled with var4 when NaN
-      _baseline_valid    : 1 if baseline valid for that row, else 0
-      _delta             : _baseline_filled - var4
-      _rising_idx        : 1 at 0->1 rising edge rows, else 0
-    """
-    # 0) Load & prep
-    df = datah.load_csv_pandas(file, columns=col_str)
+def create_time_offset(mcu_time_arr, real_time):
+    """Compute per-sample drift (ms) between MCU timer and wall clock, zeroed at the first sample."""
+    offset = -1 * (mcu_time_arr[0]) + real_time[0] * pow(10, 3)
 
-    if float_cols:
-        for col in float_cols:
-            df = datah.df_float(df, col)
+    # calculate time delta
+    i = 0
+    time_diff = []
+    for mcu_time in mcu_time_arr:
+        time_diff.append(mcu_time - real_time[i] * pow(10, 3) + offset)
+        i += 1
 
-    if clean_cols:
-        for col in clean_cols:
-            df = clean_data(df, col)
-
-    # 1) Sanity checks
-    for col in (loop_col, volt_col):
-        if col not in df.columns:
-            raise KeyError(f"Column '{col}' not found. Available: {list(df.columns)}")
-
-    # 2) Extract arrays
-    loop = df[loop_col].to_numpy().astype(np.int8)        # (N,)
-    var4 = df[volt_col].to_numpy().astype(np.float64)     # (N,)
-
-    # 3) Rising edges: indices where loop changes 0 -> 1
-    rising = np.flatnonzero((loop[1:] == 1) & (loop[:-1] == 0)) + 1
-    df["_rising_idx"] = 0
-    if len(rising) > 0:
-        df.loc[rising, "_rising_idx"] = 1
-
-    # Existing arrays
-    loop = df["BO"].to_numpy()  # boost flag
-
-    # Choose ONE:
-    #baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ma_freeze(var4, loop, window=window, min_samples=min_samples)
-    baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ema_freeze(var4, loop, alpha=1)
-
-    # Attach to df
-    df["_baseline"] = baseline
-    df["_baseline_valid"] = baseline_valid
-    df["_baseline_filled"] = baseline_filled
-    df["_delta"] = delta
-
-    return df
+    return time_diff
 
 
-def get_truth_data(file, col_str):
-    df = datah.load_csv_pandas(file, columns=col_str)
-    truth = df[col_str]
-    return truth
-
-
-def _plot_clamp_results(df, res, phase):
-    """Shared plot helper for clamp loop — call with phase='Train' or 'Verify'."""
-    idx = list(range(len(df)))
-    plotter.plot_subplots(
-        idx,
-        channels=[
-            (res,         "Residual"),
-            (df["TP"],  "TP ADC reading"),
-            (df["TP_O"],    "TP (V)"),
-            (df["BO"],    "BO (0/1)"),
-            (df["MV"], "main valve"),
-            #(df["MO"], "motor"),
-            #(df["_baseline_filled"], "TP_baseline")
-        ],
-        xlabel="Sample",
-        title=f"{phase}: Clamp Loop Results",
-        show_plot=False,
+def full_create_time_offset(df_tmp):
+    """Convenience wrapper: extract timestamp/ms columns from a DataFrame and compute time offset."""
+    time_offset = []
+    dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
+    dt_seconds = [date.timestamp() for date in dt_tmp]
+    time_offset.extend(
+        create_time_offset(
+            np.array(df_tmp["ms"]),
+            dt_seconds)
     )
+    return time_offset
 
+
+def linear_fit_train(x_arr, y_arr):
+    """Fit a linear model and log the results."""
+    _logger.info("Creating linear fit ....")
+    stats = stats_analysis.linear_fit(x_arr, y_arr)
+    _logger.info(pformat(stats))
+    return stats
+
+
+# ---------------------------------------------------------------------------
+# Plotting
+# ---------------------------------------------------------------------------
 
 def _plot_clock_drift_results(df, time_offset_arr, residual, phase):
     """Shared plot helper for clock drift — call with phase='Train' or 'Verify'.
@@ -202,175 +158,8 @@ def _plot_clock_drift_results(df, time_offset_arr, residual, phase):
     plotter.plot(x_dt,     residual,        xlabel=xlabel_dt,     ylabel="Residual (ms)",  title=f"{phase}: Residual (ms)",                   color=color,      show_plot=False)
 
 
-def create_time_offset(mcu_time_arr, real_time):
-    # calculate offset for x=0 to be y=0
-    offset = -1 * (mcu_time_arr[0]) + real_time[0] * pow(10, 3)
-
-    # calculate time delta
-    i = 0
-    time_diff = []
-    for mcu_time in mcu_time_arr:
-        time_diff.append(mcu_time - real_time[i] * pow(10, 3) + offset)
-        i += 1
-
-    return time_diff
-
-
-def full_create_time_offset(df_tmp):
-    time_offset = []
-    dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
-    dt_seconds = [date.timestamp() for date in dt_tmp]
-    time_offset.extend(
-        create_time_offset(
-            np.array(df_tmp["ms"]),
-            dt_seconds)
-    )
-    return time_offset
-
-
-def linear_fit_train(x_arr, y_arr):
-    # spit out linear fit
-    _logger.info("Creating linear fit ....")
-    stats = stats_analysis.linear_fit(x_arr, y_arr)
-    _logger.info(pformat(stats))
-    return stats
-
-
 # ---------------------------------------------------------------------------
-# Preset system
-# ---------------------------------------------------------------------------
-
-@dataclass
-class AnalysisPreset:
-    name: str
-    columns: list
-    float_cols: list | None
-    clean_cols: list | None
-    truth_col: list | None  # None for clock_drift (truth is computed, not a column)
-
-
-PRESETS = {
-    "clamp_loop": AnalysisPreset(
-        name="clamp_loop",
-        #columns=["PV", "MV", "BO", "TP", "MO", "TP_O"],
-        columns=["PV", "MV", "BO", "TP", "TP_O"],
-        float_cols=None,
-        clean_cols=None,
-        truth_col=["TP_O"],
-    ),
-    "clock_drift": AnalysisPreset(
-        name="clock_drift",
-        columns=["timestamp", "ms", "temp"],
-        float_cols=["temp"],
-        clean_cols=["ms"],
-        truth_col=None,  # truth is computed from timestamp vs ms
-    ),
-}
-
-
-# ---------------------------------------------------------------------------
-# Clamp loop analysis
-# ---------------------------------------------------------------------------
-
-def _train_model_clamp_loop(train_file, columns, float_col, clean_col, truth_col):
-    train_df = pd.DataFrame()
-    truth_df = pd.DataFrame()
-
-    # LOAD IN AND FORMAT TRAIN DATA
-    for tr_file in train_file:
-        if ".csv" in tr_file:
-            _logger.info(f"Loading in file: {tr_file}")
-            df_train_tmp = get_train_data(tr_file, columns, float_col, clean_col)
-            df_truth_tmp = get_truth_data(tr_file, truth_col)
-
-            # concatenate new DataFrame into training data
-            train_df = pd.concat([train_df, df_train_tmp], ignore_index=True)
-            truth_df = pd.concat([truth_df, df_truth_tmp], ignore_index=True)
-
-    _logger.info(f"Loaded columns: {list(train_df.columns)}")
-    if _logger.isEnabledFor(logging.DEBUG):
-        train_df.info()
-
-    # VARIABLE SETUP
-    A = np.column_stack((
-        np.ones(len(train_df)),                                    # 1) intercept
-        train_df["TP"],                                            # 2) loaded voltage (primary predictor for BO=0)
-        train_df["TP"] ** 2,
-        train_df["MV"],
-        train_df["MV"] * train_df["TP"],  # 3) MV resistive load: scales with TP, not additive
-        train_df["BO"] * train_df["_baseline_filled"],            # 4) pre-activation TP as proxy for TP_O during clamping
-        #train_df["MV"] * train_df["_baseline_filled"],            # 4) pre-activation TP as proxy for TP_O during clamping
-        train_df["BO"],                                            # 5) constant current offset from boost converter
-        #train_df["MO"], # motor voltage
-    ))
-
-    d = np.array(truth_df)
-    d = d.reshape(-1, 1)
-    _logger.debug("MATRIX A:\n%s", pformat(A))
-    _logger.debug("MATRIX d:\n%s", pformat(d))
-    _logger.info(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
-    _logger.info(f"and d of shape={d.shape} dtype={d.dtype}")
-
-    # RUN ANALYSIS
-    w = least_squares.least_squares(A, d)
-    #w = least_squares.run_prxgd(A, d)
-    w = np.array(w)
-    y = A @ w  # apply A matrix to newly found coefficients
-
-    mov_average_window = 15
-    y = filter_analysis.moving_average_causal(y, mov_average_window)
-    #y = filter_analysis.ema_causal(y, 0.2)
-
-    _logger.info(f"coefs w are of shape: {w.shape}")
-    _logger.info(f"shape of output y is: {y.shape}")
-    _logger.info(f"coefficients (w) found from data; computed output values (y) and formed residual")
-    _logger.info(f"w: {w}")
-
-    [res, ver_e_norm] = least_squares.generate_residual(y, d)
-
-    res[0:mov_average_window] = 0 # tag:HARDCODE to manually set first value to 0. Otherwise moving average will cause havoc
-
-
-    _logger.info(f"Euclidean norm: {ver_e_norm}")
-    _logger.debug("residual:\n%s", pformat(res))
-
-    _plot_clamp_results(train_df, res, "Train")
-
-    return train_df, y, w
-
-
-def _verify_clamp_loop(ver_file, columns, float_col, clean_col, truth_col, w):
-    #####################################
-    ### VERIFICATION SECTION  ###########
-    #####################################
-    df_ver = get_train_data(ver_file, columns, float_col, clean_col)
-
-    A_ver = np.column_stack((
-        np.ones(len(df_ver)),
-        df_ver["TP"],
-        df_ver["MV"] * df_ver["TP"],
-        df_ver["BO"] * df_ver["_baseline_filled"],
-        df_ver["BO"],
-        df_ver["BO"] * df_ver["MV"],
-        df_ver["BO"] * df_ver["MO"],  # motor voltage
-        (1 - df_ver["BO"]) * df_ver["MO"]
-    ))
-
-    y_ver = A_ver @ w
-    d_ver = df_ver[truth_col].to_numpy().reshape(-1, 1)
-
-    [res, ver_e_norm] = least_squares.generate_residual(y_ver, d_ver)
-    _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")
-
-    # GENERATE VERIFICATION PLOTS
-    _logger.info("Generating verification plots...")
-    _plot_clamp_results(df_ver, res, "Verify")
-
-    return df_ver
-
-
-# ---------------------------------------------------------------------------
-# Clock drift analysis (merged from clock_analysis_old.py)
+# Data loading
 # ---------------------------------------------------------------------------
 
 def _get_clock_drift_data(file, col_str, float_col, clean_col):
@@ -390,11 +179,14 @@ def _get_clock_drift_data(file, col_str, float_col, clean_col):
     return df
 
 
-def _train_model_clock_drift(train_file):
+# ---------------------------------------------------------------------------
+# Train / Verify
+# ---------------------------------------------------------------------------
+
+def _train_model(train_file):
     train_df = pd.DataFrame()
     time_offset = []
 
-    # LOAD IN AND FORMAT TRAIN DATA
     for tr_file in train_file:
         if ".csv" in tr_file:
             _logger.info(f"Loading in file: {tr_file}")
@@ -402,17 +194,14 @@ def _train_model_clock_drift(train_file):
             dt_tmp = stats_analysis.create_datetime(df_tmp["timestamp"])
             dt_seconds = [date.timestamp() for date in dt_tmp]
 
-            # extend training time offset array
             time_offset.extend(
                 create_time_offset(
                     np.array(df_tmp["ms"]),
                     dt_seconds)
             )
 
-            # concatenate new DataFrame into training data
             train_df = pd.concat([train_df, df_tmp], ignore_index=True)
 
-    # VARIABLE SETUP
     A = np.column_stack((
         np.ones(len(train_df)),
         train_df["ms"],
@@ -425,10 +214,9 @@ def _train_model_clock_drift(train_file):
     _logger.info(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
     _logger.info(f"and d of shape={d.shape} dtype={d.dtype}")
 
-    # RUN ANALYSIS
     w = least_squares.least_squares(A, d)
     w = np.array(w)
-    y = A @ w  # apply A matrix to newly found coefficients
+    y = A @ w
 
     _logger.info(f"coefs w are of shape: {w.shape}")
     _logger.info(f"shape of output y is: {y.shape}")
@@ -442,10 +230,7 @@ def _train_model_clock_drift(train_file):
     return train_df
 
 
-def _verify_clock_drift(ver_file, columns):
-    #####################################
-    ### VERIFICATION SECTION  ###########
-    #####################################
+def _verify(ver_file, columns):
     df_ver = _get_clock_drift_data(ver_file, columns, ["temp"], ["ms"])
     ver_toff = np.array(
         create_time_offset(
@@ -457,7 +242,6 @@ def _verify_clock_drift(ver_file, columns):
     [res, ver_e_norm] = least_squares.generate_residual(df_ver["dtsecond"], df_ver["time_offset"])
     _logger.info(f"Euclidean norm of this verification data is: {ver_e_norm}")
 
-    # GENERATE VERIFICATION PLOTS
     _logger.info("Generating verification plots...")
     df_ver["dtsecond_zero"] = df_ver["dtsecond"] - df_ver["dtsecond"].min()
     _plot_clock_drift_results(df_ver, df_ver["time_offset"], res, "Verify")
@@ -465,43 +249,32 @@ def _verify_clock_drift(ver_file, columns):
     return df_ver
 
 
-
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-def run(preset_name: str):
-    # get cfg
-    cfg = PRESETS[preset_name]
+COLUMNS = ["timestamp", "ms", "temp"]
 
-    # set up training data
+
+def run():
     basefilepath_train = os.getcwd() + "/data_shared/"
-    # basefilepath_train = os.getcwd() + "/data/clock_data/"
     training_files = []
-    for file in os.listdir(basefilepath_train):  # NOTE: don't need file extension check here because training function handles it
+    for file in os.listdir(basefilepath_train):
         training_files.append(basefilepath_train + file)
 
-    # set up verification data
     ver_file = training_files[0]
 
-    if preset_name == "clamp_loop":
-        df, y, w = _train_model_clamp_loop(training_files, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col)
-        #_verify_clamp_loop(ver_file, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col, w)
-    elif preset_name == "clock_drift":
-        df = _train_model_clock_drift(training_files)
-        _verify_clock_drift(ver_file, cfg.columns)
-        time_dict = stats_analysis.analyze_time(stats_analysis.create_datetime(df["timestamp"]))
-        _logger.info(pformat(time_dict))
+    df = _train_model(training_files)
+    _verify(ver_file, COLUMNS)
+    time_dict = stats_analysis.analyze_time(stats_analysis.create_datetime(df["timestamp"]))
+    _logger.info(pformat(time_dict))
 
     show_plots()
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(message)s")
-    logging.getLogger("PIL").setLevel(logging.WARNING)  # suppress PIL/Pillow image chunk noise
+    logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-    # TODO: I actually prefer if when I select the PRESET we also have the data folder bundled into that preset
-    PRESET = "clamp_loop" # tag:HARDCODE
-    # PRESET = "clock_drift"
-    run(PRESET)
+    run()

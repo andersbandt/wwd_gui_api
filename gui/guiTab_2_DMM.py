@@ -137,7 +137,7 @@ class TabDMM(guic.ThemedFrame):
 
         # add some drop-downs for unit handling
         self.unitMeas1_drop = guih.generate_drop_down(fr_m,
-                                                   ["uV", "mV", "V"],
+                                                   ["V", "mV", "uV"],
                                                    callback_func=self.set_meas1_unit)
 
         # Position the value labels
@@ -146,7 +146,13 @@ class TabDMM(guic.ThemedFrame):
         self.valueMeas1.grid(row=5, column=1, sticky='W', padx=5, pady=2)
         self.unitMeas1_drop[0].grid(row=5, column=2)
         self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
+        self.btn_func2_toggle = tk.Button(self.fr_info, text='FREQ On/Off', command=self.toggle_func2)
+        self.btn_func2_toggle.grid(row=6, column=2, padx=3, pady=2)
         self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
+
+        # hide secondary display by default (shown when DMM supports it)
+        self._secondary_visible = False
+        self._hide_secondary_display()
 
         self.labelSampleSpeed = ttk.Label(self.fr_info, width=10, text='Sample speed', style="TLabel", anchor='w')
         self.valueSampleSpeed = tk.Label(self.fr_info, width=18, text='', relief='sunken', anchor='w')
@@ -192,6 +198,22 @@ class TabDMM(guic.ThemedFrame):
                   bg=self.theme_config["warning"],
                   fg=self.theme_config["fg_dark"]).grid(row=4, column=0, columnspan=3, pady=(10, 2))
 
+    def _show_secondary_display(self):
+        self.labelFu2.grid(row=6, column=0, sticky='W', padx=5, pady=2)
+        self.valueFu2.grid(row=6, column=1, sticky='W', padx=5, pady=2)
+        self.btn_func2_toggle.grid(row=6, column=2, padx=3, pady=2)
+        self.labelMeas2.grid(row=7, column=0, sticky='W', padx=5, pady=2)
+        self.valueMeas2.grid(row=7, column=1, sticky='W', padx=5, pady=2)
+        self._secondary_visible = True
+
+    def _hide_secondary_display(self):
+        self.labelFu2.grid_remove()
+        self.valueFu2.grid_remove()
+        self.btn_func2_toggle.grid_remove()
+        self.labelMeas2.grid_remove()
+        self.valueMeas2.grid_remove()
+        self._secondary_visible = False
+
     def gui_refresh_DMM(self, kind="partial"):
         if not self.fr_port.status:
             return
@@ -204,9 +226,21 @@ class TabDMM(guic.ThemedFrame):
             return
         self.dmm_Meas1 = self.dmm_Meas1 * self.meas1_scale
 
+        if self._secondary_visible:
+            try:
+                val = self.cc.dmm.read_secondary_value()
+                self.dmm_Meas2 = val if val is not None else ""
+            except COMMUNICATION_ERRORS:
+                self.dmm_Meas2 = ""
+
         if kind == "full":
             self.dmm_Range = self.cc.dmm.get_range()
             self.dmm_Fu1 = self.cc.dmm.get_mode()
+            if self._secondary_visible:
+                try:
+                    self.dmm_Fu2 = self.cc.dmm.get_secondary_mode()
+                except COMMUNICATION_ERRORS:
+                    self.dmm_Fu2 = ""
             if hasattr(self.cc.dmm, 'get_sample_speed'):
                 try:
                     spd = self.cc.dmm.get_sample_speed()
@@ -233,6 +267,23 @@ class TabDMM(guic.ThemedFrame):
     ##############################################################################
     ####      DMM FUNCTIONS           ############################################
     ##############################################################################
+
+    def toggle_func2(self):
+        if self.cc.dmm is None:
+            return
+        try:
+            current = self.cc.dmm.get_secondary_mode().strip()
+        except COMMUNICATION_ERRORS:
+            self.prompt.print("Failed to query FUNC2 state", "error")
+            return
+
+        if current == "NONe":
+            self.cc.dmm.set_secondary_mode("FREQ")
+            self.prompt.print("Secondary display set to FREQ")
+        else:
+            self.cc.dmm.set_secondary_mode("NONe")
+            self.prompt.print("Secondary display turned off")
+        self.gui_refresh_DMM("full")
 
     def set_meas1_unit(self):
         unit = self.unitMeas1_drop[1].get()
@@ -341,6 +392,12 @@ class TabDMM(guic.ThemedFrame):
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.labelIDValue.config(text=result.device_id)
         self.build_range_controls()
+
+        if self.cc.dmm.has_capability("secondary_display"):
+            self._show_secondary_display()
+        else:
+            self._hide_secondary_display()
+
         self.fr_port.set_status(True)
         self.gui_refresh("connect")
 
@@ -354,5 +411,6 @@ class TabDMM(guic.ThemedFrame):
         if not result.success:
             guih.alert_user("Can't disconnect DMM", result.error, "warning")
         self.build_range_controls()
+        self._hide_secondary_display()
         self.fr_port.set_status(False)
 

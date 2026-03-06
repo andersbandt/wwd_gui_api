@@ -19,8 +19,6 @@ from gui import gui_class as guic
 logger = logging.getLogger(__name__)
 
 
-# TODO: this thing doesn't properly refresh channel states on connection
-
 
 class TabOSC(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
@@ -698,6 +696,7 @@ class TabOSC(guic.ThemedFrame):
             return False
 
         self.channel_count = self.cc.osc.channel_count
+        self.chan_on = [False] * self.channel_count
         self.init_fr_info()
         self.init_fr_channel()
         self.init_fr_tb_trig()
@@ -706,6 +705,7 @@ class TabOSC(guic.ThemedFrame):
         self.prompt.print(f"Connected to OSC with id: {result.device_id}")
         self.labelIDValue.config(text=result.device_id)
         self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.status = True
         self.fr_port.set_status(True)
         self.gui_refresh("connect")
 

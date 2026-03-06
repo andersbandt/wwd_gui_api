@@ -920,20 +920,23 @@ static const CalibCoefs gC = {
 };
 
 
-typedef struct {
-    float alpha;          // 0<alpha<=1 (e.g., 0.1)
-    bool  skip_first_after_fall;
+// --- Baseline tracker: remembers last TP while boost is off, freezes while on ---
+// Skips the first sample after boost turns off (residual from clamping).
+static struct {
+    uint16_t last_tp;     // last TP seen while bo==0 (after skip)
+    uint8_t  have_baseline;  // set after first valid bo==0 sample
+    uint8_t  prev_bo;
+    uint8_t  cooldown;    // 1 = skip next bo==0 sample after falling edge
+} baseline_state;
 
-    // runtime state
-    float ema;
-    uint8_t have_ema;
-    uint8_t prev_bo;
-    uint8_t cooldown;     // 1 to skip first 0 after fall
-} BaselineEMA;
+// --- Output moving average (set window=1 to disable) ---
+#define VTP_OPEN_MA_WINDOW  1  // 1 = disabled, >1 = causal moving average over N samples
 
-
-static BaselineEMA ema_state;
-
+#if VTP_OPEN_MA_WINDOW > 1
+static uint16_t ma_buf[VTP_OPEN_MA_WINDOW];
+static uint8_t  ma_count;  // number of valid samples in buffer (0..VTP_OPEN_MA_WINDOW)
+static uint8_t  ma_idx;    // next write position (circular)
+#endif
 
 static inline uint16_t sat_u16_from_float(float v) {
     if (v < 0.0f) v = 0.0f;
@@ -942,103 +945,74 @@ static inline uint16_t sat_u16_from_float(float v) {
 }
 
 
-static inline void BaselineEMA_Init(BaselineEMA *st, float alpha, bool skip_first_after_fall) {
-    st->alpha = alpha;
-    st->skip_first_after_fall = skip_first_after_fall;
-    st->ema = 0.0f;
-    st->have_ema = 0;
-    st->prev_bo = 0;
-    st->cooldown = 0;
-}
-
-
-/**
- * Update baseline EMA with uint16_t samples; returns uint16_t baseline and valid flag.
- * - While bo==0: update EMA unless skipping the first sample after a 1->0 fall.
- * - While bo==1: freeze EMA; output baseline (valid=1) if EMA exists, else valid=0.
- *
- * Inputs:
- *   tp  : current ADC sample (uint16_t, same units as training unless scaled later)
- *   bo  : clamp flag (0/1)
- * Outputs:
- *   *baseline_out       : uint16_t baseline (only meaningful if baseline_valid_out==1)
- *   *baseline_valid_out : 0/1
- */
-static inline void BaselineEMA_Update(BaselineEMA *st, uint16_t tp, uint8_t bo,
-                                      uint16_t *baseline_out, uint8_t *baseline_valid_out)
-{
-    // Detect falling edge: 1 -> 0
-    if (st->skip_first_after_fall && st->prev_bo == 1 && bo == 0) {
-        st->cooldown = 1;
-    }
-
-    if (bo == 0) {
-        // Update EMA unless skipping after a fall
-        if (st->cooldown > 0) {
-            st->cooldown--;
-        } else {
-            float tp_f = (float)tp;
-            if (!st->have_ema) {
-                st->ema = tp_f;      // seed
-                st->have_ema = 1;
-            } else {
-                st->ema = st->alpha * tp_f + (1.0f - st->alpha) * st->ema;
-            }
-        }
-        *baseline_valid_out = 0;
-        *baseline_out = 0u;          // undefined when invalid
-    } else {
-        if (st->have_ema) {
-            *baseline_out = sat_u16_from_float(st->ema);
-            *baseline_valid_out = 1;
-        } else {
-            *baseline_out = 0u;
-            *baseline_valid_out = 0;
-        }
-    }
-}
-
-
-
 // Call once at startup
 void calib_init(void) {
-    // alpha must match your intended smoothing; 0.1f is a good default
-    // alpha=1, skip is true
-    BaselineEMA_Init(&ema_state, 0.5, true);
+    memset(&baseline_state, 0, sizeof(baseline_state));
+
+#if VTP_OPEN_MA_WINDOW > 1
+    ma_count = 0;
+    ma_idx   = 0;
+    memset(ma_buf, 0, sizeof(ma_buf));
+#endif
 }
 
 
 uint16_t vtp_open(void) {
   uint16_t tp = Vpv12b;
-  uint8_t bo = SYNC_BOOST_ON_Q;
-  uint8_t mv = MV_ON_Q();
+  uint8_t  bo = SYNC_BOOST_ON_Q;
+  uint8_t  mv = MV_ON_Q();
 
-  uint16_t base; 
-  uint8_t base_valid; 
-  // Call either MA or EMA updater
-  BaselineEMA_Update(&ema_state, tp, bo, &base, &base_valid);
+  // --- Baseline: track last TP while boost off, freeze while boost on ---
+  // Skip first sample after falling edge (1->0) to avoid residual
+  if (baseline_state.prev_bo && !bo) {
+    baseline_state.cooldown = 1;
+  }
+  if (!bo) {
+    if (baseline_state.cooldown) {
+      baseline_state.cooldown = 0;
+    } else {
+      baseline_state.last_tp = tp;
+      baseline_state.have_baseline = 1;
+    }
+  }
+  baseline_state.prev_bo = bo;
 
-  // Build features safely
-  uint16_t baseline_filled = (base_valid ? base : tp);
+  uint16_t baseline_filled = (bo && baseline_state.have_baseline)
+                             ? baseline_state.last_tp : tp;
 
-  // --- Features per A order ---
-  const float TP2     = tp * tp;                // compute in float to avoid integer overflow
-  const float MV_TP   = mv * tp;
-  const float BO_BASE = ((float)bo) * baseline_filled;
+  // --- Features per A matrix column order ---
+  // Cast to float BEFORE multiply to prevent uint16_t overflow
+  const float fTP     = (float)tp;
+  const float TP2     = fTP * fTP;
+  const float MV_TP   = (float)mv * fTP;
+  const float BO_BASE = (float)bo * (float)baseline_filled;
 
+  // y = w0 + w1*TP + w2*TP^2 + w3*MV + w4*(MV*TP) + w5*(BO*baseline_filled) + w6*BO
+  float y_f = gC.w0
+    + gC.w1 * fTP
+    + gC.w2 * TP2
+    + gC.w3 * (float)mv
+    + gC.w4 * MV_TP
+    + gC.w5 * BO_BASE
+    + gC.w6 * (float)bo;
 
-    // y = w0 + w1*TP + w2*TP^2 + w3*MV + w4*(MV*TP) + w5*(BO*baseline_filled) + w6*BO
-    float y_f = gC.w0
-      + gC.w1 * tp
-      + gC.w2 * TP2
-      + gC.w3 * mv
-      + gC.w4 * MV_TP
-      + gC.w5 * BO_BASE
-      + gC.w6 * (float)bo;
+  uint16_t result = sat_u16_from_float(y_f);
 
-    // Convert to desired output units; here we return a 16-bit value
-    return sat_u16_from_float(y_f);
-    //return y_f;
+#if VTP_OPEN_MA_WINDOW > 1
+  // Causal moving average over the last VTP_OPEN_MA_WINDOW samples
+  ma_buf[ma_idx] = result;
+  ma_idx = (ma_idx + 1) % VTP_OPEN_MA_WINDOW;
+  if (ma_count < VTP_OPEN_MA_WINDOW) {
+    ma_count++;
+  }
+  uint32_t sum = 0;
+  for (uint8_t i = 0; i < ma_count; i++) {
+    sum += ma_buf[i];
+  }
+  result = (uint16_t)((sum + (ma_count >> 1)) / ma_count);  // rounded
+#endif
+
+  return result;
 }
 
 

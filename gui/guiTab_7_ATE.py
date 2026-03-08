@@ -315,7 +315,7 @@ Understanding Results:
             bench_result = self.ate.benchmark(100, method, store_values=store)
         except COMMUNICATION_ERRORS as e:
             self.prompt.print("Communication error: " + str(e), "error")
-            guih.alert_user("Communication error: " + str(e), "error")
+            guih.alert_user("Communication error: ", str(e), "error")
             return
         self.prompt.print(bench_result["string"])
 

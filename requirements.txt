@@ -16,6 +16,8 @@ simpleeval
 zeroconf
 psutil
 pytest
+scikit-learn
+
 
 
 

@@ -458,6 +458,16 @@ Understanding Results:
             self.prompt.print("Accuracy test complete!")
             self.prompt.print(f"Mean Error: {stats['mean_error']:.6f}V ({stats['mean_error_pct']:.3f}% FS), Max Error: {stats['max_error']:.6f}V ({stats['max_error_pct']:.3f}% FS)")
 
+            # Compute and display calibration coefficients
+            cal = stats_analysis.fit_cal_coeffs(set_array, measured_array)
+            self.prompt.print(
+                f"\n--- Calibration Coefficients (CH{ps_channel}) ---\n"
+                f"  fit: measured = {cal['fit_slope']:.6f}*set + {cal['fit_intercept']:.6f}  (R={cal['r']:.6f})\n"
+                f"  v_slope  = {cal['v_slope']}\n"
+                f"  v_offset = {cal['v_offset']}\n"
+                f"  Paste into EEequipment/SPD3303X/config.ini under [CH{ps_channel}]"
+            )
+
             # Plot results with residuals
             plotter.plot_accuracy_with_residuals(
                 set_array,

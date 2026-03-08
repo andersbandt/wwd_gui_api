@@ -1,5 +1,10 @@
 # Scripting and Automation Plan
 
+- NOTE: I think I should come up with a few example scripts 
+and then ask Claude to implement them based on the examples
+
+
+
 ## Current State
 
 The `StimulusConfig` system (`common/logger.py`) already supports:

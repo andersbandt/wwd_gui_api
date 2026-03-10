@@ -228,6 +228,10 @@ class TabPS(guic.ThemedFrame):
         else:
             return
 
+        if status_decode.get("error"):
+            self.prompt.print(f"Status query failed: {status_decode['error']}", "error")
+            return
+
         try:
             if status_decode["ch1_state"] == "ON":
                 self.ch1_toggle_btn.config(bg=self.theme_config["success"])
@@ -369,6 +373,9 @@ class TabPS(guic.ThemedFrame):
             self.fr_port.set_status(False)
             return False
 
+        for fr in (self.fr_info, self.fr_control, self.fr_status):
+            for w in fr.winfo_children():
+                w.destroy()
         self.channel_count = self.cc.ps.channel_count
         self.init_fr_info()
         self.init_fr_control()

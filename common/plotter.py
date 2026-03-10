@@ -770,17 +770,25 @@ def start_live_plot(
             x = list(cur_time_buf)
             for i, ch in enumerate(cur_channels):
                 buf = cur_bufs.get(ch)
+                buf_list = list(buf) if buf else []
                 fig.add_trace(
                     go.Scatter(
                         x=x,
-                        y=list(buf) if buf else [],
+                        y=buf_list,
                         mode="lines",
                         name=ch,
                         line=dict(color=COLORS[i % len(COLORS)], width=2),
                     ),
                     row=i + 1, col=1
                 )
-                fig.update_yaxes(title_text=ch, row=i + 1, col=1)
+                valid = [v for v in buf_list if v is not None]
+                if valid:
+                    ymin, ymax = min(valid), max(valid)
+                    span = ymax - ymin
+                    pad = span * 0.1 if span > 0 else abs(ymax) * 0.05 or 0.001
+                    fig.update_yaxes(title_text=ch, range=[ymin - pad, ymax + pad], row=i + 1, col=1)
+                else:
+                    fig.update_yaxes(title_text=ch, row=i + 1, col=1)
 
             # only label the bottom x-axis
             fig.update_xaxes(title_text=cur_x_label, row=n_ch, col=1)

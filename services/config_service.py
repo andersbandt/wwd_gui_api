@@ -80,20 +80,20 @@ class ConfigService:
     # DMM
     # ------------------------------------------------------------------
 
-    def get_dmm_sample_speed(self) -> str:
-        """Return validated DMM sample speed ('slow', 'medium', or 'fast')."""
-        sample_speed = "fast"
+    def get_dmm_rate(self) -> str:
+        """Return validated DMM rate ('slow', 'medium', or 'fast')."""
+        rate = "fast"
 
         if "DMM" in self._config:
-            sample_speed = self._config["DMM"].get("sample_speed", "fast").strip()
+            rate = self._config["DMM"].get("rate", "fast").strip()
 
-        valid_speeds = ["slow", "medium", "fast"]
-        if sample_speed not in valid_speeds:
-            logger.warning(f"Invalid DMM sample_speed '{sample_speed}' in config. Using 'fast'.")
-            sample_speed = "fast"
+        valid_rates = ["slow", "medium", "fast"]
+        if rate not in valid_rates:
+            logger.warning(f"Invalid DMM rate '{rate}' in config. Using 'fast'.")
+            rate = "fast"
 
-        logger.info(f"DMM default sample speed: {sample_speed}")
-        return sample_speed
+        logger.info(f"DMM default rate: {rate}")
+        return rate
 
     # ------------------------------------------------------------------
     # USB

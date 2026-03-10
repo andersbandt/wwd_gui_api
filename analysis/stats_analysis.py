@@ -90,6 +90,30 @@ def compute_accuracy_stats(set_values, measured_values):
     }
 
 
+def fit_cal_coeffs(set_values, measured_values):
+    """Compute voltage calibration coefficients from an accuracy sweep.
+
+    Fits measured = a*set + b, then inverts to get the correction coefficients
+    for the formula: cal_value = value*(1 + v_slope) + v_offset
+
+    Returns:
+        dict with keys: v_slope, v_offset, fit_slope, fit_intercept, r
+    """
+    reg = _linregress_stats(
+        np.asarray(set_values, dtype=float),
+        np.asarray(measured_values, dtype=float),
+    )
+    a = reg["slope"]
+    b = reg["intercept"]
+    return {
+        "v_slope": (1.0 / a) - 1.0,
+        "v_offset": -b / a,
+        "fit_slope": a,
+        "fit_intercept": b,
+        "r": reg["r"],
+    }
+
+
 def format_accuracy_report(stats, set_values, measured_values, config=None):
     """Build a formatted accuracy test report string.
 

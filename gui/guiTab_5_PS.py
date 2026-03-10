@@ -19,7 +19,6 @@ from gui.gui_class import ColorCircle
 logger = logging.getLogger(__name__)
 
 
-
 class TabPS(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)

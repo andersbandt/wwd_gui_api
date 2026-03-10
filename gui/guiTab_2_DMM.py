@@ -13,7 +13,6 @@ from gui import gui_class as guic
 
 logger = logging.getLogger(__name__)
 
-# TODO: settings are still not updated on connection in this tab
 
 
 class TabDMM(guic.ThemedFrame):

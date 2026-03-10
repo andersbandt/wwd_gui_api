@@ -19,8 +19,6 @@ from gui import gui_class as guic
 logger = logging.getLogger(__name__)
 
 
-# TODO: this thing doesn't properly refresh channel states on connection
-
 
 class TabOSC(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):

@@ -288,6 +288,7 @@ class TabUSB(guic.ThemedFrame):
                 self.t3 = None
             self.prompt.print("Serial close!")
             num_lines = self.ser_obj.stop_process()
+            self.ser_obj.close()  # ensure port is closed even if recording was never started
             self.prompt.print(f"Port closed: {num_lines} lines wrote")
             self.ser_obj = None
             self.cc.set_ser(None)

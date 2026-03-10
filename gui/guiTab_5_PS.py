@@ -374,6 +374,9 @@ class TabPS(guic.ThemedFrame):
             self.fr_port.set_status(False)
             return False
 
+        for fr in (self.fr_info, self.fr_control, self.fr_status):
+            for w in fr.winfo_children():
+                w.destroy()
         self.channel_count = self.cc.ps.channel_count
         self.init_fr_info()
         self.init_fr_control()

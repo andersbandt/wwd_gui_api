@@ -13,7 +13,6 @@ from gui import gui_class as guic
 
 logger = logging.getLogger(__name__)
 
-# TODO: settings are still not updated on connection in this tab
 
 
 class TabDMM(guic.ThemedFrame):
@@ -37,10 +36,10 @@ class TabDMM(guic.ThemedFrame):
         self.meas1_scale = 1
         self.dmm_Fu2 = ''
         self.dmm_Meas2 = ''
-        self.dmm_SampleSpeed = ''
+        self.dmm_Rate = ''
 
         # Load DMM configuration
-        self.default_sample_speed = self.cc.config_svc.get_dmm_sample_speed()
+        self.default_rate = self.cc.config_svc.get_dmm_rate()
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "DMM Console Output")
@@ -154,13 +153,13 @@ class TabDMM(guic.ThemedFrame):
         self._secondary_visible = False
         self._hide_secondary_display()
 
-        self.labelSampleSpeed = ttk.Label(self.fr_info, width=10, text='Sample speed', style="TLabel", anchor='w')
-        self.valueSampleSpeed = tk.Label(self.fr_info, width=18, text='', relief='sunken', anchor='w')
-        self.labelSampleSpeed.grid(row=8, column=0, sticky='W', padx=5, pady=2)
-        self.valueSampleSpeed.grid(row=8, column=1, sticky='W', padx=5, pady=2)
+        self.labelRate = ttk.Label(self.fr_info, width=10, text='Rate', style="TLabel", anchor='w')
+        self.valueRate = tk.Label(self.fr_info, width=18, text='', relief='sunken', anchor='w')
+        self.labelRate.grid(row=8, column=0, sticky='W', padx=5, pady=2)
+        self.valueRate.grid(row=8, column=1, sticky='W', padx=5, pady=2)
 
         # ADD A REFRESH
-        self.btn_update = tk.Button(self.fr_info, text='UPDATE DMM', command=lambda: self.gui_refresh_DMM(kind="full"))
+        self.btn_update = tk.Button(self.fr_info, text='UPDATE DMM', command=self.gui_refresh_DMM)
         self.btn_update.grid(row=7, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
@@ -186,11 +185,11 @@ class TabDMM(guic.ThemedFrame):
         self.fr_range.grid(row=2, column=0, columnspan=3, pady=self.theme_config["size"]["ypad_s"])
 
         # sample rate control
-        ttk.Label(fr_m, text='Sample:', style="TLabel", anchor='e').grid(row=3, column=0, padx=5, sticky='E')
-        self.sample_drop = guih.generate_drop_down(fr_m, ["slow", "medium", "fast"])
-        self.sample_drop[1].set(self.default_sample_speed)
-        self.sample_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
-        tk.Button(fr_m, text='Set', command=self.dmm_set_sample).grid(row=3, column=2, padx=5)
+        ttk.Label(fr_m, text='Rate:', style="TLabel", anchor='e').grid(row=3, column=0, padx=5, sticky='E')
+        self.rate_drop = guih.generate_drop_down(fr_m, ["slow", "medium", "fast"])
+        self.rate_drop[1].set(self.default_rate)
+        self.rate_drop[0].grid(row=3, column=1, pady=self.theme_config["size"]["ypad_s"])
+        tk.Button(fr_m, text='Set', command=self.dmm_set_rate).grid(row=3, column=2, padx=5)
 
         # reset button
         tk.Button(fr_m, text='Reset DMM',
@@ -214,11 +213,10 @@ class TabDMM(guic.ThemedFrame):
         self.valueMeas2.grid_remove()
         self._secondary_visible = False
 
-    def gui_refresh_DMM(self, kind="partial"):
+    def _refresh_measurements(self):
+        """Read current measurements and update display."""
         if not self.fr_port.status:
             return
-
-        # TODO: audit this method of determining port status vs. like that status thing I was going to do in SerialConnFrame
         try:
             self.dmm_Meas1 = self.cc.dmm.read_value()
         except COMMUNICATION_ERRORS:
@@ -233,35 +231,44 @@ class TabDMM(guic.ThemedFrame):
             except COMMUNICATION_ERRORS:
                 self.dmm_Meas2 = ""
 
-        if kind == "full":
-            self.dmm_Range = self.cc.dmm.get_range()
-            self.dmm_Fu1 = self.cc.dmm.get_mode()
-            if self._secondary_visible:
-                try:
-                    self.dmm_Fu2 = self.cc.dmm.get_secondary_mode()
-                except COMMUNICATION_ERRORS:
-                    self.dmm_Fu2 = ""
-            if hasattr(self.cc.dmm, 'get_sample_speed'):
-                try:
-                    spd = self.cc.dmm.get_sample_speed()
-                    self.dmm_SampleSpeed = spd if spd is not None else ""
-                except COMMUNICATION_ERRORS:
-                    self.dmm_SampleSpeed = ""
+        self.valueMeas1.config(text=self.dmm_Meas1)
+        self.valueMeas2.config(text=self.dmm_Meas2)
 
-        # update Label
-        if self.fr_port.status:
-            self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
-            self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
-            self.valueMeas1.config(text=self.dmm_Meas1)
-            self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
-            self.valueMeas2.config(text=self.dmm_Meas2)
-            self.valueSampleSpeed.config(text=self.dmm_SampleSpeed)
+    def _refresh_settings(self):
+        """Query and display current DMM settings (mode, range, sample speed)."""
+        if not self.fr_port.status:
+            return
+        self.dmm_Range = self.cc.dmm.get_range()
+        self.dmm_Fu1 = self.cc.dmm.get_mode()
+        if self._secondary_visible:
+            try:
+                self.dmm_Fu2 = self.cc.dmm.get_secondary_mode()
+            except COMMUNICATION_ERRORS:
+                self.dmm_Fu2 = ""
+        try:
+            rate = self.cc.dmm.get_rate()
+            if rate is not None:
+                self.dmm_Rate = rate
+        except COMMUNICATION_ERRORS:
+            pass
+
+        self.valueRange.config(text='{:8s}'.format(self.dmm_Auto + ':' + self.dmm_Range))
+        self.valueFu1.config(text='{:8s}'.format(self.dmm_Fu1))
+        self.valueFu2.config(text='{:8s}'.format(self.dmm_Fu2))
+        self.valueRate.config(text=self.dmm_Rate)
+
+    def gui_refresh_DMM(self):
+        """Full refresh: settings then measurements."""
+        self._refresh_settings()
+        self._refresh_measurements()
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
-
         if self.fr_port.status:
-            self.gui_refresh_DMM("full")
+            if event == "auto":
+                self._refresh_measurements()
+            else:
+                self.gui_refresh_DMM()
 
 
     ##############################################################################
@@ -283,7 +290,7 @@ class TabDMM(guic.ThemedFrame):
         else:
             self.cc.dmm.set_secondary_mode("NONe")
             self.prompt.print("Secondary display turned off")
-        self.gui_refresh_DMM("full")
+        self.gui_refresh_DMM()
 
     def set_meas1_unit(self):
         unit = self.unitMeas1_drop[1].get()
@@ -345,11 +352,13 @@ class TabDMM(guic.ThemedFrame):
             except COMMUNICATION_ERRORS as e:
                 self.prompt.print(f"Range {n} error: {e}", "error")
 
-    def dmm_set_sample(self):
+    def dmm_set_rate(self):
         if self.cc.dmm is not None:
-            sample_speed = self.sample_drop[1].get()
-            self.prompt.print(f"Setting DMM sample speed to {sample_speed}")
-            self.cc.dmm.set_sample_speed(sample_speed)
+            rate = self.rate_drop[1].get()
+            self.prompt.print(f"Setting DMM rate to {rate}")
+            self.cc.dmm.set_rate(rate)
+            self.dmm_Rate = rate
+            self.valueRate.config(text=self.dmm_Rate)
 
     def dmm_reset(self):
         if self.cc.dmm is None:
@@ -364,7 +373,7 @@ class TabDMM(guic.ThemedFrame):
             self.cc.dmm.write(cmd)
             self.prompt.print(f"DMM reset ({cmd})")
             self.build_range_controls()
-            self.gui_refresh_DMM("full")
+            self.gui_refresh_DMM()
         except COMMUNICATION_ERRORS as e:
             self.prompt.print(f"Reset command failed: {e}", "error")
 
@@ -386,8 +395,9 @@ class TabDMM(guic.ThemedFrame):
             return False
 
         self.prompt.print(f"Connected to DMM with id: {result.device_id}")
-        self.cc.dmm.set_sample_speed(self.default_sample_speed)
-        self.prompt.print(f"DMM sample speed set to: {self.default_sample_speed}")
+        self.cc.dmm.set_rate(self.default_rate)
+        self.dmm_Rate = self.default_rate
+        self.prompt.print(f"DMM rate set to: {self.default_rate}")
 
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.labelIDValue.config(text=result.device_id)

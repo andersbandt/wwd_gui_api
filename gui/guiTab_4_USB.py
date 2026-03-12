@@ -26,6 +26,18 @@ TEST_TYPE_COMMANDS = {
 }
 
 
+# TODO: Display on Screen still has so much line misalignment
+
+# TODO: log to .csv still has so much line misalignment
+#   AND when I log to .csv the timestamps don't get their own header column
+#   check the `bad_example_alignment.csv` in `serial_data`
+
+
+# TODO: the filename box doesn't work for raw text mode. I want this to work for all test modes
+
+# TODO: just redo the GUI here. Test mode on the bottom, make tooltips, padding, etc
+
+
 class TabUSB(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):
         super().__init__(master, theme_config)
@@ -216,10 +228,12 @@ class TabUSB(guic.ThemedFrame):
             self.prompt.print("ERROR: select an output mode first", "error")
             return
 
+        # TODO: I don't like how one thread here requires data/* as the folder and the other just takes /* and implies data
+        #   the CSV one should use the `get_data_dir` function
         if output_mode == "Log to File (CSV)":
             headers_raw = self.csv_headers.get("1.0", "end").strip("\n").strip()
             parameters = [h.strip() for h in headers_raw.split(",") if h.strip()]
-            self.start_process("serial_data", parameters)
+            self.start_process("data/serial_data", parameters)
         elif output_mode == "Display on Screen":
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,

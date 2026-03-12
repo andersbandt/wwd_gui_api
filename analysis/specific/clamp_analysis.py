@@ -30,16 +30,13 @@ _logger.setLevel(logging.INFO)
 class ClampPreset:
     name: str
     columns: list
-    float_cols: list | None
-    clean_cols: list | None
     truth_col: list | None
 
 
 PRESET = ClampPreset(
     name="clamp_loop",
-    columns=["PV", "MV", "BO", "TP", "TP_O"],
-    float_cols=None,
-    clean_cols=None,
+    #columns=["PV", "MV", "BO", "TP", "TP_O"],
+    columns=["PV", "MV", "CCR0", "CCR1", "TP", "MO", "TP_O"],
     truth_col=["TP_O"],
 )
 
@@ -51,13 +48,11 @@ PRESET = ClampPreset(
 def get_train_data(
     file,
     col_str,
-    float_cols=None,
-    clean_cols=None,
     *,
+    loop_b=False,
     loop_col="BO",
     volt_col="TP",
-    window=5,
-    min_samples=3,
+    ccr=True
 ):
     """
     Load and prepare a DataFrame with baseline features for a clamp loop.
@@ -71,37 +66,43 @@ def get_train_data(
     """
     df = datah.load_csv_pandas(file, columns=col_str)
 
-    if float_cols:
-        for col in float_cols:
-            df = datah.df_float(df, col)
+    if loop_b:
+        for col in (loop_col, volt_col):
+            if col not in df.columns:
+                raise KeyError(f"Column '{col}' not found. Available: {list(df.columns)}")
 
-    if clean_cols:
-        for col in clean_cols:
-            df = clean_data(df, col)
+        loop = df[loop_col].to_numpy().astype(np.int8)
+        var4 = df[volt_col].to_numpy().astype(np.float64)
 
-    for col in (loop_col, volt_col):
-        if col not in df.columns:
-            raise KeyError(f"Column '{col}' not found. Available: {list(df.columns)}")
+        # Rising edges: indices where loop changes 0 -> 1
+        rising = np.flatnonzero((loop[1:] == 1) & (loop[:-1] == 0)) + 1
+        df["_rising_idx"] = 0
+        if len(rising) > 0:
+            df.loc[rising, "_rising_idx"] = 1
 
-    loop = df[loop_col].to_numpy().astype(np.int8)
-    var4 = df[volt_col].to_numpy().astype(np.float64)
+        loop = df["BO"].to_numpy()
 
-    # Rising edges: indices where loop changes 0 -> 1
-    rising = np.flatnonzero((loop[1:] == 1) & (loop[:-1] == 0)) + 1
-    df["_rising_idx"] = 0
-    if len(rising) > 0:
-        df.loc[rising, "_rising_idx"] = 1
+        # Choose ONE:
+        #baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ma_freeze(var4, loop, window=5, min_samples=3)
+        baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ema_freeze(var4, loop, alpha=1.0)  # alpha=1.0 must match MCU calib_init()
 
-    loop = df["BO"].to_numpy()
+        df["_baseline"] = baseline
+        df["_baseline_valid"] = baseline_valid
+        df["_baseline_filled"] = baseline_filled
+        df["_delta"] = delta
 
-    # Choose ONE:
-    #baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ma_freeze(var4, loop, window=window, min_samples=min_samples)
-    baseline, baseline_valid, baseline_filled, delta = filter_analysis.baseline_ema_freeze(var4, loop, alpha=1.0)  # alpha=1.0 must match MCU calib_init()
+    if ccr:
+        scale = 256
 
-    df["_baseline"] = baseline
-    df["_baseline_valid"] = baseline_valid
-    df["_baseline_filled"] = baseline_filled
-    df["_delta"] = delta
+        CCR0_fx = (df["CCR0"] * scale).astype(int)
+        CCR1_fx = (df["CCR1"] * scale).astype(int)
+
+        # safe integer division with rounding and divide-by-zero protection
+        df["CCR_fx"] = np.where(
+            CCR0_fx != 0,
+            (CCR1_fx * scale) // CCR0_fx,
+            0
+        )
 
     return df
 
@@ -122,11 +123,13 @@ def _plot_clamp_results(df, res, phase):
     plotter.plot_subplots(
         idx,
         channels=[
-            (res,         "Residual"),
+            (res,         "Residual (mV)"),
             #(df["TP"],  "TP ADC reading"),
-            #(df["TP_O"],    "TP (mV)"),
+            (df["TP_O"],    "TP (mV)"),
             #(df["BO"],    "Boosting"),
-            (df["MV"], "main valve"),
+            # (df["MV"], "main valve"),
+            (df["CCR0"], "CCR0"),
+            (df["CCR1"], "CCR1"),
         ],
         xlabel="Sample",
         title=f"{phase}: Clamp Loop Results",
@@ -138,14 +141,14 @@ def _plot_clamp_results(df, res, phase):
 # Train / Verify
 # ---------------------------------------------------------------------------
 
-def _train_model(train_file, columns, float_col, clean_col, truth_col):
+def _train_model(train_file, columns, truth_col):
     train_df = pd.DataFrame()
     truth_df = pd.DataFrame()
 
     for tr_file in train_file:
         if ".csv" in tr_file:
             _logger.info(f"Loading in file: {tr_file}")
-            df_train_tmp = get_train_data(tr_file, columns, float_col, clean_col)
+            df_train_tmp = get_train_data(tr_file, columns)
             df_truth_tmp = get_truth_data(tr_file, truth_col)
 
             train_df = pd.concat([train_df, df_train_tmp], ignore_index=True)
@@ -155,49 +158,73 @@ def _train_model(train_file, columns, float_col, clean_col, truth_col):
     if _logger.isEnabledFor(logging.DEBUG):
         train_df.info()
 
+    # NOTE: old method (pre CCR0)
+    # A = np.column_stack((
+    #     np.ones(len(train_df)),
+    #     train_df["TP"],
+    #     train_df["TP"] ** 2,
+    #     train_df["MV"],
+    #     train_df["MV"] * train_df["TP"],
+    #     train_df["BO"] * train_df["_baseline_filled"],
+    #     train_df["BO"],
+    # ))
+
     A = np.column_stack((
         np.ones(len(train_df)),
         train_df["TP"],
         train_df["TP"] ** 2,
         train_df["MV"],
-        train_df["MV"] * train_df["TP"],
-        train_df["BO"] * train_df["_baseline_filled"],
-        train_df["BO"],
+        train_df["CCR0"],
+        train_df["CCR_fx"],
     ))
 
+    # shape truth values
     d = np.array(truth_df)
     d = d.reshape(-1, 1)
+
+    # calculate coeffs with least squares
+    w = least_squares.least_squares(A, d)
+    w = np.array(w)
+
+    # compute y
+    y = A @ w
+    mov_average_window = 5
+    y = filter_analysis.moving_average_causal(y, mov_average_window)
+
+    # calculate residual
+    [res, ver_e_norm] = least_squares.generate_residual(y, d)
+    res[0:mov_average_window] = 0  # tag:HARDCODE to manually set first value to 0. Otherwise moving average will cause havoc
+
+    # try a second layer
+    # A2 = np.column_stack((
+    #     np.ones(len(train_df)),
+    #     train_df["MV"],
+    # ))
+    # w2 = least_squares.least_squares(A2, res)
+    # w2 = np.asarray(w2, dtype=float).reshape(-1, 1)
+    # y = y + (A2 @ w2)
+    # [res, ver_e_norm] = least_squares.generate_residual(y, d)
+
+    # print logger
     _logger.debug("MATRIX A:\n%s", pformat(A))
     _logger.debug("MATRIX d:\n%s", pformat(d))
     _logger.info(f"Computing least squares with A matrix of shape={A.shape} dtype={A.dtype}")
     _logger.info(f"and d of shape={d.shape} dtype={d.dtype}")
-
-    w = least_squares.least_squares(A, d)
-    w = np.array(w)
-    y = A @ w
-
-    mov_average_window = 15
-    y = filter_analysis.moving_average_causal(y, mov_average_window)
-
     _logger.info(f"coefs w are of shape: {w.shape}")
     _logger.info(f"shape of output y is: {y.shape}")
     _logger.info(f"coefficients (w) found from data; computed output values (y) and formed residual")
     _logger.info(f"w: {w}")
-
-    [res, ver_e_norm] = least_squares.generate_residual(y, d)
-
-    res[0:mov_average_window] = 0  # tag:HARDCODE to manually set first value to 0. Otherwise moving average will cause havoc
-
     _logger.info(f"Euclidean norm: {ver_e_norm}")
     _logger.debug("residual:\n%s", pformat(res))
 
+    # plot results
     _plot_clamp_results(train_df, res, "Train")
 
     return train_df, y, w
 
 
-def _verify(ver_file, columns, float_col, clean_col, truth_col, w):
-    df_ver = get_train_data(ver_file, columns, float_col, clean_col)
+def _verify(ver_file, columns, truth_col, w):
+    df_ver = get_train_data(ver_file, columns)
 
     A_ver = np.column_stack((
         np.ones(len(df_ver)),
@@ -229,15 +256,15 @@ def _verify(ver_file, columns, float_col, clean_col, truth_col, w):
 def run():
     cfg = PRESET
 
-    basefilepath_train = os.getcwd() + "/data_shared/"
+    basefilepath_train = os.getcwd() + "/data/serial_data/"
     training_files = []
     for file in os.listdir(basefilepath_train):
         training_files.append(basefilepath_train + file)
 
     ver_file = training_files[0]
 
-    df, y, w = _train_model(training_files, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col)
-    #_verify(ver_file, cfg.columns, cfg.float_cols, cfg.clean_cols, cfg.truth_col, w)
+    df, y, w = _train_model(training_files, cfg.columns, cfg.truth_col)
+    #_verify(ver_file, cfg.columns, cfg.truth_col, w)
 
     show_plots()
 

@@ -26,6 +26,10 @@ from queue import Queue, Empty
 from analysis.specific import filter_analysis
 
 
+# TODO: I still don't see the Y-axis expanding to fill the screen if there is only 1 plot
+
+
+
 # Matplotlib default color cycle — shared across all plot types for visual consistency.
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']

@@ -4,11 +4,53 @@ import argparse
 import ctypes
 import logging
 import sys
+from colorlog import ColoredFormatter
 
 from common.app_logging import setup_logging
 from gui import gui_driver
 
 logger = logging.getLogger(__name__)
+
+
+# TODO: Can we have Claude document all the various folder paths and where they are coded in?
+#   maybe even suggest a better folder structure and .gitignore styling?
+
+
+def setup_logging(level=logging.INFO):
+    logger = logging.getLogger()
+    logger.setLevel(level)
+
+    for h in list(logger.handlers):
+        logger.removeHandler(h)
+
+    fmt = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+
+    formatter = ColoredFormatter(
+        fmt,
+        datefmt=datefmt,
+        log_colors={
+            "DEBUG":    "cyan",
+            "INFO":     "white",
+            "WARNING":  "yellow",
+            "ERROR":    "red",
+            "CRITICAL": "bold_white,bg_red",
+        },
+        secondary_log_colors={},
+        style="%",
+    )
+
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+# Example
+if __name__ == "__main__":
+
+    log = logging.getLogger("demo")
+    log.info("Colored with colorlog")
+
 
 
 
@@ -17,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser(description="A description of your script.")
 
     # Add command-line arguments
-    parser.add_argument('-a', '--auto-connect', action='store_true', help='Enable auto-connect mode')
+    parser.add_argument('-a', '--autoconnect', action='store_true', help='Enable auto-connect mode')
     parser.add_argument('-c', '--compact', action='store_true', help='Force compact mode (overrides automatic screen size detection)')
     parser.add_argument('--log-level', default='DEBUG',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
@@ -32,7 +74,7 @@ def main():
 
     # Use the arguments to determine behavior
     autoconnect = False
-    if args.auto_connect:
+    if args.autoconnect:
         logger.info("Auto-connect enabled.")
         autoconnect = True
 
@@ -45,6 +87,8 @@ def main():
     # rather than the generic Python icon, and allows correct taskbar pinning.
     if sys.platform == 'win32':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('wwd.gui.api')
+
+    # TODO: can I do this for Linux too ?
 
     # Call the main function of your GUI driver
     gui_driver.main(autoconnect, force_compact)

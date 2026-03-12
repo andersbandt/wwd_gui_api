@@ -3,6 +3,8 @@
 - NOTE: I think I should come up with a few example scripts 
 and then ask Claude to implement them based on the examples
 
+- NOTE: I'm realizing most of my scripting needs will probably involve SerialProcessor
+
 
 
 ## Current State
@@ -39,30 +41,6 @@ so the emergency stop button can interrupt it cleanly.
 the **services layer**, not raw drivers. The services already have safety logic (limits,
 state checks). This is the correct boundary — don't expose raw equipment objects.
 
-```python
-# Example: data/scripts/power_ramp_test.py
-
-def execute(cc, log, config):
-    """
-    Args:
-        cc:     Equipment wrapper (exposes cc.ps_service, cc.dmm_service, etc.)
-        log:    Callable to print to the GUI prompt
-        config: Dict of user parameters from the GUI (e.g. settling_time, samples_per_step)
-    """
-    ps  = cc.ps_service
-    dmm = cc.dmm_service
-
-    for voltage in [1.0, 1.5, 2.0, 2.5, 3.0]:
-        ps.set_voltage(1, voltage)          # channel, voltage
-        time.sleep(config['settling_time'])
-
-        for i in range(config['samples_per_step']):
-            meas = dmm.read_value()
-            log({'Voltage': voltage, 'Measurement': meas, 'Sample': i})
-            time.sleep(0.1)
-
-    return "Test complete"
-```
 
 **Implementation notes:**
 - `ScriptRunner` class lives in `common/script_runner.py`
@@ -79,16 +57,9 @@ not meaningfully secure. Don't rely on it. The real protection is:
 2. Services enforce voltage/current limits before applying them
 3. An emergency stop button calls `StoppableThread.stop()` and triggers safe shutdown
 
-### Tier 3 — Visual Sequence Builder (future, significant effort)
 
-GUI drag-and-drop sequence builder (LabVIEW-style):
-- Set voltage/frequency blocks, wait blocks, measurement blocks, conditionals
-- Serializes to JSON/YAML for save/load
-- No Python knowledge required
 
-Not worth planning in detail until Tier 2 is proven useful.
 
----
 
 ## Implementation Order
 

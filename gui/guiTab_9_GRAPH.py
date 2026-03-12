@@ -28,7 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 # Define named tuple for file data
+# TODO: what is this thing again? Is it resuable across tabs?
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
+
+
+# TODO: would be a nice to ensure that on disconnect the last line is collected properly
 
 
 def focus_next_widget(event):
@@ -578,6 +582,7 @@ class TabGraph(guic.ThemedFrame):
 
             stem = Path(filename).stem
             filepath = os.path.join(self.data_dir, filename)
+            # TODO: why do we have to read_csv here? This will fail if we have a poorly formatted .csv file in there
             files.append(FileData(
                 filename=filename,
                 filepath=filepath,

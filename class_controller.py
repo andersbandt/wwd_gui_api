@@ -300,6 +300,8 @@ class ClassController:
             except COMMUNICATION_ERRORS as e:
                 logger.error(f"Failed to disconnect PS: {e}")
 
+
+        # TODO: catch and handle COMMUNICATION ERRORS here
         if self.dmm is not None:
             logger.info("Disconnecting DMM")
             self.dmm.disconnect()

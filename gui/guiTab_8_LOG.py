@@ -29,6 +29,10 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 _logger = logging.getLogger(__name__)
 
 
+# TODO: how hard would it be to capture and report effective sample rate?
+# TODO: disable DEBUG level printout during logging? Lots of pyvisa noise specifically, so maybe could just switch the level on that
+
+# TODO: would like pause/resume button to change colors
 
 
 class TabLog(guic.ThemedFrame):

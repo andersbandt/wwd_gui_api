@@ -18,7 +18,7 @@ t = np.linspace(0, 1, N)
 V = Vfinal * (1 - np.exp(-t / tau))
 
 
-# TODO: somehow correlate the tau value to
+# TODO: somehow correlate the tau value to seconds of rampup (add some time delay here based on tau)
 
 
 # increment through voltages

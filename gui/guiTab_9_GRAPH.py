@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
 
 
-# TODO: would be a nice to ensure that on disconnect the last line is collected properly
+# TODO: would be a nice to ensure that on disconnect the last line is collected properly. Maybe it already is
 
 
 def focus_next_widget(event):

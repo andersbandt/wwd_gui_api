@@ -644,7 +644,7 @@ Understanding Results:
         self.prompt.print(f"Closing PYVISA resource!")
         self.ate.disconnect()
         self.fr_port.set_status(False)
-        self.cc.set_ps(None)
+        self.ate = None
         self.prompt.print(f"Connection is closed.")
 
 

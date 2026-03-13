@@ -12,8 +12,7 @@ from gui import gui_driver
 logger = logging.getLogger(__name__)
 
 
-# TODO: Can we have Claude document all the various folder paths and where they are coded in?
-#   maybe even suggest a better folder structure and .gitignore styling?
+# TODO: folder paths and structure are documented in CLAUDE.md — review that for completeness
 
 
 def setup_logging(level=logging.INFO):
@@ -88,7 +87,7 @@ def main():
     if sys.platform == 'win32':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('wwd.gui.api')
 
-    # TODO: can I do this for Linux too ?
+    # Linux doesn't have an equivalent App User Model ID API — not applicable.
 
     # Call the main function of your GUI driver
     gui_driver.main(autoconnect, force_compact)

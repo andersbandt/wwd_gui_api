@@ -27,7 +27,6 @@ import numpy as np
 _logger = logging.getLogger(__name__)
 
 
-# TODO: would be kind of cool feature to print out the IDN of each PyVISA resource (or COM port, etc)
 
 
 class TabATE(guic.ThemedFrame):
@@ -121,6 +120,10 @@ class TabATE(guic.ThemedFrame):
         self.labelIDValue.grid(row=2, column=1, sticky='W', padx=5, pady=1)
         self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=1)
         self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=1)
+
+        # Scan IDN button — queries *IDN? on all discovered PyVISA resources
+        self.btn_scan_idn = tk.Button(self.fr_info, text='Scan IDN', command=self.scan_idn)
+        self.btn_scan_idn.grid(row=4, column=0, columnspan=2, pady=5, padx=5, sticky='W')
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -286,6 +289,32 @@ class TabATE(guic.ThemedFrame):
         else:
             menu.add_command(label="(no scripts found)", command=lambda: var.set("(no scripts found)"))
             var.set("(no scripts found)")
+
+    def scan_idn(self):
+        """Query *IDN? on all discovered PyVISA resources and print results."""
+        import pyvisa
+        self.prompt.print("--- Scanning PyVISA resources ---")
+        try:
+            rm = pyvisa.ResourceManager()
+            resources = [r for r in rm.list_resources() if not r.startswith('ASRL')]
+        except Exception as e:
+            self.prompt.print(f"Could not open ResourceManager: {e}", "error")
+            return
+
+        if not resources:
+            self.prompt.print("No PyVISA resources found.")
+            return
+
+        for addr in resources:
+            try:
+                inst = rm.open_resource(addr)
+                idn = inst.query("*IDN?").strip()
+                inst.close()
+                self.prompt.print(f"  {addr} -> {idn}")
+            except Exception as e:
+                self.prompt.print(f"  {addr} -> ERROR: {e}", "warning")
+
+        self.prompt.print(f"Scan complete. {len(resources)} resource(s) found.")
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()

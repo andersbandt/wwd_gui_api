@@ -288,9 +288,10 @@ class TabOSC(guic.ThemedFrame):
     # =========================================================================
     # fr_tb_trig — Timebase + Trigger
     # =========================================================================
-    # TODO: this frame could benefit from dynamic (compact) padding
     def init_fr_tb_trig(self):
         fr = self.fr_tb_trig
+        px = self.theme_config["pad"]["xpad_l"]
+        py = self.theme_config["pad"]["xpad_s"]
 
         # clear existing widgets
         for w in fr.winfo_children():
@@ -300,55 +301,55 @@ class TabOSC(guic.ThemedFrame):
 
         # --- Timebase Controls ---
         ttk.Label(fr, text="Timebase", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=5)
+            row=cur_row, column=0, columnspan=3, pady=py)
         cur_row += 1
 
         self.tb_label = ttk.Label(fr, text=self._format_timebase(self.tb_steps[self.tb_index]),
                                    style="TLabel", width=12, anchor="center")
-        self.tb_label.grid(row=cur_row, column=1, padx=5, pady=3)
+        self.tb_label.grid(row=cur_row, column=1, padx=px, pady=py)
         tk.Button(fr, text="\u25C0", width=4, command=self.timebase_down).grid(
-            row=cur_row, column=0, padx=5, pady=3, sticky="e")
+            row=cur_row, column=0, padx=px, pady=py, sticky="e")
         tk.Button(fr, text="\u25B6", width=4, command=self.timebase_up).grid(
-            row=cur_row, column=2, padx=5, pady=3, sticky="w")
+            row=cur_row, column=2, padx=px, pady=py, sticky="w")
         cur_row += 1
 
-        ttk.Label(fr, text="Position (s)", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
+        ttk.Label(fr, text="Position (s)", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
         self.tb_pos_entry = tk.Entry(fr, width=10)
-        self.tb_pos_entry.grid(row=cur_row, column=1, padx=5, pady=3)
+        self.tb_pos_entry.grid(row=cur_row, column=1, padx=px, pady=py)
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_timebase_position(self.tb_pos_entry.get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
         cur_row += 1
 
         # --- Trigger Controls ---
         ttk.Label(fr, text="Trigger", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
+            row=cur_row, column=0, columnspan=3, pady=(px, py))
         cur_row += 1
 
-        ttk.Label(fr, text="Source", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
+        ttk.Label(fr, text="Source", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
         self.trig_source_drop = guih.generate_drop_down(fr, ["CHANnel1", "CHANnel2", "CHANnel3", "CHANnel4"])
         self.trig_source_drop[1].set("CHANnel1")
-        self.trig_source_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        self.trig_source_drop[0].grid(row=cur_row, column=1, padx=px, pady=py)
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_trigger_source(self.trig_source_drop[1].get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
         cur_row += 1
 
-        ttk.Label(fr, text="Level (V)", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
+        ttk.Label(fr, text="Level (V)", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
         self.trig_level_entry = tk.Entry(fr, width=10)
-        self.trig_level_entry.grid(row=cur_row, column=1, padx=5, pady=3)
+        self.trig_level_entry.grid(row=cur_row, column=1, padx=px, pady=py)
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_trigger_level(self.trig_level_entry.get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
         cur_row += 1
 
-        ttk.Label(fr, text="Slope", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
+        ttk.Label(fr, text="Slope", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
         self.trig_slope_drop = guih.generate_drop_down(fr, ["POSitive", "NEGative", "EITHer"])
         self.trig_slope_drop[1].set("POSitive")
-        self.trig_slope_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        self.trig_slope_drop[0].grid(row=cur_row, column=1, padx=px, pady=py)
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_trigger_slope(self.trig_slope_drop[1].get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
 
     # =========================================================================
     # gui_refresh

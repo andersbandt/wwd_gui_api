@@ -4,7 +4,7 @@ import argparse
 import ctypes
 import logging
 import sys
-from colorlog import ColoredFormatter
+
 
 from common.app_logging import setup_logging
 from gui import gui_driver
@@ -13,44 +13,21 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: folder paths and structure are documented in CLAUDE.md — review that for completeness
+#   for cleanup, the per instrument files are pretty sillly with my logging infrastructure now ... remove those ?
+#   just 3? serial_Data (.csv files from UART). text_Data (.txt or .log files), and then instriument data (general LOG)
 
 
-def setup_logging(level=logging.INFO):
-    logger = logging.getLogger()
-    logger.setLevel(level)
+# TODO: CLAUDE.md should use an update
 
-    for h in list(logger.handlers):
-        logger.removeHandler(h)
 
-    fmt = "%(log_color)s%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-    datefmt = "%Y-%m-%d %H:%M:%S"
+# TODO: Didn't i add suppoort for ERROR printouts in my prompt? Seems like I should audit that I'm using that a lot
 
-    formatter = ColoredFormatter(
-        fmt,
-        datefmt=datefmt,
-        log_colors={
-            "DEBUG":    "cyan",
-            "INFO":     "white",
-            "WARNING":  "yellow",
-            "ERROR":    "red",
-            "CRITICAL": "bold_white,bg_red",
-        },
-        secondary_log_colors={},
-        style="%",
-    )
-
-    ch = logging.StreamHandler()
-    ch.setLevel(level)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
 
 # Example
 if __name__ == "__main__":
 
     log = logging.getLogger("demo")
     log.info("Colored with colorlog")
-
-
 
 
 def main():
@@ -87,7 +64,7 @@ def main():
     if sys.platform == 'win32':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('wwd.gui.api')
 
-    # Linux doesn't have an equivalent App User Model ID API — not applicable.
+    # NOTE: Linux doesn't have an equivalent App User Model ID API — not applicable.
 
     # Call the main function of your GUI driver
     gui_driver.main(autoconnect, force_compact)

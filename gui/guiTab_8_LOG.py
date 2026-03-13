@@ -29,6 +29,7 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 _logger = logging.getLogger(__name__)
 
 
+# TODO: I think I did globally set pyvisa to loglevel WARNING so maybe can undo that logic I added to change it during logging
 
 
 class TabLog(guic.ThemedFrame):

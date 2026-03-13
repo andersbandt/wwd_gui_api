@@ -1,82 +1,83 @@
-# Scripting and Automation Plan
+# Scripting and Automation
 
-- NOTE: I think I should come up with a few example scripts 
-and then ask Claude to implement them based on the examples
+## Overview
 
-- NOTE: I'm realizing most of my scripting needs will probably involve SerialProcessor
+User-defined Python scripts that run against connected equipment through the services layer.
+Scripts are self-contained `.py` files — all parameters are defined in the script text, not in the GUI.
 
+Scripts can run two ways:
+1. **From the GUI** — ATE tab (Tab 7) provides script selection, Run/Stop buttons, and log output
+2. **From the terminal** — `python data/scripts/examples/ex1.py` (uses last-used equipment from `ports_used.xml`)
 
+## Current Implementation (Phase 2 — complete)
 
-## Current State
+### Script contract
 
-The `StimulusConfig` system (`common/logger.py`) already supports:
-- Linear and logarithmic sweeps
-- Dual-stimulus (nested loops)
-- PS voltage, FG frequency, FG duty cycle stimulus types
-- Basic parameter validation
-- Full integration with the Logger tab (Tab 8)
+Every script must define:
 
-The ATE tab (Tab 7) already has accuracy test automation and stimulus integration.
-Scripting would extend this with user-defined sequences beyond what the GUI can configure.
+```python
+def execute(ctx, log, check_stop):
+    ...
+```
 
----
+| Argument     | Type / Description                                                     |
+|--------------|------------------------------------------------------------------------|
+| `ctx`        | `ScriptContext` — exposes `ctx.ps`, `ctx.dmm`, `ctx.fg`, `ctx.osc`    |
+| `log`        | `Callable(str)` — prints to the ATE tab prompt (thread-safe)          |
+| `check_stop` | `Callable()` — raises `ScriptStoppedError` if user pressed Stop       |
 
-## Recommended Approach: Three-Tier System
+Scripts can optionally return a string, which gets logged as "Script returned: ...".
 
-### Tier 1 — Expand StimulusConfig (quick win, no scripting needed)
+### Equipment access
 
-Add predefined patterns to `StimulusType` in `common/logger.py`:
-- `CUSTOM_POINTS` — comma-separated list of values entered in the GUI (no fixed step size)
-- `STEP_HOLD` — step-and-hold with a configurable hold time per step (separate from settling time)
+`ScriptContext` exposes the four equipment services directly:
 
-These cover a large portion of real test patterns without requiring a script.
-`CUSTOM_POINTS` fits naturally into the existing Logger tab sweep UI.
+- `ctx.ps` — `PSService` (set_voltage, output_on/off, read_voltage, read_current, etc.)
+- `ctx.dmm` — `DMMService` (read_value, set_rate, etc.)
+- `ctx.fg` — `FGService` (set_frequency, set_duty, output_on/off, etc.)
+- `ctx.osc` — `OscService`
 
-### Tier 2 — Script Mode (complex/reusable sequences)
+All methods are model-generic. No raw driver access — services handle error catching and null checks.
 
-Load and execute a user Python file from `data/scripts/`. Run in a `StoppableThread`
-so the emergency stop button can interrupt it cleanly.
+### Coupling with StimulusConfig / RecordConfig
 
-**Equipment access:** Scripts receive a wrapper around `ClassController` that exposes
-the **services layer**, not raw drivers. The services already have safety logic (limits,
-state checks). This is the correct boundary — don't expose raw equipment objects.
+Scripts can optionally import and use existing logging infrastructure:
 
+- `StimulusConfig` + `StimulusGenerator` — generates sweep values (linear, log, by increment or step count)
+- `RecordConfig` + `setup_recording()` — creates structured CSV files with proper headers
 
-**Implementation notes:**
-- `ScriptRunner` class lives in `common/script_runner.py`
-- Loads the script with `importlib`, calls `execute(cc_wrapper, log_cb, config)`
-- Runs inside a `StoppableThread`; the thread's `stopped()` flag should be checked
-  periodically (pass it in, or have the wrapper check it on each equipment call)
-- Script output goes to the ATE tab's prompt via the `log` callback (thread-safe `after(0, ...)`)
-- On completion or exception, restore equipment to a safe state (PS off, etc.)
-- Store user scripts in `data/scripts/`, ship examples in `data/scripts/examples/`
+See `examples/ex2.py` for a full example of both.
+This is optional — scripts can also just use plain `for` loops and their own file I/O.
 
-**On "sandboxing":** Python `exec()`-based sandboxing with restricted builtins is
-not meaningfully secure. Don't rely on it. The real protection is:
-1. The equipment wrapper only exposes service methods (no raw serial/VISA objects)
-2. Services enforce voltage/current limits before applying them
-3. An emergency stop button calls `StoppableThread.stop()` and triggers safe shutdown
+### Stop mechanism
 
+Scripts call `check_stop()` in their loops. When the user presses Stop:
+1. The `_ScriptThread` stop event is set
+2. Next `check_stop()` call raises `ScriptStoppedError`
+3. `ScriptRunner` catches it, logs "stopped by user", runs `_safe_shutdown()` (PS outputs off)
 
+Unhandled exceptions are also caught — traceback is logged to prompt, safe shutdown runs.
 
+### Standalone mode (terminal)
 
+Scripts can be run directly from the terminal without the GUI. Add this to any script:
 
-## Implementation Order
+```python
+if __name__ == "__main__":
+    from common.script_runner import standalone
+    standalone(__file__)
+```
 
-**Phase 1 — StimulusConfig expansion** (small, self-contained):
-1. Add `CUSTOM_POINTS` to `StimulusType` with a text entry in the Logger tab sweep UI
-2. Add `hold_time` field to `StimulusConfig` for step-and-hold patterns
+`standalone()` does the following:
+1. Finds the project root by walking up from the script file
+2. Reads `config/ports_used.xml` for last-used port + model per equipment type
+3. Creates a `ClassController`, loads registries, connects equipment via services
+4. Builds a `ScriptContext` and calls `execute(ctx, print, check_stop)`
+5. Ctrl+C triggers graceful stop (sets stop event, `check_stop()` raises)
+6. Runs safe shutdown and `controller.shutdown()` on exit
 
-**Phase 2 — Script runner**:
-1. `common/script_runner.py` — `ScriptRunner` class (load, validate, execute, stop)
-2. Equipment wrapper class — thin wrapper around `cc` exposing only service methods
-3. ATE tab (Tab 7) — add script loader UI: file picker, config entry, Run/Stop buttons
-4. `data/scripts/examples/` — 2-3 example scripts covering common patterns
-
-**Phase 3 — Polish** (after Phase 2 is working):
-1. Script parameter UI — let scripts declare expected config keys with types/defaults
-2. Dry-run / validation mode — check equipment is connected before starting
-3. Script output saved alongside CSV data
+The `log` callback in standalone mode is just `print`.
+Equipment connections come from whatever was last used in the GUI — no hardcoding needed.
 
 ---
 
@@ -84,21 +85,41 @@ not meaningfully secure. Don't rely on it. The real protection is:
 
 | Concern              | Location                          |
 |----------------------|-----------------------------------|
-| StimulusConfig types | `common/logger.py`                |
-| Sweep UI             | `gui/guiTab_8_LOG.py` (Tab 8)    |
 | ScriptRunner         | `common/script_runner.py`         |
-| Script loader UI     | `gui/guiTab_7_ATE.py` (Tab 7)    |
+| ScriptContext        | `common/script_runner.py`         |
+| Script UI            | `gui/guiTab_7_ATE.py` (Tab 7)    |
 | User scripts         | `data/scripts/`                   |
 | Example scripts      | `data/scripts/examples/`          |
-| Equipment wrapper    | `common/script_runner.py` or `common/equipment_wrapper.py` |
+| StimulusConfig       | `common/logger.py`                |
+| RecordConfig         | `common/logger.py`                |
 
 ---
 
-## Safety Checklist (Phase 2)
+## Examples
 
-- [ ] Equipment wrapper enforces service-layer limits (no raw driver access)
-- [ ] Scripts run in `StoppableThread`; stop flag propagates to equipment calls
-- [ ] Emergency stop button triggers `StoppableThread.stop()` + safe shutdown sequence
-- [ ] Unhandled exceptions in script are caught, logged to prompt, safe state restored
-- [ ] Timeout: kill thread after configurable max duration
-- [ ] PS output turned off after script ends (success or failure)
+| File    | Description                                                         |
+|---------|---------------------------------------------------------------------|
+| `ex1.py` | Exponential PS voltage ramp (PS only, simple loop)                 |
+| `ex2.py` | PS sweep + DMM measurement with StimulusGenerator + CSV logging    |
+| `ex3.py` | Temperature profile sketch (aspirational, oven controller needed)  |
+| `ex4.py` | Minimal template — good starting point for new scripts             |
+
+---
+
+## Safety Checklist
+
+- [x] Scripts access services layer only (no raw driver access)
+- [x] Scripts run in `_ScriptThread`; stop flag checked via `check_stop()`
+- [x] Stop button in ATE tab sends stop signal
+- [x] Unhandled exceptions caught, logged to prompt, safe state restored
+- [x] PS outputs turned off after script ends (success, failure, or stop)
+- [ ] Timeout: kill thread after configurable max duration (not yet implemented)
+
+---
+
+## Future Work
+
+- **Serial integration**: expose `SerialProcessor` on `ScriptContext` (needs a service or direct access)
+- **Timeout**: configurable max script duration with forced stop
+- **Dry-run validation**: check that required equipment is connected before starting
+- **Tier 1 StimulusConfig expansion**: `CUSTOM_POINTS` and `STEP_HOLD` patterns in the Logger tab sweep UI (independent of scripting)

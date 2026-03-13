@@ -2,6 +2,7 @@
 
 # import needed GUI packages
 import logging
+import os
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -12,6 +13,7 @@ from gui import gui_class as guic
 
 # import user created modules
 from common import plotter
+from common.script_runner import ScriptRunner
 from analysis import stats_analysis
 
 # import needed packages
@@ -40,9 +42,14 @@ class TabATE(guic.ThemedFrame):
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_accuracy = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_script = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up serial / PS variables
         self.ate = None
+
+        # Script runner
+        self.scripts_dir = os.path.join("data", "scripts")
+        self.script_runner = ScriptRunner(self.cc, self._script_log)
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "ATE Output")
@@ -55,7 +62,8 @@ class TabATE(guic.ThemedFrame):
         self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_accuracy.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=2, column=1, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+        self.fr_script.grid(row=3, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=2, column=1, columnspan=4, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(1, weight=1)
@@ -80,6 +88,7 @@ class TabATE(guic.ThemedFrame):
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_accuracy()
+        self.init_fr_script()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
@@ -197,6 +206,85 @@ class TabATE(guic.ThemedFrame):
                                          fg=self.theme_config["fg_dark"],
                                          height=2, width=20)
         self.acc_run_button.grid(row=2, column=2, rowspan=3, padx=20, pady=10)
+
+    def init_fr_script(self):
+        """Initialize the script runner frame."""
+        fr_m = self.fr_script
+
+        title_label = ttk.Label(fr_m, text='Script Runner', style="TPinkLabel.TLabel", width=20)
+        title_label.grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Script selection dropdown
+        ttk.Label(fr_m, text="Script:", style="TLabel").grid(row=1, column=0, sticky='e', padx=5, pady=5)
+        scripts = ScriptRunner.list_scripts(self.scripts_dir)
+        self.script_drop = guih.generate_drop_down(fr_m, scripts if scripts else ["(no scripts found)"])
+        self.script_drop[0].grid(row=1, column=1, padx=5, pady=5)
+
+        # Refresh button
+        self.script_refresh_btn = tk.Button(fr_m, text="Refresh",
+                                            command=self._refresh_script_list,
+                                            width=8)
+        self.script_refresh_btn.grid(row=1, column=2, padx=5, pady=5)
+
+        # Run / Stop buttons
+        self.script_run_btn = tk.Button(fr_m, text="Run Script",
+                                        command=self._run_script,
+                                        bg=self.theme_config["success"],
+                                        fg=self.theme_config["fg_dark"],
+                                        height=2, width=12)
+        self.script_run_btn.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+
+        self.script_stop_btn = tk.Button(fr_m, text="Stop",
+                                         command=self._stop_script,
+                                         bg=self.theme_config["error"],
+                                         fg=self.theme_config["fg_dark"],
+                                         height=2, width=12,
+                                         state=tk.DISABLED)
+        self.script_stop_btn.grid(row=2, column=2, padx=10, pady=10)
+
+    def _script_log(self, msg):
+        """Thread-safe log callback for the script runner."""
+        self.after(0, lambda: self.prompt.print(str(msg)))
+
+    def _run_script(self):
+        """Run the selected script."""
+        selected = self.script_drop[1].get()
+        if not selected or selected == "(no scripts found)":
+            guih.alert_user("No Script", "Please select a script to run.", "warning")
+            return
+
+        script_path = os.path.join(self.scripts_dir, selected)
+        started = self.script_runner.run(script_path)
+        if started:
+            self.script_run_btn.config(state=tk.DISABLED)
+            self.script_stop_btn.config(state=tk.NORMAL)
+            self._poll_script_done()
+
+    def _stop_script(self):
+        """Stop the running script."""
+        self.script_runner.stop()
+
+    def _poll_script_done(self):
+        """Check if the script thread has finished and re-enable buttons."""
+        if self.script_runner.is_running():
+            self.after(500, self._poll_script_done)
+        else:
+            self.script_run_btn.config(state=tk.NORMAL)
+            self.script_stop_btn.config(state=tk.DISABLED)
+
+    def _refresh_script_list(self):
+        """Rescan scripts directory and update the dropdown."""
+        scripts = ScriptRunner.list_scripts(self.scripts_dir)
+        menu = self.script_drop[0]["menu"]
+        menu.delete(0, "end")
+        var = self.script_drop[1]
+        if scripts:
+            for s in scripts:
+                menu.add_command(label=s, command=lambda v=s: var.set(v))
+            var.set(scripts[0])
+        else:
+            menu.add_command(label="(no scripts found)", command=lambda: var.set("(no scripts found)"))
+            var.set("(no scripts found)")
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()

@@ -10,6 +10,7 @@ import serial
 # import user defined modules
 from common.serial_api import SerialProcessor
 from common.path_helper import get_data_dir
+from common.logger import build_log_name
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -25,15 +26,6 @@ TEST_TYPE_COMMANDS = {
     "clock-test":     "CR81",
 }
 
-
-# TODO: Display on Screen still has so much line misalignment
-
-# TODO: log to .csv still has so much line misalignment
-#   AND when I log to .csv the timestamps don't get their own header column
-#   check the `bad_example_alignment.csv` in `serial_data`
-
-
-# TODO: the filename box doesn't work for raw text mode. I want this to work for all test modes
 
 
 class TabUSB(guic.ThemedFrame):
@@ -79,10 +71,7 @@ class TabUSB(guic.ThemedFrame):
     def initTabContent(self):
         logger.debug("Initializing tab 4 (USB) content")
 
-        # add tab header information
-        # TODO: I would like to bundle and standardize these frame tab styling, font size, etc.
-        l1 = ttk.Label(self, text="USB (COM) connection", style="BW.TLabel", font=("Arial", 16))
-        l1.grid(row=0, column=0, columnspan=2)
+        self.create_tab_header("USB (COM) connection", columnspan=2)
 
         self.init_fr_state()
         self.init_fr_test()
@@ -99,16 +88,21 @@ class TabUSB(guic.ThemedFrame):
 
         # show timestamps checkbox
         self.var_show_timestamp = tk.IntVar(value=1)
-        # TODO: I need to ensure this timestamp addition happens in all modes (text, csv, etc)
         ttk.Checkbutton(self.fr_state, text="Add timestamps",
                         variable=self.var_show_timestamp,
                         onvalue=1, offvalue=0).grid(row=3, column=4, padx=5, pady=5, sticky='w')
 
-        # add output file name box
-        lbl_filename = Label(self.fr_state, text="Output file name")
+        # add output file name box (postfix when not overriding, full name when overriding)
+        lbl_filename = Label(self.fr_state, text="Filename postfix")
         lbl_filename.grid(row=4, column=1, padx=5, pady=5)
         self.output_file_name = Text(self.fr_state, height=2, width=20)
         self.output_file_name.grid(row=4, column=3, padx=5, pady=5)
+
+        # override prefix checkbox — when checked, the text box IS the full filename (no auto prefix)
+        self.var_override_prefix = tk.IntVar(value=0)
+        ttk.Checkbutton(self.fr_state, text="Override prefix",
+                        variable=self.var_override_prefix,
+                        onvalue=1, offvalue=0).grid(row=4, column=4, padx=5, pady=5, sticky='w')
 
         # CSV headers (used when output mode is "Log to File (CSV)")
         lbl_csv_headers = Label(self.fr_state, text="CSV Headers")
@@ -120,12 +114,18 @@ class TabUSB(guic.ThemedFrame):
                                  command=self._toggle_recording,
                                  fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
                                  height=2, width=14)
-        self.btn_record.grid(row=4, column=4, padx=5, pady=5)
+        self.btn_record.grid(row=5, column=4, padx=5, pady=5)
 
         # ── Tooltips ─────────────────────────────────────
-        guic.Tooltip(lbl_mode, "") # TODO: add information about the various output modes
-        guic.Tooltip(lbl_csv_headers, "comma-separated, e.g. timestamp,val1,val2")
-        guic.Tooltip(lbl_filename, "TODO")  # TODO: add info about the output folder (and directory)
+        guic.Tooltip(lbl_mode, "Display on Screen: show in console\n"
+                               "Log to File (Raw): write bytes as-is\n"
+                               "Log to File (Timestamp): text with optional timestamps\n"
+                               "Log to File (CSV): comma-delimited data")
+        guic.Tooltip(lbl_csv_headers, "comma-separated, e.g. val1,val2\n"
+                                      "timestamp column is added automatically when checkbox is checked")
+        guic.Tooltip(lbl_filename, "Optional text appended to the auto-generated filename.\n"
+                                   "Files are saved to the data/ directory.\n"
+                                   "Check 'Override prefix' to use this as the full filename instead.")
 
     def init_fr_test(self):
         btn_act_test = Button(self.fr_test, text="Activate test mode",
@@ -147,7 +147,6 @@ class TabUSB(guic.ThemedFrame):
             list(TEST_TYPE_COMMANDS.keys())
         )
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
-
 
     def gui_refresh(self, event):
         self.fr_port.refresh_ports()
@@ -197,22 +196,21 @@ class TabUSB(guic.ThemedFrame):
     #### THREADS    #################
     #################################
 
-    def display_serial_data(self, timestamp, data):
+    def display_serial_data(self, timestamp, line):
         """
-        Callback for displaying serial data on GUI prompt.
-        Called from SerialProcessor thread, uses tkinter's after() for thread safety.
-
-        Args:
-            timestamp: Unused — provided by SerialProcessor callback contract
-            data: Serial data string (may contain multiple newline-delimited lines)
+        Callback for displaying a single complete line on the GUI prompt.
+        Called from SerialProcessor thread (line-buffered), uses tkinter's after() for thread safety.
         """
         show_ts = bool(self.var_show_timestamp.get())
-        # Split multi-line chunks so each line gets its own timestamp
-        lines = data.strip().split('\n')
-        for line in lines:
-            line = line.strip()
-            if line:
-                self.after(0, lambda l=line: self.prompt.print(l, timestamp=show_ts))
+        self.after(0, lambda l=line: self.prompt.print(l, timestamp=show_ts))
+
+    def _build_logname(self, prefix, extension):
+        """Build a log filename based on user input and override setting."""
+        user_text = self.output_file_name.get("1.0", "end").strip().strip("\n")
+        override = bool(self.var_override_prefix.get())
+        if override and user_text:
+            return user_text if user_text.endswith("." + extension) else user_text + "." + extension
+        return build_log_name(prefix, user_text or None, extension)
 
     def _toggle_recording(self):
         if self._recording:
@@ -238,12 +236,15 @@ class TabUSB(guic.ThemedFrame):
             self.prompt.print("ERROR: select an output mode first", "error")
             return
 
-        # TODO: I don't like how one thread here requires data/* as the folder and the other just takes /* and implies data
-        #   the CSV one should use the `get_data_dir` function
+        show_timestamp = bool(self.var_show_timestamp.get())
+
         if output_mode == "Log to File (CSV)":
             headers_raw = self.csv_headers.get("1.0", "end").strip("\n").strip()
             parameters = [h.strip() for h in headers_raw.split(",") if h.strip()]
-            self.start_process("data/serial_data", parameters)
+            if show_timestamp:
+                parameters.insert(0, "timestamp")
+            logname = self._build_logname("DATA", "csv")
+            self.start_process(get_data_dir("serial_data"), "data", parameters, logname, show_timestamp)
         elif output_mode == "Display on Screen":
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
@@ -252,15 +253,19 @@ class TabUSB(guic.ThemedFrame):
             )
             self.t2.start()
         elif output_mode == "Log to File (Raw)":
+            logname = self._build_logname("TEXT", "log")
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, get_data_dir("text_data"), "raw")
+                args=(self.basefilepath, get_data_dir("text_data"), "raw"),
+                kwargs={'logname': logname, 'show_timestamp': show_timestamp}
             )
             self.t2.start()
         elif output_mode == "Log to File (Timestamp)":
+            logname = self._build_logname("TEXT", "log")
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
-                args=(self.basefilepath, get_data_dir("text_data"), "timestamp")
+                args=(self.basefilepath, get_data_dir("text_data"), "timestamp"),
+                kwargs={'logname': logname, 'show_timestamp': show_timestamp}
             )
             self.t2.start()
         else:
@@ -320,20 +325,17 @@ class TabUSB(guic.ThemedFrame):
         self.btn_record.config(text="Start Recording", bg=self.theme_config["light_3"])
         self.fr_port.set_status(False)
 
-    def start_process(self, data_subfolder, parameters):
+    def start_process(self, data_subfolder, data_mode, parameters, logname, show_timestamp):
         if self.t3 is not None:
             self.t3.stop()
-
-        filename = self.output_file_name.get("1.0", "end").strip().strip("\n")
-        if not filename:
-            filename = None
 
         self.t3 = guic.StoppableThread(
             target=lambda: self.ser_obj.process_data(self.basefilepath,
                                                      data_subfolder,
-                                                     "data",
+                                                     data_mode,
                                                      parameters=parameters,
-                                                     filename=filename)
+                                                     logname=logname,
+                                                     show_timestamp=show_timestamp)
         )
         self.t3.start()
 

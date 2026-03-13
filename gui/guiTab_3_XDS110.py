@@ -29,10 +29,7 @@ class tabXDS110(guic.ThemedFrame):
         self.basefilepath = basefilepath
         self.after_call_id = None
 
-        # print welcome text_data
-        l1 = ttk.Label(self, text="XDS110 and target control", style="BW.TLabel",
-                       font=("Arial", 16))
-        l1.grid(column=0, row=0)
+        self.create_tab_header("XDS110 and target control", columnspan=4)
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "XDS110 Comms")

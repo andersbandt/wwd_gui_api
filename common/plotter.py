@@ -26,7 +26,6 @@ from queue import Queue, Empty
 from analysis.specific import filter_analysis
 
 
-# TODO: I still don't see the Y-axis expanding to fill the screen if there is only 1 plot
 
 
 
@@ -801,7 +800,7 @@ def start_live_plot(
             template="plotly_white",
             margin=dict(l=60, r=40, t=35, b=50),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=row_height * n_ch,
+            height=max(row_height * n_ch, 700),
         )
         return fig
 
@@ -841,7 +840,7 @@ def start_live_plot(
             template="plotly_white",
             margin=dict(l=60, r=40, t=35, b=50),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=row_height * n_ch,
+            height=max(row_height * n_ch, 700),
         )
 
         filename = f"live_export_{_dt.now().strftime('%Y%m%d_%H%M%S')}.html"

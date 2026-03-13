@@ -29,10 +29,6 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 _logger = logging.getLogger(__name__)
 
 
-# TODO: how hard would it be to capture and report effective sample rate?
-# TODO: disable DEBUG level printout during logging? Lots of pyvisa noise specifically, so maybe could just switch the level on that
-
-# TODO: would like pause/resume button to change colors
 
 
 class TabLog(guic.ThemedFrame):
@@ -57,6 +53,7 @@ class TabLog(guic.ThemedFrame):
         self._record_thread = None
         self._dash_thread = None
         self._paused = False
+        self._record_start_time = None
         self._live_state = {}
         self.math_config = MathConfig()
         self.math_evaluator = None
@@ -78,12 +75,12 @@ class TabLog(guic.ThemedFrame):
         prompt_parent = self.fr_bottom if compact else self
         self.prompt = guic.Prompt(prompt_parent, self.theme_config, "Data Logger Output")
 
-        # place top row
-        self.fr_status.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
-        self.fr_setup.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+        # place top row (row 0 reserved for tab header)
+        self.fr_status.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+        self.fr_setup.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
 
         # place bottom row container spanning full width
-        self.fr_bottom.grid(row=1, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+        self.fr_bottom.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
 
         # place items inside bottom row (independent column sizing)
         self.fr_stimulus.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
@@ -96,19 +93,19 @@ class TabLog(guic.ThemedFrame):
             self.fr_bottom.rowconfigure(0, weight=1)
         else:
             # normal: prompt gets its own full-width row at the bottom
-            self.prompt.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
-            self.rowconfigure(2, weight=1)
+            self.prompt.grid(row=3, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+            self.rowconfigure(3, weight=1)
 
         # parent weights
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # initialize tab content
         self.initTabContent()
 
     def initTabContent(self):
         _logger.debug("Initializing tab 8 (Logger) content")
-
+        self.create_tab_header("Logger", columnspan=2)
         self.init_fr_status()
         self.init_fr_setup()
         self.init_fr_stimulus()
@@ -1004,7 +1001,13 @@ class TabLog(guic.ThemedFrame):
         self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
         self.prompt.print(f"Recording every {self.record_speed} seconds ...")
 
-        self.btn_pause.config(state=tk.NORMAL, text="Pause", command=lambda: self.pause_record())
+        self.btn_pause.config(state=tk.NORMAL, text="Pause",
+                              bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.pause_record())
+        self._record_start_time = time.monotonic()
+
+        # Suppress noisy pyvisa DEBUG logging during recording
+        logging.getLogger('pyvisa').setLevel(logging.WARNING)
 
         # Start live plot if requested
         if self.var_live_plot.get():
@@ -1019,7 +1022,11 @@ class TabLog(guic.ThemedFrame):
         if self._record_thread is not None:
             self._record_thread.stop()
         self.cc.recording = False  # Signal to ClassController that recording has stopped
-        self.btn_pause.config(state=tk.DISABLED, text="Pause", command=lambda: self.pause_record())
+        self.btn_pause.config(state=tk.DISABLED, text="Pause",
+                              bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.pause_record())
+        self._record_start_time = None
+        logging.getLogger('pyvisa').setLevel(logging.DEBUG)
         self.prompt.print("Stopped data record!")
 
         # plot data if requested
@@ -1033,7 +1040,9 @@ class TabLog(guic.ThemedFrame):
         if self._record_thread is not None:
             self._record_thread.stop()
         self.cc.recording = False
-        self.btn_pause.config(text="Resume", command=lambda: self.resume_record())
+        self.btn_pause.config(text="Resume",
+                              bg=self.theme_config["light_5"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.resume_record())
         self.prompt.print("Recording paused")
 
     def resume_record(self):
@@ -1043,7 +1052,10 @@ class TabLog(guic.ThemedFrame):
         self._paused = False
         self.record_status = True
         self.cc.recording = True
-        self.btn_pause.config(text="Pause", command=lambda: self.pause_record())
+        self.btn_pause.config(text="Pause",
+                              bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.pause_record())
+        self._record_start_time = time.monotonic()  # reset rate tracking for resumed segment
         self.prompt.print(f"Resuming recording ...")
         self._record_thread = guic.StoppableThread(target=self.thread_record)
         self._record_thread.start()
@@ -1101,6 +1113,20 @@ class TabLog(guic.ThemedFrame):
     def set_record_directory(self):
         self.data_dir = filedialog.askdirectory()
         self.lbl_data_directory.config(text=self.data_dir)
+
+    def _update_record_counter(self):
+        """Update the record counter label with count and effective sample rate (every 10 samples)."""
+        cnt = self.recCnt
+        if cnt % 10 == 0 and cnt > 0 and self._record_start_time is not None:
+            elapsed = time.monotonic() - self._record_start_time
+            if elapsed > 0:
+                rate = cnt / elapsed
+                text = f'#{cnt:6d} {rate:.1f}/s'
+            else:
+                text = f'#{cnt:7d}'
+        else:
+            text = f'#{cnt:7d}'
+        self.after(0, lambda t=text: self.labelRNums.config(text=t))
 
     def _get_sample_interval(self):
         """Return the sample interval in seconds from the rate entry + unit dropdown."""
@@ -1261,8 +1287,7 @@ class TabLog(guic.ThemedFrame):
 
             # Update record counter and UI (thread-safe)
             self.recCnt += 1
-            cnt = self.recCnt
-            self.after(0, lambda n=cnt: self.labelRNums.config(text=f'#{n:7d}'))
+            self._update_record_counter()
 
             # Deadline-based sleep: only sleep the remaining time in the interval
             elapsed = time.monotonic() - t_start
@@ -1314,8 +1339,7 @@ class TabLog(guic.ThemedFrame):
 
                 # Update record counter and UI (thread-safe)
                 self.recCnt += 1
-                cnt = self.recCnt
-                self.after(0, lambda n=cnt: self.labelRNums.config(text=f'#{n:7d}'))
+                self._update_record_counter()
 
             except Exception as e:
                 self.prompt.print(f"Error in serial-triggered recording: {e}")

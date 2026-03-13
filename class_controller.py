@@ -301,14 +301,19 @@ class ClassController:
                 logger.error(f"Failed to disconnect PS: {e}")
 
 
-        # TODO: catch and handle COMMUNICATION ERRORS here
         if self.dmm is not None:
             logger.info("Disconnecting DMM")
-            self.dmm.disconnect()
+            try:
+                self.dmm.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to disconnect DMM: {e}")
 
         if self.fg is not None:
             logger.info("Disconnecting FG")
-            self.fg.disconnect()
+            try:
+                self.fg.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to disconnect FG: {e}")
 
         if self.osc is not None:
             logger.info("Disconnecting OSC")
@@ -319,7 +324,10 @@ class ClassController:
 
         if self.relay is not None:
             logger.info("Opening all relay channels")
-            self.relay.open_all()
+            try:
+                self.relay.open_all()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to open relay channels: {e}")
 
         logger.info("ClassController: shutdown complete")
 

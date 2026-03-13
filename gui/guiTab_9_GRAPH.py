@@ -27,12 +27,11 @@ from gui import gui_class as guic
 logger = logging.getLogger(__name__)
 
 
-# Define named tuple for file data
-# TODO: what is this thing again? Is it resuable across tabs?
+# Container for a loaded CSV file: original filename, full path, stem split by '_', and the DataFrame
 FileData = namedtuple('FileData', ['filename', 'filepath', 'parts', 'df'])
 
 
-# TODO: would be a nice to ensure that on disconnect the last line is collected properly. Maybe it already is
+
 
 
 def focus_next_widget(event):
@@ -222,10 +221,7 @@ class TabGraph(guic.ThemedFrame):
     def initTabContent(self):
         logger.debug("Initializing tab 9 (Graph) content")
 
-        # print welcome text_data
-        l1 = ttk.Label(self, text="Grapher", style="BW.TLabel",
-                       font=(self.theme_config["font"]["family"], 16))
-        l1.grid(column=0, row=0, columnspan=4)
+        self.create_tab_header("Grapher", columnspan=4)
 
         self.init_fr_setup()
         self.init_fr_files()
@@ -582,12 +578,17 @@ class TabGraph(guic.ThemedFrame):
 
             stem = Path(filename).stem
             filepath = os.path.join(self.data_dir, filename)
-            # TODO: why do we have to read_csv here? This will fail if we have a poorly formatted .csv file in there
+            try:
+                df = pd.read_csv(filepath)
+            except Exception as e:
+                logger.warning(f"Skipping {filename}: {e}")
+                self.prompt.print(f"WARNING: skipped {filename} (bad CSV)", "warning")
+                continue
             files.append(FileData(
                 filename=filename,
                 filepath=filepath,
                 parts=stem.split('_'),
-                df=pd.read_csv(filepath)))
+                df=df))
 
         self.files = files
         self.file_listbox.delete(0, tk.END)

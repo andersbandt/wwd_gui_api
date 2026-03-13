@@ -182,6 +182,14 @@ class ThemedFrame(tk.Frame):
     def set_bg(self, bg):
         self.configure(bg=bg)
 
+    def create_tab_header(self, text, columnspan=2):
+        """Create a standardized tab header label using the h1 theme config."""
+        h1 = self.theme_config["h1"]
+        lbl = ttk.Label(self, text=text, style="BW.TLabel",
+                        font=(h1["family"], h1["size"], h1["style"]))
+        lbl.grid(row=0, column=0, columnspan=columnspan)
+        return lbl
+
 
 class Prompt(ThemedFrame):
     def __init__(self, master, theme_config, title, height=10, width=80):

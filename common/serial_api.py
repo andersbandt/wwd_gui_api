@@ -142,17 +142,21 @@ class SerialProcessor(SerialGeneral):
         # Previously used collections.deque(maxlen=200) but it wasn't fully thread-safe
         self.r_buf = queue.Queue(maxsize=200)  # Thread-safe read buffer
 
-    def init_data(self, data_mode, parameters, filename=None):
+    def init_data(self, data_mode, parameters=None, logname=None):
         _logger.info("SerialProcessor data initialization")
+        if logname is None:
+            if data_mode == "data":
+                logname = logger.build_log_name("DATA", None, "csv")
+            else:
+                logname = logger.build_log_name("TEXT", None, "log")
+
+        filepath = os.path.join(self.basefilepath, logname)
         if data_mode == "data":
-            logname = logger.build_log_name("SER", filename, "csv")
-            filepath = os.path.join(self.basefilepath, logname)
             self.logfile = csvh.CSVHelper(filepath, parameters)
             self.logfile.initialize_file()
             _logger.info(f"path is at: {self.logfile.file_path}")
         elif data_mode == "raw" or data_mode == "timestamp":
-            logname = logger.build_log_name("SER", "", "log", date_strf='%Y%m%d')
-            self.logfile = os.path.join(self.basefilepath, logname)
+            self.logfile = filepath
             logger.append_text(self.logfile, "\n\n\n===================================\n"
                                              "=======INFO: USB LOG START=========\n"
                                              "===================================\n")
@@ -191,48 +195,126 @@ class SerialProcessor(SerialGeneral):
                 self.serStatus = False
                 _logger.error(e)
 
-    def process_data(self, basefilepath, data_folder, data_mode, parameters=None, gui_callback=None, filename=None):
-        # If gui_callback is provided, display on GUI instead of logging to file
+    def _process_complete_line(self, data_mode, timestamp, line, show_timestamp):
+        """Process a single complete line based on data mode and timestamp setting."""
+        self.num_lines += 1
+        if data_mode == "timestamp":
+            if show_timestamp:
+                logger.append_text(self.logfile, "\n" + timestamp + " --->   " + line)
+            else:
+                logger.append_text(self.logfile, "\n" + line)
+        elif data_mode == "data":
+            row = []
+            if show_timestamp:
+                row.append(timestamp)
+            row.extend(line.split(','))
+            self.logfile.add_row(row)
+
+    def process_data(self, basefilepath, data_folder, data_mode, parameters=None,
+                     gui_callback=None, logname=None, show_timestamp=True):
+        # GUI display mode — line-buffered so partial chunks are reassembled
         if gui_callback:
             _logger.info("Starting to display data on GUI")
             self.procStatus = True
             self.num_lines = 0
+            line_buf = ""
+            last_ts = ""
             while self.serStatus and self.procStatus:
                 try:
                     data = self.r_buf.get(timeout=0.1)
-                    self.num_lines += 1
-                    gui_callback(data[0], data[1])
                 except queue.Empty:
                     continue
+                last_ts, chunk = data[0], data[1]
+                line_buf += chunk
+                while '\n' in line_buf:
+                    line, line_buf = line_buf.split('\n', 1)
+                    line = line.rstrip('\r')
+                    if line:
+                        self.num_lines += 1
+                        gui_callback(last_ts, line)
+            # drain any remaining queued chunks before flushing
+            while not self.r_buf.empty():
+                try:
+                    data = self.r_buf.get_nowait()
+                except queue.Empty:
+                    break
+                last_ts, chunk = data[0], data[1]
+                line_buf += chunk
+                while '\n' in line_buf:
+                    line, line_buf = line_buf.split('\n', 1)
+                    line = line.rstrip('\r')
+                    if line:
+                        self.num_lines += 1
+                        gui_callback(last_ts, line)
+            # flush any remaining partial line
+            remaining = line_buf.strip()
+            if remaining:
+                self.num_lines += 1
+                gui_callback(last_ts, remaining)
             _logger.info("SerialProcessor finished GUI display")
             return
 
         # File logging mode
         self.basefilepath = os.path.join(basefilepath, data_folder)
-        self.init_data(data_mode, parameters, filename=filename)
+        self.init_data(data_mode, parameters, logname=logname)
 
         _logger.info(f"Starting to process data with mode: {data_mode}")
         self.procStatus = True
         self.num_lines = 0
+        line_buf = ""
+        last_ts = ""
+
         while self.serStatus and self.procStatus:
             try:
                 data = self.r_buf.get(timeout=0.1)
             except queue.Empty:
                 continue
 
-            self.num_lines += 1
-            if data_mode == "timestamp":
-                serStrDat = "\n" + data[0] + " --->   " + data[1]
-                logger.append_text(self.logfile, serStrDat)
-            elif data_mode == "data":
-                data_array = [data[0]]
-                split = data[1].split(',')
-                data_array.extend(split)
-                self.logfile.add_row(data_array)
-            elif data_mode == "raw":
-                logger.append_text(self.logfile, data[1])
+            last_ts, chunk = data[0], data[1]
+
+            if data_mode == "raw":
+                # Raw mode: no line buffering, dump as-is
+                self.num_lines += 1
+                if show_timestamp:
+                    logger.append_text(self.logfile, "\n" + last_ts + " --->   " + chunk)
+                else:
+                    logger.append_text(self.logfile, chunk)
+                continue
+
+            # Line-buffered modes (timestamp, CSV data)
+            line_buf += chunk
+            while '\n' in line_buf:
+                line, line_buf = line_buf.split('\n', 1)
+                line = line.rstrip('\r')
+                if line:
+                    self._process_complete_line(data_mode, last_ts, line, show_timestamp)
+
+        # drain any remaining queued chunks
+        while not self.r_buf.empty():
+            try:
+                data = self.r_buf.get_nowait()
+            except queue.Empty:
+                break
+            last_ts, chunk = data[0], data[1]
+            if data_mode == "raw":
+                self.num_lines += 1
+                if show_timestamp:
+                    logger.append_text(self.logfile, "\n" + last_ts + " --->   " + chunk)
+                else:
+                    logger.append_text(self.logfile, chunk)
             else:
-                raise BaseException("ERROR: undefined data mode for SerialReader")
+                line_buf += chunk
+                while '\n' in line_buf:
+                    line, line_buf = line_buf.split('\n', 1)
+                    line = line.rstrip('\r')
+                    if line:
+                        self._process_complete_line(data_mode, last_ts, line, show_timestamp)
+
+        # Flush remaining line buffer for line-buffered modes
+        if data_mode != "raw":
+            remaining = line_buf.strip().rstrip('\r')
+            if remaining:
+                self._process_complete_line(data_mode, last_ts, remaining, show_timestamp)
 
         _logger.info("SerialProcessor finished process_data()")
 

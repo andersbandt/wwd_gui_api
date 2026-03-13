@@ -104,10 +104,7 @@ class TabMainDashboard(guic.ThemedFrame):
 
     def initTabContent(self):
         logger.debug("Initializing tab 1 main dashboard")
-        # print welcome text_data
-        l1 = ttk.Label(self, text="Welcome to the WWD program!!!!", style="BW.TLabel",
-                       font=(self.theme_config["font"]["family"], 16))
-        l1.grid(column=0, row=0, columnspan=2)
+        self.create_tab_header("Welcome to the WWD program!!!!", columnspan=2)
         self.init_fr_main_status()
         self.init_fr_relay_control()
         self.init_fr_control()

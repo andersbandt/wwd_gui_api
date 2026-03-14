@@ -26,7 +26,7 @@ TEST_TYPE_COMMANDS = {
     "clock-test":     "CR81",
 }
 
-
+# TODO: on rate update I would like program to actual query DMM, instead of manually updating to "fast", or "slow", etc.
 
 class TabUSB(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config, autoconnect):

@@ -16,18 +16,10 @@ logger = logging.getLogger(__name__)
 #   for cleanup, the per instrument files are pretty sillly with my logging infrastructure now ... remove those ?
 #   just 3? serial_Data (.csv files from UART). text_Data (.txt or .log files), and then instriument data (general LOG)
 
-
 # TODO: CLAUDE.md should use an update
 
+# TODO: Didn't i add support for ERROR printouts in my prompt? Seems like I should audit that I'm using that a lot
 
-# TODO: Didn't i add suppoort for ERROR printouts in my prompt? Seems like I should audit that I'm using that a lot
-
-
-# Example
-if __name__ == "__main__":
-
-    log = logging.getLogger("demo")
-    log.info("Colored with colorlog")
 
 
 def main():

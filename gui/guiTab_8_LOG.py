@@ -32,6 +32,9 @@ _logger = logging.getLogger(__name__)
 # TODO: I think I did globally set pyvisa to loglevel WARNING so maybe can undo that logic I added to change it during logging
 
 
+# TODO: this rate printout is unusable. It needs its own box, not lumped into labelnums
+
+
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)

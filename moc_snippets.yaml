@@ -1,0 +1,85 @@
+# MOC Snippets — introductory blurbs injected before each section's file list.
+# Key: relative folder path from the vault root (e.g. "Circuits" or "Circuits/Analysis").
+# Value: a string that will be written as a paragraph before the file list.
+#
+# Example:
+#Circuits: "Covers fundamental circuit theory, analysis methods, and common circuit topologies."
+
+
+
+### CIRCUITS
+Circuits: "Articles below haven't found a home yet"
+Circuits/Analysis: "Methods for analyzing circuit behavior. You would typically learn most of these in your basic circuits college coursework."
+Circuits/Analysis/Theory: "These are the theories and equations that govern our analysis methods."
+
+Circuits/Concepts: "Various concepts that you might encounter when describing circuits."
+Circuits/Concepts/Ground: "Different ground reference types used in electrical systems."
+Circuits/Concepts/Parasitics: "All circuits have RLC components. When they are unwanted, they are called parasitics."
+
+Circuits/Digital Circuit: "Digital circuits, typically composed of componets that deal with 2 binary states."
+Circuits/Logic: "Logic refers to the logic components making up the building blocks of digital circuits."
+
+Circuits/Parameters: "Electrical parameters are what we use to quantify circuit behavior. There is a wide range in this section, from basic voltage and current descriptions to power to more complicated ratios describing performance of circuits"
+Circuits/Parameters/VI: "Voltage and current descriptions"
+Circuits/Parameters/Power: "Descriptions of power"
+Circuits/Parameters/RLC: "Various descriptions of resistance, capacitance, and inductance"
+Circuits/Parameters/Time: "Parameters for characterizing things in the time-domain"
+
+
+Circuits/Networks: "Networks are basic, abstract descriptions of circuits. They are useful to talk in when discussing filters and stuff in the RF domain."
+
+Circuits/Noise: "Noise, the bane of any circuit"
+
+
+
+### COMPUTING
+Computing: Topics related to how processors work. Everything from the low-level digital arithmetic, to higher-level topics in file and resource management in CPUs"
+Computing/Computers: "Topics one might encounter when working with personal computers"
+Computing/Computers/Architecture: "Architecture defining processors. Also applicable to embedded processors"
+Computing/Computers/OS: "Operating system topics"    
+
+
+
+### ELECTRIC MACHINES
+Electric Machines: Machines, commonly used for force generation or generating eletricity from force
+Electric Machines/Generation: How we can employ mechanical force to generate electricity
+Electric Machines:Motors: Motor construction, driving, etc.    
+
+        
+
+### EMBEDDED SYSTEMS
+Embedded Systems: Embedded systems are what happens when we add brains to circuits
+Embedded Systems/Basics: The most basic concpets in writing firmware and working with embedded devices"
+Embedded Systems/Basics/Debug: "Debug probes, layers behind debugging"
+Embedded Systems/Communication: "Communication across ICs on a board, communication to a whole different systems, wireless, protocols "
+Embedded Systems/Design: "Guides on how to design a good embedded systems"
+Embedded Systems/Design/Logging: "Logging"
+Embedded Systems/Design/Testing: "Various methods for testing embedded devices"
+Embedded Systems/Firmware: "More computer science related topics on how low-level code works on embedded devices"
+Embedded Systems/Processors: "Info about processors. Everything from simple 16-bit MCU to complex CPU devices"
+Embedded Systems/UI: "UI design, specifically for embedded devices"
+        
+
+### RF
+RF: RF engineering focuses on designing devices that produce or use signals within the radio band of the EM spectrum
+RF/Antenna: Antenna are how we shape and guide radio waves from electrical waves, and do the reverse   
+RF/Parameters: These are specific parameters used to characterize RF systems
+RF/Radar: Radar is the application of RF waves as sensing and navigation systems
+RF/Transmission: Transmission will focus on the physical methods we use to transmit RF waves
+
+
+### Semiconductors
+Semiconductors: "The world of semiconductors is broad. There is complicated quantum physics involved, materials science, fabrication. They are being used increasingly more and more, in favor of discrete components."
+Semiconductors/Device Physics: "This is the underlying physics behind diodes and transistors. It starts simple with np junctions, and builds from there."
+Semiconductors/Device Physics/Concepts: "The most basic concepts to build your understanding upon"
+Semiconductors/Device Physics/Materials: "Semiconductor materials, as well as ways to characterize them physically"
+Semiconductors/Device Physics/MOS: "MOS devices are just Metal-Oxide-Semiconductor"
+Semiconductors/General: "A hodge podge of general topics, mostly from my days working as a semiconductor test engineer"
+Semiconducotrs/IC: "Various topics related to integrated circuits"
+Semiconductors/Manufacturing: "Topics related to the manufacturing, assembly, and packaging of semiconductor devices"
+
+
+    
+
+
+    

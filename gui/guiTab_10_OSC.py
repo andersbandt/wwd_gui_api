@@ -410,16 +410,25 @@ class TabOSC(guic.ThemedFrame):
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't toggle channel", str(e), "error")
 
+    @staticmethod
+    def _parse_si(value_str):
+        """Parse a numeric string with an optional SI suffix (e.g. '750m' → 0.75)."""
+        suffixes = {"n": 1e-9, "u": 1e-6, "µ": 1e-6, "m": 1e-3, "k": 1e3, "M": 1e6}
+        s = value_str.strip()
+        if s and s[-1] in suffixes:
+            return float(s[:-1]) * suffixes[s[-1]]
+        return float(s)
+
     def set_channel_scale(self, channel, value_str):
         if not self.cc.get_osc_status():
             guih.alert_user("Can't set scale", "No OSC connection!", "error")
             return
         try:
-            scale = float(value_str)
+            scale = self._parse_si(value_str)
             self.cc.osc.set_scale(channel, scale)
             self.prompt.print(f"CH{channel} scale set to {scale} V/div")
         except ValueError:
-            guih.alert_user("Invalid Input", "Scale must be a number", "error")
+            guih.alert_user("Invalid Input", "Scale must be a number (e.g. 0.5 or 750m)", "error")
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't set scale", str(e), "error")
 

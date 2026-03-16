@@ -2,6 +2,7 @@
 
 # import needed packages
 import logging
+import os
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
@@ -39,6 +40,7 @@ class TabUSB(guic.ThemedFrame):
         # serial Object (SerialProcessor)
         self.ser_obj = None
         self._recording = False
+        self._conn_watch_id = None
 
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close(),
@@ -276,6 +278,34 @@ class TabUSB(guic.ThemedFrame):
         self.btn_record.config(text="Stop Recording", bg=self.theme_config["error"])
         self.prompt.print(f"Recording started ({output_mode}).")
 
+    _CONN_WATCH_MS = 2000  # how often to poll for unexpected port loss
+
+    def _start_connection_watch(self):
+        self._conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_connection)
+
+    def _stop_connection_watch(self):
+        if self._conn_watch_id is not None:
+            self.after_cancel(self._conn_watch_id)
+            self._conn_watch_id = None
+
+    def _watch_connection(self):
+        """Periodic GUI-thread check for unexpected port loss.
+
+        Two-pronged: serStatus catches the case where inWaiting() raises an
+        OSError (common on Linux). os.path.exists() catches the case where the
+        fd silently returns 0 bytes instead of raising — the /dev entry
+        disappears immediately when the device re-enumerates at a new path.
+        """
+        if self.ser_obj is None:
+            return
+        port = self.ser_obj.port
+        port_gone = not self.ser_obj.serStatus or not os.path.exists(port)
+        if port_gone:
+            self.prompt.print(f"ERROR: connection lost on {port} — device may have changed tty path", "error")
+            self.port_close()
+            return
+        self._conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_connection)
+
     def thread_print_display(self):
         """Start serial reader (t1) on connect. Recording is started separately via the record button."""
         self.t1 = guic.StoppableThread(
@@ -303,10 +333,12 @@ class TabUSB(guic.ThemedFrame):
 
         self.cc.set_ser(self.ser_obj)
         self.thread_print_display()  # starts t1 (serial reader)
+        self._start_connection_watch()
         self.prompt.print("Init successful!")
         return True
 
     def port_close(self):
+        self._stop_connection_watch()
         if self.ser_obj is not None:
             if self.t1 is not None:
                 self.t1.stop()

@@ -1441,18 +1441,26 @@ class TabLog(guic.ThemedFrame):
 
         # Power Supply data if requested
         if self.record_config.use_ps:
-            row[logger.COL_PS_VSET1] = self.cc.ps_service.read_set_voltage(1) or "ERROR"
-            row[logger.COL_PS_VMEAS1] = self.cc.ps_service.read_voltage(1) or "ERROR"
-            row[logger.COL_PS_IMEAS1] = self.cc.ps_service.read_current(1) or "ERROR"
+            v1set = self.cc.ps_service.read_set_voltage(1)
+            v1 = self.cc.ps_service.read_voltage(1)
+            i1 = self.cc.ps_service.read_current(1)
+            row[logger.COL_PS_VSET1] = v1set if v1set is not None else "ERROR"
+            row[logger.COL_PS_VMEAS1] = v1 if v1 is not None else "ERROR"
+            row[logger.COL_PS_IMEAS1] = i1 if i1 is not None else "ERROR"
             if self.record_config.ps_channel == 2:
-                row[logger.COL_PS_VSET2] = self.cc.ps_service.read_set_voltage(2) or "ERROR"
-                row[logger.COL_PS_VMEAS2] = self.cc.ps_service.read_voltage(2) or "ERROR"
-                row[logger.COL_PS_IMEAS2] = self.cc.ps_service.read_current(2) or "ERROR"
+                v2set = self.cc.ps_service.read_set_voltage(2)
+                v2 = self.cc.ps_service.read_voltage(2)
+                i2 = self.cc.ps_service.read_current(2)
+                row[logger.COL_PS_VSET2] = v2set if v2set is not None else "ERROR"
+                row[logger.COL_PS_VMEAS2] = v2 if v2 is not None else "ERROR"
+                row[logger.COL_PS_IMEAS2] = i2 if i2 is not None else "ERROR"
 
         # Function Generator data if requested
         if self.record_config.use_fg:
-            row[logger.COL_FG_FREQ] = self.cc.fg_service.get_frequency() or "ERROR"
-            row[logger.COL_FG_WAVEFORM] = self.cc.fg_service.get_shape() or "ERROR"
+            freq = self.cc.fg_service.get_frequency()
+            shape = self.cc.fg_service.get_shape()
+            row[logger.COL_FG_FREQ] = freq if freq is not None else "ERROR"
+            row[logger.COL_FG_WAVEFORM] = shape if shape is not None else "ERROR"
 
         # Oscilloscope data if requested
         if self.record_config.use_osc and self.record_config.osc_config:

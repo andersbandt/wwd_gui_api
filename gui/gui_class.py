@@ -10,6 +10,8 @@ from tkinter import Text, INSERT
 from tkinter import scrolledtext
 
 import json
+import re
+import time
 import threading
 import concurrent.futures
 import copy
@@ -17,6 +19,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+_ANSI_RE = re.compile(r'\x1b\[([0-9;]*)m')
 
 # import user created modules
 from gui import gui_helper as guih
@@ -223,6 +227,12 @@ class Prompt(ThemedFrame):
                                                 borderwidth=10)
         self.prompt.tag_configure("error", foreground=self.theme_config["error"])
         self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
+        self.prompt.tag_configure("ansi_red",     foreground=self.theme_config["error"])
+        self.prompt.tag_configure("ansi_green",   foreground=self.theme_config["success"])
+        self.prompt.tag_configure("ansi_yellow",  foreground=self.theme_config["warning"])
+        self.prompt.tag_configure("ansi_cyan",    foreground=self.theme_config["light_4"])
+        self.prompt.tag_configure("ansi_magenta", foreground=self.theme_config["light_6"])
+        self.prompt.tag_configure("ansi_blue",    foreground="#61AFEF")
         self.prompt.grid(row=1, column=0, columnspan=3, padx=5, pady=10, sticky="nsew")
 
         # make it so ScrolledText will stretch
@@ -238,7 +248,7 @@ class Prompt(ThemedFrame):
             self.toggle_timestamp(state=timestamp)
 
         if self.show_timestamps:
-            time_str = datetime.now().strftime("%H:%M:%S")
+            time_str = time.strftime("%H:%M:%S")
             prefix = f"[{time_str}]>>> "
         else:
             prefix = ">>> "
@@ -251,6 +261,49 @@ class Prompt(ThemedFrame):
 
         self.prompt.see("end")  # Auto-scroll to the end
         return True
+
+    def _ansi_code_to_tag(self, code_str):
+        """Map an ANSI SGR code string (e.g. '1;31') to a Prompt tag name."""
+        codes = set(code_str.split(';')) if code_str else {'0'}
+        if '31' in codes or '91' in codes:
+            return "ansi_red"
+        if '32' in codes or '92' in codes:
+            return "ansi_green"
+        if '33' in codes or '93' in codes:
+            return "ansi_yellow"
+        if '34' in codes or '94' in codes:
+            return "ansi_blue"
+        if '35' in codes or '95' in codes:
+            return "ansi_magenta"
+        if '36' in codes or '96' in codes:
+            return "ansi_cyan"
+        return "normal"
+
+    def print_ansi(self, message, timestamp=None):
+        """Print message interpreting ANSI SGR escape codes as text colors."""
+        if timestamp is not None:
+            self.toggle_timestamp(state=timestamp)
+
+        if self.show_timestamps:
+            time_str = time.strftime("%H:%M:%S")
+            prefix = f"[{time_str}]>>> "
+        else:
+            prefix = ">>> "
+
+        self.prompt.insert(INSERT, prefix, "normal")
+
+        current_tag = "normal"
+        last_end = 0
+        for m in _ANSI_RE.finditer(message):
+            if m.start() > last_end:
+                self.prompt.insert(INSERT, message[last_end:m.start()], current_tag)
+            current_tag = self._ansi_code_to_tag(m.group(1))
+            last_end = m.end()
+        if last_end < len(message):
+            self.prompt.insert(INSERT, message[last_end:], current_tag)
+
+        self.prompt.insert(INSERT, "\n", "normal")
+        self.prompt.see("end")
 
     def toggle_timestamp(self, state=None):
         if state is not None:

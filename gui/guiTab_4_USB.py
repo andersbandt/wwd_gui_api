@@ -202,7 +202,7 @@ class TabUSB(guic.ThemedFrame):
         Called from SerialProcessor thread (line-buffered), uses tkinter's after() for thread safety.
         """
         show_ts = bool(self.var_show_timestamp.get())
-        self.after(0, lambda l=line: self.prompt.print(l, timestamp=show_ts))
+        self.after(0, lambda l=line: self.prompt.print_ansi(l, timestamp=show_ts))
 
     def _build_logname(self, prefix, extension):
         """Build a log filename based on user input and override setting."""

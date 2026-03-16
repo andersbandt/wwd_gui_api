@@ -249,6 +249,20 @@ git submodule update --init
   - New drivers are picked up automatically via `equipment_manager.get_instruments`
 - **conftest.py** — Adds project root to `sys.path` so pytest can import `EEequipment` and other packages
 
+## Known Quirks and Gotchas
+
+### Prompt timestamps use `time.strftime`, not `datetime.now`
+`Prompt.print()` and `Prompt.print_ansi()` use `time.strftime("%H:%M:%S")` instead of `datetime.now().strftime(...)`. On this Linux machine, `datetime.now()` returns UTC despite the system clock being set to local time — `time.strftime()` reliably returns local time. Do not switch back to `datetime.now()`.
+
+### `or "ERROR"` is wrong for numeric equipment reads
+In `_collect_data_row` (Logger tab), always use `val if val is not None else "ERROR"` to guard equipment reads — never `val or "ERROR"`. Clamped current/voltage can return `0.0`, which is falsy and would be replaced with the string `"ERROR"`, breaking the live plot.
+
+### SPD3303X: first VISA connect fails with EOVERFLOW (Errno 75)
+The SPD3303X leaves stale data in the USBTMC bulk-in endpoint on disconnect. `PyVISAHandler.connect()` calls `inst.clear()` after `open_resource()` to drain it. This is wrapped in try/except so it silently skips on backends that don't support it. Don't remove this.
+
+### USB tab serial output: ANSI escape codes from Zephyr
+The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).
+
 ## Development Notes
 
 - The codebase uses tag comments like `tag:HARDCODE` for hardcoded values that might need refactoring

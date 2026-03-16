@@ -113,7 +113,7 @@ class TabOSC(guic.ThemedFrame):
 
         # Device ID
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
-        self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
+        self.labelIDValue = tk.Label(self.fr_info, text='', width=25, height=2, relief='sunken', anchor='w', wraplength=170, justify='left')
 
         # Connected timestamp
         self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')

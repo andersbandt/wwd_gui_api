@@ -225,7 +225,7 @@ class RecordConfig:
 
     def print(self) -> None:
         """Log the pretty summary at DEBUG level."""
-        _logger.debug(self.pretty())
+        _logger.debug("\n" + self.pretty())
 
 
 def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channel, serial_params, make_graph,

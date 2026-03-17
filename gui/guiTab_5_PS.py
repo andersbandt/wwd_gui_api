@@ -328,7 +328,7 @@ class TabPS(guic.ThemedFrame):
             else:
                 raise ValueError("Wrong channel input")
         except ValueError as e:
-            guih.alert_user("Can't toggle channel", "Error: {e}", "error")
+            guih.alert_user("Can't toggle channel", f"Error: {e}", "error")
         else:
             state = None
             if channel == 1:

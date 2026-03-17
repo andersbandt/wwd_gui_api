@@ -178,7 +178,8 @@ class SerialProcessor(SerialGeneral):
                     try:
                         serStrDat = ser_bytes.decode('utf-8')
                     except UnicodeDecodeError:
-                        _logger.error(f"DECODE ERROR ON SerialReader DATA: [{serStrDat}")
+                        _logger.error(f"DECODE ERROR ON SerialReader DATA: {ser_bytes!r}")
+                        continue
                     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
                     # Use put_nowait to avoid blocking if queue is full (drops oldest behavior)

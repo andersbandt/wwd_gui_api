@@ -225,8 +225,9 @@ class Prompt(ThemedFrame):
                                                 bg=self.theme_config["dark_2"],
                                                 fg=self.theme_config["fg_light"],
                                                 borderwidth=10)
-        self.prompt.tag_configure("error", foreground=self.theme_config["error"])
-        self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
+        self.prompt.tag_configure("error",   foreground=self.theme_config["error"])
+        self.prompt.tag_configure("warning", foreground=self.theme_config["warning"])
+        self.prompt.tag_configure("normal",  foreground=self.theme_config["fg_light"])
         self.prompt.tag_configure("ansi_red",     foreground=self.theme_config["error"])
         self.prompt.tag_configure("ansi_green",   foreground=self.theme_config["success"])
         self.prompt.tag_configure("ansi_yellow",  foreground=self.theme_config["warning"])
@@ -255,9 +256,11 @@ class Prompt(ThemedFrame):
 
         message = prefix + message + "\n"
         if print_type == "error":
-            self.prompt.insert(INSERT, message, "error")  # Apply 'error' tag
+            self.prompt.insert(INSERT, message, "error")
+        elif print_type == "warning":
+            self.prompt.insert(INSERT, message, "warning")
         else:
-            self.prompt.insert(INSERT, message, "normal")  # Apply 'normal' tag
+            self.prompt.insert(INSERT, message, "normal")
 
         self.prompt.see("end")  # Auto-scroll to the end
         return True

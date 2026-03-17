@@ -206,13 +206,13 @@ class TabUSB(guic.ThemedFrame):
         show_ts = bool(self.var_show_timestamp.get())
         self.after(0, lambda l=line: self.prompt.print_ansi(l, timestamp=show_ts))
 
-    def _build_logname(self, prefix, extension):
+    def _build_logname(self, prefix, extension, date_strf='%Y%m%d%H%M%S'):
         """Build a log filename based on user input and override setting."""
         user_text = self.output_file_name.get("1.0", "end").strip().strip("\n")
         override = bool(self.var_override_prefix.get())
         if override and user_text:
             return user_text if user_text.endswith("." + extension) else user_text + "." + extension
-        return build_log_name(prefix, user_text or None, extension)
+        return build_log_name(prefix, user_text or None, extension, date_strf=date_strf)
 
     def _toggle_recording(self):
         if self._recording:
@@ -255,7 +255,7 @@ class TabUSB(guic.ThemedFrame):
             )
             self.t2.start()
         elif output_mode == "Log to File (Raw)":
-            logname = self._build_logname("TEXT", "log")
+            logname = self._build_logname("TEXT", "log", date_strf='%Y%m%d')
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(self.basefilepath, get_data_dir("text_data"), "raw"),
@@ -263,7 +263,7 @@ class TabUSB(guic.ThemedFrame):
             )
             self.t2.start()
         elif output_mode == "Log to File (Timestamp)":
-            logname = self._build_logname("TEXT", "log")
+            logname = self._build_logname("TEXT", "log", date_strf='%Y%m%d')
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(self.basefilepath, get_data_dir("text_data"), "timestamp"),
@@ -303,6 +303,7 @@ class TabUSB(guic.ThemedFrame):
         if port_gone:
             self.prompt.print(f"ERROR: connection lost on {port} — device may have changed tty path", "error")
             self.port_close()
+            guih.alert_user("Serial port lost", f"Connection on {port} dropped unexpectedly.\nThe device may have re-enumerated at a different tty path.", "error")
             return
         self._conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_connection)
 

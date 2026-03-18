@@ -6,7 +6,7 @@ import logging
 import tkinter as tk
 import xml.etree.ElementTree
 from tkinter import ttk
-from tkinter import Text, INSERT
+from tkinter import Text
 from tkinter import scrolledtext
 
 import json
@@ -269,11 +269,11 @@ class Prompt(ThemedFrame):
 
         message = prefix + message + "\n"
         if print_type == "error":
-            self.prompt.insert(INSERT, message, "error")
+            self.prompt.insert(tk.END,message, "error")
         elif print_type == "warning":
-            self.prompt.insert(INSERT, message, "warning")
+            self.prompt.insert(tk.END,message, "warning")
         else:
-            self.prompt.insert(INSERT, message, "normal")
+            self.prompt.insert(tk.END,message, "normal")
 
         if self._autoscroll.get():
             self.prompt.see("end")
@@ -307,19 +307,19 @@ class Prompt(ThemedFrame):
         else:
             prefix = ">>> "
 
-        self.prompt.insert(INSERT, prefix, "normal")
+        self.prompt.insert(tk.END,prefix, "normal")
 
         current_tag = "normal"
         last_end = 0
         for m in _ANSI_RE.finditer(message):
             if m.start() > last_end:
-                self.prompt.insert(INSERT, message[last_end:m.start()], current_tag)
+                self.prompt.insert(tk.END,message[last_end:m.start()], current_tag)
             current_tag = self._ansi_code_to_tag(m.group(1))
             last_end = m.end()
         if last_end < len(message):
-            self.prompt.insert(INSERT, message[last_end:], current_tag)
+            self.prompt.insert(tk.END,message[last_end:], current_tag)
 
-        self.prompt.insert(INSERT, "\n", "normal")
+        self.prompt.insert(tk.END,"\n", "normal")
         if self._autoscroll.get():
             self.prompt.see("end")
 

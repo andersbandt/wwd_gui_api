@@ -7,6 +7,7 @@ from tkinter import ttk
 
 # import needed packages
 import time
+import threading
 
 # import user defined modules
 from EEequipment import equipment_manager
@@ -45,6 +46,12 @@ class TabPS(guic.ThemedFrame):
         self.ps_v2r = 0
         self.ps_i1 = 0
         self.ps_i2 = 0
+
+        # channel status cache — avoid querying the instrument on every tab switch
+        self._STATUS_CACHE_TTL = 10.0  # seconds
+        self._status_cache = None
+        self._status_cache_time = 0.0
+        self._poll_after_id = None
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "PS Console Output")
@@ -222,10 +229,33 @@ class TabPS(guic.ThemedFrame):
             self.valueV2_r.config(text='{:8s}'.format(str(self.ps_v2r)))
             self.valueI2.config(text='{:8s}'.format(str(self.ps_i2)))
 
+    def _get_status_cached(self):
+        """Return cached channel status, querying the instrument only when the cache is stale."""
+        now = time.monotonic()
+        if self._status_cache is not None and (now - self._status_cache_time) < self._STATUS_CACHE_TTL:
+            return self._status_cache
+        status = self.cc.ps.check_status()
+        self._status_cache = status
+        self._status_cache_time = time.monotonic()
+        return status
+
+    def _schedule_status_poll(self):
+        """Background poll every TTL seconds so the cache stays fresh even when the tab isn't visible."""
+        if not self.cc.get_ps_status():
+            return
+
+        def _poll():
+            status = self.cc.ps.check_status()
+            self._status_cache = status
+            self._status_cache_time = time.monotonic()
+
+        threading.Thread(target=_poll, daemon=True).start()
+        self._poll_after_id = self.after(int(self._STATUS_CACHE_TTL * 1000), self._schedule_status_poll)
+
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
         if self.cc.get_ps_status():
-            status_decode = self.cc.ps.check_status()
+            status_decode = self._get_status_cached()
         else:
             return
 
@@ -263,7 +293,7 @@ class TabPS(guic.ThemedFrame):
 
     def gui_refresh(self, event):
         logger.debug("gui_refresh for PS ...")
-        if event == "auto":
+        if event == "auto" and not self.fr_port.status:
             self.fr_port.refresh_ports()
             logger.debug("End of refreshing ports")
         self.gui_refresh_info()
@@ -337,7 +367,12 @@ class TabPS(guic.ThemedFrame):
                 state = self.ch2_on
             self.prompt.print(f"Toggled channel {channel} to state {state}")
 
-        time.sleep(0.5)
+        # Patch the cache with the known new state so gui_refresh_channel_state
+        # doesn't need to query the instrument again.
+        if self._status_cache is not None:
+            key = f"ch{channel}_state"
+            self._status_cache[key] = "ON" if (self.ch1_on if channel == 1 else self.ch2_on) else "OFF"
+            self._status_cache_time = time.monotonic()
         self.gui_refresh("call")
 
     def set_voltage(self, channel, voltage_str):
@@ -389,6 +424,13 @@ class TabPS(guic.ThemedFrame):
 
         self.ch1_on = 0
         self.ch2_on = 0
+        # Invalidate cache so the first refresh actually queries the instrument
+        self._status_cache = None
+        self._status_cache_time = 0.0
+        # Start background poll to keep cache warm
+        if self._poll_after_id is not None:
+            self.after_cancel(self._poll_after_id)
+        self._poll_after_id = self.after(int(self._STATUS_CACHE_TTL * 1000), self._schedule_status_poll)
         self.gui_refresh("connect")
 
         if result.error:
@@ -397,6 +439,10 @@ class TabPS(guic.ThemedFrame):
 
     def port_close(self):
         self.prompt.print("Closing PS resource!")
+        if self._poll_after_id is not None:
+            self.after_cancel(self._poll_after_id)
+            self._poll_after_id = None
+        self._status_cache = None
         result = self.cc.ps_service.disconnect()
         if not result.success:
             guih.alert_user("Can't disconnect PS", result.error, "warning")

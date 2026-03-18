@@ -217,6 +217,17 @@ class Prompt(ThemedFrame):
                                  bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"])
         self.toggle_timestamp_btn.grid(row=0, column=2, padx=7, pady=4, sticky="ew")
 
+        # autoscroll checkbox
+        self._autoscroll = tk.BooleanVar(value=True)
+        tk.Checkbutton(self, text="Autoscroll",
+                       variable=self._autoscroll,
+                       bg=self.theme_config["light_4"],
+                       fg=self.theme_config["fg_light"],
+                       selectcolor=self.theme_config["dark_2"],
+                       activebackground=self.theme_config["light_4"],
+                       activeforeground=self.theme_config["fg_light"]
+                       ).grid(row=0, column=3, padx=7, pady=4, sticky="ew")
+
         # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
                                                 font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_prompt"]),
@@ -234,12 +245,14 @@ class Prompt(ThemedFrame):
         self.prompt.tag_configure("ansi_cyan",    foreground=self.theme_config["light_4"])
         self.prompt.tag_configure("ansi_magenta", foreground=self.theme_config["light_6"])
         self.prompt.tag_configure("ansi_blue",    foreground="#61AFEF")
-        self.prompt.grid(row=1, column=0, columnspan=3, padx=5, pady=10, sticky="nsew")
+        self.prompt.grid(row=1, column=0, columnspan=4, padx=5, pady=10, sticky="nsew")
 
         # make it so ScrolledText will stretch
         self.grid_rowconfigure(1, weight=1)       # row=1 holds the ScrolledText
         self.grid_columnconfigure(0, weight=1)    # column=0 should stretch
-        self.grid_columnconfigure(1, weight=1)    # since you used columnspan=2
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_columnconfigure(3, weight=1)
 
 
     # gui_print: prints a message on a Tkinter frame
@@ -262,7 +275,8 @@ class Prompt(ThemedFrame):
         else:
             self.prompt.insert(INSERT, message, "normal")
 
-        self.prompt.see("end")  # Auto-scroll to the end
+        if self._autoscroll.get():
+            self.prompt.see("end")
         return True
 
     def _ansi_code_to_tag(self, code_str):
@@ -306,7 +320,8 @@ class Prompt(ThemedFrame):
             self.prompt.insert(INSERT, message[last_end:], current_tag)
 
         self.prompt.insert(INSERT, "\n", "normal")
-        self.prompt.see("end")
+        if self._autoscroll.get():
+            self.prompt.see("end")
 
     def toggle_timestamp(self, state=None):
         if state is not None:

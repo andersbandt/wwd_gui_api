@@ -323,11 +323,14 @@ class ClassController:
                 logger.error(f"Failed to disconnect OSC: {e}")
 
         if self.relay is not None:
-            logger.info("Opening all relay channels")
-            try:
-                self.relay.open_all()
-            except COMMUNICATION_ERRORS as e:
-                logger.error(f"Failed to open relay channels: {e}")
+            if self.config_svc is not None and self.config_svc.get_relay_open_on_exit():
+                logger.info("Opening all relay channels on exit (relay_open_on_exit=YES)")
+                try:
+                    self.relay.open_all()
+                except COMMUNICATION_ERRORS as e:
+                    logger.error(f"Failed to open relay channels: {e}")
+            else:
+                logger.info("Leaving relay state unchanged on exit (relay_open_on_exit=NO)")
 
         logger.info("ClassController: shutdown complete")
 

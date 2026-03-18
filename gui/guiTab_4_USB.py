@@ -247,7 +247,8 @@ class TabUSB(guic.ThemedFrame):
             if show_timestamp:
                 parameters.insert(0, "timestamp")
             logname = self._build_logname("DATA", "csv")
-            self.start_process(get_data_dir("serial_data"), "data", parameters, logname, show_timestamp)
+            self.start_process(get_data_dir("serial_data"), "data", parameters, logname, show_timestamp,
+                               progress_callback=self._log_progress_cb)
         elif output_mode == "Display on Screen":
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
@@ -260,7 +261,8 @@ class TabUSB(guic.ThemedFrame):
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(self.basefilepath, get_data_dir("text_data"), "raw"),
-                kwargs={'logname': logname, 'show_timestamp': show_timestamp}
+                kwargs={'logname': logname, 'show_timestamp': show_timestamp,
+                        'progress_callback': self._log_progress_cb}
             )
             self.t2.start()
         elif output_mode == "Log to File (Timestamp)":
@@ -268,7 +270,8 @@ class TabUSB(guic.ThemedFrame):
             self.t2 = guic.StoppableThread(
                 target=self.ser_obj.process_data,
                 args=(self.basefilepath, get_data_dir("text_data"), "timestamp"),
-                kwargs={'logname': logname, 'show_timestamp': show_timestamp}
+                kwargs={'logname': logname, 'show_timestamp': show_timestamp,
+                        'progress_callback': self._log_progress_cb}
             )
             self.t2.start()
         else:
@@ -359,7 +362,12 @@ class TabUSB(guic.ThemedFrame):
         self.btn_record.config(text="Start Recording", bg=self.theme_config["light_3"])
         self.fr_port.set_status(False)
 
-    def start_process(self, data_subfolder, data_mode, parameters, logname, show_timestamp):
+    def _log_progress_cb(self, n):
+        """Called from the logger thread every 200 lines; posts to GUI thread via after()."""
+        self.after(0, lambda: self.prompt.print(f"Logged {n} lines to file..."))
+
+    def start_process(self, data_subfolder, data_mode, parameters, logname, show_timestamp,
+                      progress_callback=None):
         if self.t3 is not None:
             self.t3.stop()
 
@@ -369,7 +377,8 @@ class TabUSB(guic.ThemedFrame):
                                                      data_mode,
                                                      parameters=parameters,
                                                      logname=logname,
-                                                     show_timestamp=show_timestamp)
+                                                     show_timestamp=show_timestamp,
+                                                     progress_callback=progress_callback)
         )
         self.t3.start()
 

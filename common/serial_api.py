@@ -196,9 +196,12 @@ class SerialProcessor(SerialGeneral):
                 self.serStatus = False
                 _logger.error(e)
 
-    def _process_complete_line(self, data_mode, timestamp, line, show_timestamp):
+    def _process_complete_line(self, data_mode, timestamp, line, show_timestamp,
+                               progress_callback=None, progress_interval=200):
         """Process a single complete line based on data mode and timestamp setting."""
         self.num_lines += 1
+        if progress_callback and self.num_lines % progress_interval == 0:
+            progress_callback(self.num_lines)
         if data_mode == "timestamp":
             if show_timestamp:
                 logger.append_text(self.logfile, "\n" + timestamp + " --->   " + line)
@@ -212,7 +215,8 @@ class SerialProcessor(SerialGeneral):
             self.logfile.add_row(row)
 
     def process_data(self, basefilepath, data_folder, data_mode, parameters=None,
-                     gui_callback=None, logname=None, show_timestamp=True):
+                     gui_callback=None, logname=None, show_timestamp=True,
+                     progress_callback=None, progress_interval=200):
         # GUI display mode — line-buffered so partial chunks are reassembled
         if gui_callback:
             _logger.info("Starting to display data on GUI")
@@ -276,6 +280,8 @@ class SerialProcessor(SerialGeneral):
             if data_mode == "raw":
                 # Raw mode: no line buffering, dump as-is
                 self.num_lines += 1
+                if progress_callback and self.num_lines % progress_interval == 0:
+                    progress_callback(self.num_lines)
                 if show_timestamp:
                     logger.append_text(self.logfile, "\n" + last_ts + " --->   " + chunk)
                 else:
@@ -288,7 +294,8 @@ class SerialProcessor(SerialGeneral):
                 line, line_buf = line_buf.split('\n', 1)
                 line = line.rstrip('\r')
                 if line:
-                    self._process_complete_line(data_mode, last_ts, line, show_timestamp)
+                    self._process_complete_line(data_mode, last_ts, line, show_timestamp,
+                                                progress_callback, progress_interval)
 
         # drain any remaining queued chunks
         while not self.r_buf.empty():
@@ -299,6 +306,8 @@ class SerialProcessor(SerialGeneral):
             last_ts, chunk = data[0], data[1]
             if data_mode == "raw":
                 self.num_lines += 1
+                if progress_callback and self.num_lines % progress_interval == 0:
+                    progress_callback(self.num_lines)
                 if show_timestamp:
                     logger.append_text(self.logfile, "\n" + last_ts + " --->   " + chunk)
                 else:
@@ -309,7 +318,8 @@ class SerialProcessor(SerialGeneral):
                     line, line_buf = line_buf.split('\n', 1)
                     line = line.rstrip('\r')
                     if line:
-                        self._process_complete_line(data_mode, last_ts, line, show_timestamp)
+                        self._process_complete_line(data_mode, last_ts, line, show_timestamp,
+                                                    progress_callback, progress_interval)
 
         # Flush remaining line buffer for line-buffered modes
         if data_mode != "raw":

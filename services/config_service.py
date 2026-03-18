@@ -141,6 +141,16 @@ class ConfigService:
         return self._config["VISA"].get("backend", "").strip()
 
     # ------------------------------------------------------------------
+    # Shutdown
+    # ------------------------------------------------------------------
+
+    def get_relay_open_on_exit(self) -> bool:
+        """Return whether relay channels should be opened on application exit (default True)."""
+        if "SHUTDOWN" not in self._config:
+            return True
+        return self._config["SHUTDOWN"].getboolean("relay_open_on_exit", True)
+
+    # ------------------------------------------------------------------
     # Paths
     # ------------------------------------------------------------------
 

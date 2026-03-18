@@ -29,11 +29,6 @@ from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math
 _logger = logging.getLogger(__name__)
 
 
-# TODO: I think I did globally set pyvisa to loglevel WARNING so maybe can undo that logic I added to change it during logging
-
-
-# TODO: this rate printout is unusable. It needs its own box, not lumped into labelnums
-
 
 class TabLog(guic.ThemedFrame):
     def __init__(self, master, class_controller, basefilepath, theme_config):
@@ -1010,9 +1005,6 @@ class TabLog(guic.ThemedFrame):
                               command=lambda: self.pause_record())
         self._record_start_time = time.monotonic()
 
-        # Suppress noisy pyvisa DEBUG logging during recording
-        logging.getLogger('pyvisa').setLevel(logging.WARNING)
-
         # Start live plot if requested
         if self.var_live_plot.get():
             self._start_live_plot()
@@ -1030,7 +1022,6 @@ class TabLog(guic.ThemedFrame):
                               bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
                               command=lambda: self.pause_record())
         self._record_start_time = None
-        logging.getLogger('pyvisa').setLevel(logging.DEBUG)
         self.prompt.print("Stopped data record!")
 
         # plot data if requested

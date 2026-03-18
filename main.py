@@ -13,13 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: folder paths and structure are documented in CLAUDE.md — review that for completeness
-#   for cleanup, the per instrument files are pretty sillly with my logging infrastructure now ... remove those ?
-#   just 3? serial_Data (.csv files from UART). text_Data (.txt or .log files), and then instriument data (general LOG)
 
-# TODO: CLAUDE.md should use an update
+# TODO: CLAUDE.md should use an update on folder paths and project structure (removed dmm_data and ps_data, removedd script_data)
 
 # TODO: Didn't i add support for ERROR printouts in my prompt? Seems like I should audit that I'm using that a lot
-
 
 
 def main():

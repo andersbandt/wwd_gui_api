@@ -151,7 +151,8 @@ class TabUSB(guic.ThemedFrame):
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
 
     def gui_refresh(self, event):
-        self.fr_port.refresh_ports()
+        if not self.fr_port.status:
+            self.fr_port.refresh_ports()
         self.fr_port.gui_refresh()
 
 

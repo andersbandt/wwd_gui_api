@@ -382,7 +382,7 @@ class TabOSC(guic.ThemedFrame):
             guih.alert_user("Can't update OSC", str(e), "warning")
 
     def gui_refresh(self, event):
-        if event == "auto":
+        if event == "auto" and not self.fr_port.status:
             self.fr_port.refresh_ports()
         if self.fr_port.status:
             self.update_osc()

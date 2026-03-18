@@ -317,7 +317,8 @@ class TabATE(guic.ThemedFrame):
         self.prompt.print(f"Scan complete. {len(resources)} resource(s) found.")
 
     def gui_refresh(self, event):
-        self.fr_port.refresh_ports()
+        if not self.fr_port.status:
+            self.fr_port.refresh_ports()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################

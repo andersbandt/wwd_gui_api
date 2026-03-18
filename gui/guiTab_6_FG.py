@@ -212,7 +212,7 @@ class TabFG(guic.ThemedFrame):
             self.valueOffset.config(text='{:8s}'.format(str(self.offset)))
 
     def gui_refresh(self, event):
-        if event == "auto":
+        if event == "auto" and not self.fr_port.status:
             self.fr_port.refresh_ports()
         if self.fr_port.status:
             self.update_FG()

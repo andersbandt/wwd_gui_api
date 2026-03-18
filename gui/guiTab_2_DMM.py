@@ -264,7 +264,8 @@ class TabDMM(guic.ThemedFrame):
         self._refresh_measurements()
 
     def gui_refresh(self, event):
-        self.fr_port.refresh_ports()
+        if not self.fr_port.status:
+            self.fr_port.refresh_ports()
         if self.fr_port.status:
             if event == "auto":
                 self._refresh_measurements()

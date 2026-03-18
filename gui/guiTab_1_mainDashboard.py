@@ -184,7 +184,8 @@ class TabMainDashboard(guic.ThemedFrame):
                 guih.alert_user("Can't refresh relay!", "Relay is not connected", "error")
 
         # update serial status
-        self.fr_port.refresh_ports()
+        if not self.fr_port.status:
+            self.fr_port.refresh_ports()
         self.fr_port.gui_refresh()
 
     def relay_autoconnect(self):

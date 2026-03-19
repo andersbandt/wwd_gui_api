@@ -1,12 +1,35 @@
 """Central controller that holds references to all connected equipment."""
 
+import logging
+import os
 import xml.etree.ElementTree as ET
 
 from services import DMMService, PSService, FGService, OscService
+from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+
+logger = logging.getLogger(__name__)
+
+_PORTS_XML = os.path.join("config", "ports_used.xml")
+
+
+def _write_xml(tree, root):
+    """Strip compounded whitespace nodes, re-indent, and write ports_used.xml."""
+    for elem in root.iter():
+        if elem.text and not elem.text.strip():
+            elem.text = None
+        if elem.tail and not elem.tail.strip():
+            elem.tail = None
+    ET.indent(root, space="    ", level=0)
+    with open(_PORTS_XML, "wb") as f:
+        tree.write(f, encoding="utf-8", xml_declaration=True)
 
 
 class ClassController:
     def __init__(self):
+        # Create ports_used.xml on first run if it doesn't exist
+        if not os.path.exists(_PORTS_XML):
+            root = ET.Element("PortsUsed")
+            _write_xml(ET.ElementTree(root), root)
         self.ser = None
         self.dmm = None
         self.ps = None
@@ -48,7 +71,7 @@ class ClassController:
         if self.ser is None:
             return False
         else:
-            return self.ser.status
+            return self.ser.serStatus
 
     def get_dmm_status(self):
         if self.dmm is None:
@@ -90,7 +113,7 @@ class ClassController:
 
         # Load or create XML tree
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             root = ET.Element("PortsUsed")
@@ -101,29 +124,21 @@ class ClassController:
         for child in root:
             if child.text == port and child.tag != usage:
                 root.remove(child)
-                print(f"Port {port} reassigned from {child.tag} to {usage}")
+                logger.info(f"Port {port} reassigned from {child.tag} to {usage}")
 
         # Update or create the element for this usage
         usage_element = root.find(usage)
         if usage_element is not None:
-            # Update existing element
             old_port = usage_element.text
             usage_element.text = str(port)
             if old_port != port:
-                print(f"Updated {usage}: {old_port} -> {port}")
+                logger.info(f"Updated {usage}: {old_port} -> {port}")
         else:
-            # Create new element for this usage
             usage_element = ET.SubElement(root, usage)
             usage_element.text = str(port)
-            print(f"Created new port mapping: {usage} -> {port}")
+            logger.info(f"Created new port mapping: {usage} -> {port}")
 
-        # Pretty-print the XML with indentation
-        ET.indent(root, space="    ", level=0)
-
-        # Write back to the XML file
-        with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
-
+        _write_xml(tree, root)
         return True
 
     def set_used_model(self, model, usage):
@@ -137,7 +152,7 @@ class ClassController:
         """
         # Load or create XML tree
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             root = ET.Element("PortsUsed")
@@ -146,27 +161,19 @@ class ClassController:
         # Find or create the usage element
         usage_element = root.find(usage)
         if usage_element is None:
-            # Create new element for this usage if it doesn't exist
             usage_element = ET.SubElement(root, usage)
             usage_element.text = ""
 
-        # Update or create the model attribute
         old_model = usage_element.get("model")
         usage_element.set("model", str(model))
 
         if old_model != model:
             if old_model:
-                print(f"Updated {usage} model: {old_model} -> {model}")
+                logger.info(f"Updated {usage} model: {old_model} -> {model}")
             else:
-                print(f"Set {usage} model: {model}")
+                logger.info(f"Set {usage} model: {model}")
 
-        # Pretty-print the XML with indentation
-        ET.indent(root, space="    ", level=0)
-
-        # Write back to the XML file
-        with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
-
+        _write_xml(tree, root)
         return True
 
     def get_used_model(self, usage):
@@ -180,7 +187,7 @@ class ClassController:
             str: The model name if found, None otherwise
         """
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             return None
@@ -195,7 +202,7 @@ class ClassController:
     def set_used_method(self, method, usage):
         """Save the port detection method for a specific tab/usage as an XML attribute."""
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             root = ET.Element("PortsUsed")
@@ -207,15 +214,12 @@ class ClassController:
             usage_element.text = ""
 
         usage_element.set("method", str(method))
-
-        ET.indent(root, space="    ", level=0)
-        with open("config/ports_used.xml", "wb") as xml_file:
-            tree.write(xml_file, encoding="utf-8", xml_declaration=True)
+        _write_xml(tree, root)
 
     def get_used_method(self, usage):
         """Retrieve the saved port detection method for a specific tab/usage."""
         try:
-            tree = ET.parse("config/ports_used.xml")
+            tree = ET.parse(_PORTS_XML)
             root = tree.getroot()
         except (FileNotFoundError, ET.ParseError):
             return None
@@ -224,7 +228,10 @@ class ClassController:
         if usage_element is not None:
             method = usage_element.get("method")
             if method is not None:
-                return int(method)
+                try:
+                    return int(method)
+                except ValueError:
+                    return None
         return None
 
     def add_active_connection(self, port, usage):
@@ -236,7 +243,7 @@ class ClassController:
             usage: The name of the connection (e.g., "DMM", "Serial", "PS")
         """
         self.active_connections[port] = usage
-        print(f"Active connection added: {usage} @ {port}")
+        logger.info(f"Active connection added: {usage} @ {port}")
 
     def remove_active_connection(self, port):
         """
@@ -250,7 +257,7 @@ class ClassController:
         """
         if port in self.active_connections:
             usage = self.active_connections.pop(port)
-            print(f"Active connection removed: {usage} @ {port}")
+            logger.info(f"Active connection removed: {usage} @ {port}")
             return True
         return False
 
@@ -276,6 +283,56 @@ class ClassController:
             dict: Copy of active_connections dictionary
         """
         return self.active_connections.copy()
+
+    def shutdown(self):
+        """Gracefully disconnect all active equipment. Called on application close."""
+        logger.info("ClassController: shutting down all equipment...")
+
+        if self.ps is not None:
+            logger.info("Disconnecting power supply (turning outputs off first)")
+            try:
+                self.ps.output_off(1)
+                self.ps.output_off(2)
+            except COMMUNICATION_ERRORS:
+                logger.error("Failed to turn off PS outputs (IO error)")
+            try:
+                self.ps.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to disconnect PS: {e}")
+
+
+        if self.dmm is not None:
+            logger.info("Disconnecting DMM")
+            try:
+                self.dmm.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to disconnect DMM: {e}")
+
+        if self.fg is not None:
+            logger.info("Disconnecting FG")
+            try:
+                self.fg.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to disconnect FG: {e}")
+
+        if self.osc is not None:
+            logger.info("Disconnecting OSC")
+            try:
+                self.osc.disconnect()
+            except COMMUNICATION_ERRORS as e:
+                logger.error(f"Failed to disconnect OSC: {e}")
+
+        if self.relay is not None:
+            if self.config_svc is not None and self.config_svc.get_relay_open_on_exit():
+                logger.info("Opening all relay channels on exit (relay_open_on_exit=YES)")
+                try:
+                    self.relay.open_all()
+                except COMMUNICATION_ERRORS as e:
+                    logger.error(f"Failed to open relay channels: {e}")
+            else:
+                logger.info("Leaving relay state unchanged on exit (relay_open_on_exit=NO)")
+
+        logger.info("ClassController: shutdown complete")
 
 
 

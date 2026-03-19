@@ -13,5 +13,11 @@ pyvisa-py
 sv_ttk
 dash
 simpleeval
+zeroconf
+psutil
+pytest
+scikit-learn
+
+
 
 

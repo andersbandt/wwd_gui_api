@@ -1,11 +1,13 @@
 """Power supply control tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
 # import needed packages
 import time
+import threading
 
 # import user defined modules
 from EEequipment import equipment_manager
@@ -15,6 +17,7 @@ from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
 
+logger = logging.getLogger(__name__)
 
 
 class TabPS(guic.ThemedFrame):
@@ -44,6 +47,12 @@ class TabPS(guic.ThemedFrame):
         self.ps_i1 = 0
         self.ps_i2 = 0
 
+        # channel status cache — avoid querying the instrument on every tab switch
+        self._STATUS_CACHE_TTL = 10.0  # seconds
+        self._status_cache = None
+        self._status_cache_time = 0.0
+        self._poll_after_id = None
+
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "PS Console Output")
 
@@ -64,19 +73,19 @@ class TabPS(guic.ThemedFrame):
             self.fr_port.connect_previous_port()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="W")
-        self.fr_port.grid(row=0, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.fr_status.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+        self.fr_info.grid(row=1, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="W")
+        self.fr_port.grid(row=1, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_status.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=2, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(2, weight=1)
-        self.rowconfigure(1, weight=1)
-
+        self.rowconfigure(2, weight=1)
 
     def initTabContent(self):
-        print("Initializing tab 6 (PS) content")
+        logger.debug("Initializing tab 5 (PS) content")
+        self.create_tab_header("PS Control", columnspan=3)
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_status()
@@ -98,7 +107,7 @@ class TabPS(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("PS_PyVISA")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous PS model: {previous_model}")
+            logger.info(f"Restored previous PS model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -193,7 +202,6 @@ class TabPS(guic.ThemedFrame):
             self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
             self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
 
-
     def init_fr_status(self):
         # channel 1 CV/CC mode
         self.labelCh1Mode = ttk.Label(self.fr_status, width=10, text='Ch 1 Mode', style="TLabel", anchor='w')
@@ -219,11 +227,38 @@ class TabPS(guic.ThemedFrame):
             self.valueV2_r.config(text='{:8s}'.format(str(self.ps_v2r)))
             self.valueI2.config(text='{:8s}'.format(str(self.ps_i2)))
 
+    def _get_status_cached(self):
+        """Return cached channel status, querying the instrument only when the cache is stale."""
+        now = time.monotonic()
+        if self._status_cache is not None and (now - self._status_cache_time) < self._STATUS_CACHE_TTL:
+            return self._status_cache
+        status = self.cc.ps.check_status()
+        self._status_cache = status
+        self._status_cache_time = time.monotonic()
+        return status
+
+    def _schedule_status_poll(self):
+        """Background poll every TTL seconds so the cache stays fresh even when the tab isn't visible."""
+        if not self.cc.get_ps_status():
+            return
+
+        def _poll():
+            status = self.cc.ps.check_status()
+            self._status_cache = status
+            self._status_cache_time = time.monotonic()
+
+        threading.Thread(target=_poll, daemon=True).start()
+        self._poll_after_id = self.after(int(self._STATUS_CACHE_TTL * 1000), self._schedule_status_poll)
+
     # NOTE: this function is quite similar to the relay one in tab 1
     def gui_refresh_channel_state(self):
         if self.cc.get_ps_status():
-            status_decode = self.cc.ps.check_status()
+            status_decode = self._get_status_cached()
         else:
+            return
+
+        if status_decode.get("error"):
+            self.prompt.print(f"Status query failed: {status_decode['error']}", "error")
             return
 
         try:
@@ -255,13 +290,13 @@ class TabPS(guic.ThemedFrame):
             self.ch2_mode.set_color("black")
 
     def gui_refresh(self, event):
-        print("gui_refresh for PS ...")
-        if event == "auto":
+        logger.debug("gui_refresh for PS ...")
+        if event == "auto" and not self.fr_port.status:
             self.fr_port.refresh_ports()
-            print("End of refreshing ports")
+            logger.debug("End of refreshing ports")
         self.gui_refresh_info()
         self.gui_refresh_channel_state()
-        print("end of gui_refresh for PS!")
+        logger.debug("end of gui_refresh for PS!")
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -321,7 +356,7 @@ class TabPS(guic.ThemedFrame):
             else:
                 raise ValueError("Wrong channel input")
         except ValueError as e:
-            guih.alert_user("Can't toggle channel", "Error: {e}", "error")
+            guih.alert_user("Can't toggle channel", f"Error: {e}", "error")
         else:
             state = None
             if channel == 1:
@@ -330,7 +365,12 @@ class TabPS(guic.ThemedFrame):
                 state = self.ch2_on
             self.prompt.print(f"Toggled channel {channel} to state {state}")
 
-        time.sleep(0.5)
+        # Patch the cache with the known new state so gui_refresh_channel_state
+        # doesn't need to query the instrument again.
+        if self._status_cache is not None:
+            key = f"ch{channel}_state"
+            self._status_cache[key] = "ON" if (self.ch1_on if channel == 1 else self.ch2_on) else "OFF"
+            self._status_cache_time = time.monotonic()
         self.gui_refresh("call")
 
     def set_voltage(self, channel, voltage_str):
@@ -367,6 +407,9 @@ class TabPS(guic.ThemedFrame):
             self.fr_port.set_status(False)
             return False
 
+        for fr in (self.fr_info, self.fr_control, self.fr_status):
+            for w in fr.winfo_children():
+                w.destroy()
         self.channel_count = self.cc.ps.channel_count
         self.init_fr_info()
         self.init_fr_control()
@@ -379,7 +422,14 @@ class TabPS(guic.ThemedFrame):
 
         self.ch1_on = 0
         self.ch2_on = 0
-        self.gui_refresh_channel_state()
+        # Invalidate cache so the first refresh actually queries the instrument
+        self._status_cache = None
+        self._status_cache_time = 0.0
+        # Start background poll to keep cache warm
+        if self._poll_after_id is not None:
+            self.after_cancel(self._poll_after_id)
+        self._poll_after_id = self.after(int(self._STATUS_CACHE_TTL * 1000), self._schedule_status_poll)
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")
@@ -387,6 +437,10 @@ class TabPS(guic.ThemedFrame):
 
     def port_close(self):
         self.prompt.print("Closing PS resource!")
+        if self._poll_after_id is not None:
+            self.after_cancel(self._poll_after_id)
+            self._poll_after_id = None
+        self._status_cache = None
         result = self.cc.ps_service.disconnect()
         if not result.success:
             guih.alert_user("Can't disconnect PS", result.error, "warning")

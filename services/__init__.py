@@ -17,6 +17,7 @@ Usage (future):
 """
 
 from services.equipment_service import EquipmentService, ConnectionResult
+from services.config_service import ConfigService, TargetConfig
 from services.dmm_service import DMMService
 from services.ps_service import PSService
 from services.fg_service import FGService

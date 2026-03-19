@@ -2,18 +2,25 @@
 
 
 # import modules
+import logging
 import tkinter as tk
 import xml.etree.ElementTree
 from tkinter import ttk
-from tkinter import Text, INSERT
+from tkinter import Text
 from tkinter import scrolledtext
 
 import json
+import re
+import time
 import threading
 import concurrent.futures
 import copy
 import xml.etree.ElementTree as ET
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+_ANSI_RE = re.compile(r'\x1b\[([0-9;]*)m')
 
 # import user created modules
 from gui import gui_helper as guih
@@ -168,7 +175,7 @@ class ThemedApp:
 
 
 # NOTE: this thing is mainly used for the tabs and the stuff in `gui_class.py`
-#   it's not currently used for many of of the sub-Frames in tabs
+#   it's not currently used for many of the sub-Frames in tabs
 class ThemedFrame(tk.Frame):
     def __init__(self, root, theme_config, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
@@ -179,6 +186,13 @@ class ThemedFrame(tk.Frame):
     def set_bg(self, bg):
         self.configure(bg=bg)
 
+    def create_tab_header(self, text, columnspan=2):
+        """Create a standardized tab header label using the h1 theme config."""
+        h1 = self.theme_config["h1"]
+        lbl = ttk.Label(self, text=text, style="BW.TLabel",
+                        font=(h1["family"], h1["size"], h1["style"]))
+        lbl.grid(row=0, column=0, columnspan=columnspan)
+        return lbl
 
 
 class Prompt(ThemedFrame):
@@ -188,6 +202,7 @@ class Prompt(ThemedFrame):
         self.width = width
         self.set_bg(self.theme_config["light_4"])
         self.show_timestamps = True
+
 
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
 
@@ -203,6 +218,17 @@ class Prompt(ThemedFrame):
                                  bg=self.theme_config["light_2"], fg=self.theme_config["fg_light"])
         self.toggle_timestamp_btn.grid(row=0, column=2, padx=7, pady=4, sticky="ew")
 
+        # autoscroll checkbox
+        self._autoscroll = tk.BooleanVar(value=True)
+        tk.Checkbutton(self, text="Autoscroll",
+                       variable=self._autoscroll,
+                       bg=self.theme_config["light_4"],
+                       fg=self.theme_config["fg_light"],
+                       selectcolor=self.theme_config["dark_2"],
+                       activebackground=self.theme_config["light_4"],
+                       activeforeground=self.theme_config["fg_light"]
+                       ).grid(row=0, column=3, padx=7, pady=4, sticky="ew")
+
         # set up text_data box for user communication
         self.prompt = scrolledtext.ScrolledText(self,
                                                 font=(self.theme_config["font"]["family"], self.theme_config["font"]["size_prompt"]),
@@ -211,14 +237,23 @@ class Prompt(ThemedFrame):
                                                 bg=self.theme_config["dark_2"],
                                                 fg=self.theme_config["fg_light"],
                                                 borderwidth=10)
-        self.prompt.tag_configure("error", foreground=self.theme_config["error"])
-        self.prompt.tag_configure("normal", foreground=self.theme_config["fg_light"])
-        self.prompt.grid(row=1, column=0, columnspan=3, padx=5, pady=10, sticky="nsew")
+        self.prompt.tag_configure("error",   foreground=self.theme_config["error"])
+        self.prompt.tag_configure("warning", foreground=self.theme_config["warning"])
+        self.prompt.tag_configure("normal",  foreground=self.theme_config["fg_light"])
+        self.prompt.tag_configure("ansi_red",     foreground=self.theme_config["error"])
+        self.prompt.tag_configure("ansi_green",   foreground=self.theme_config["success"])
+        self.prompt.tag_configure("ansi_yellow",  foreground=self.theme_config["warning"])
+        self.prompt.tag_configure("ansi_cyan",    foreground=self.theme_config["light_4"])
+        self.prompt.tag_configure("ansi_magenta", foreground=self.theme_config["light_6"])
+        self.prompt.tag_configure("ansi_blue",    foreground="#61AFEF")
+        self.prompt.grid(row=1, column=0, columnspan=4, padx=5, pady=10, sticky="nsew")
 
         # make it so ScrolledText will stretch
         self.grid_rowconfigure(1, weight=1)       # row=1 holds the ScrolledText
         self.grid_columnconfigure(0, weight=1)    # column=0 should stretch
-        self.grid_columnconfigure(1, weight=1)    # since you used columnspan=2
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_columnconfigure(3, weight=1)
 
 
     # gui_print: prints a message on a Tkinter frame
@@ -228,19 +263,66 @@ class Prompt(ThemedFrame):
             self.toggle_timestamp(state=timestamp)
 
         if self.show_timestamps:
-            time_str = datetime.now().strftime("%H:%M:%S")
+            time_str = time.strftime("%H:%M:%S")
             prefix = f"[{time_str}]>>> "
         else:
             prefix = ">>> "
 
         message = prefix + message + "\n"
         if print_type == "error":
-            self.prompt.insert(INSERT, message, "error")  # Apply 'error' tag
+            self.prompt.insert(tk.END,message, "error")
+        elif print_type == "warning":
+            self.prompt.insert(tk.END,message, "warning")
         else:
-            self.prompt.insert(INSERT, message, "normal")  # Apply 'normal' tag
+            self.prompt.insert(tk.END,message, "normal")
 
-        self.prompt.see("end")  # Auto-scroll to the end
+        if self._autoscroll.get():
+            self.prompt.see("end")
         return True
+
+    def _ansi_code_to_tag(self, code_str):
+        """Map an ANSI SGR code string (e.g. '1;31') to a Prompt tag name."""
+        codes = set(code_str.split(';')) if code_str else {'0'}
+        if '31' in codes or '91' in codes:
+            return "ansi_red"
+        if '32' in codes or '92' in codes:
+            return "ansi_green"
+        if '33' in codes or '93' in codes:
+            return "ansi_yellow"
+        if '34' in codes or '94' in codes:
+            return "ansi_blue"
+        if '35' in codes or '95' in codes:
+            return "ansi_magenta"
+        if '36' in codes or '96' in codes:
+            return "ansi_cyan"
+        return "normal"
+
+    def print_ansi(self, message, timestamp=None):
+        """Print message interpreting ANSI SGR escape codes as text colors."""
+        if timestamp is not None:
+            self.toggle_timestamp(state=timestamp)
+
+        if self.show_timestamps:
+            time_str = time.strftime("%H:%M:%S")
+            prefix = f"[{time_str}]>>> "
+        else:
+            prefix = ">>> "
+
+        self.prompt.insert(tk.END,prefix, "normal")
+
+        current_tag = "normal"
+        last_end = 0
+        for m in _ANSI_RE.finditer(message):
+            if m.start() > last_end:
+                self.prompt.insert(tk.END,message[last_end:m.start()], current_tag)
+            current_tag = self._ansi_code_to_tag(m.group(1))
+            last_end = m.end()
+        if last_end < len(message):
+            self.prompt.insert(tk.END,message[last_end:], current_tag)
+
+        self.prompt.insert(tk.END,"\n", "normal")
+        if self._autoscroll.get():
+            self.prompt.see("end")
 
     def toggle_timestamp(self, state=None):
         if state is not None:
@@ -340,7 +422,7 @@ class ConnFrame(ThemedFrame):
 
     def connect(self):
         self.status = self.connect_cmd()
-        print(f"Connect with {self.port} had status: {self.status} !\n")
+        logger.info(f"Connect with {self.port} had status: {self.status}")
         self.gui_refresh()
         return self.status
 
@@ -442,7 +524,7 @@ class SerialConnFrame(ConnFrame):
         is_active, active_usage = self.cc.is_port_active(self.port)
         if is_active:
             message = f"ERROR: Port {self.port} is already in use by {active_usage}"
-            print(message)
+            logger.error(message)
             guih.alert_user("Port already in use", message, "error")
             self.status = False
             self.gui_refresh()
@@ -498,7 +580,7 @@ class SerialConnFrame(ConnFrame):
                 ports = future.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
                 ports = []
-                print(f"WARNING: Port scan timed out after {timeout}s")
+                logger.warning(f"Port scan timed out after {timeout}s")
 
         if not ports:
             ports = []
@@ -531,7 +613,7 @@ class SerialConnFrame(ConnFrame):
         root = ET.Element("PortsUsed")
         try:
             tree = ET.ElementTree(root, file="config/ports_used.xml")
-        except xml.etree.ElementTree.ParseError:
+        except (FileNotFoundError, xml.etree.ElementTree.ParseError):
             return False
 
         port_elem = tree.find(self.name)
@@ -545,7 +627,7 @@ class SerialConnFrame(ConnFrame):
         self.port = self.get_previous_port()
         self.com_drop[1].set(self.port)
         if self.port is not None:
-            print(f"Connect to previous port for {self.name} @ {self.port}")
+            logger.info(f"Connect to previous port for {self.name} @ {self.port}")
             self.connect(set_used_port=False)
         return self.status
 
@@ -574,6 +656,7 @@ class AutoConnFrame(ConnFrame):
 ### THREADS             ##################
 ##########################################
 
+# Kept here (rather than common/) because it's only used by GUI tabs for background polling.
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""

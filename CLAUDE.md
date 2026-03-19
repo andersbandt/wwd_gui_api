@@ -84,7 +84,7 @@ This controller is passed to all tabs, allowing them to share equipment instance
 
 The theming system supports "compact" mode for smaller screens, which scales down padding and button sizes. Theme is selected in `config/master.ini` under `[THEME]`.
 
-### Services Layer (Scaffolding — Not Yet Wired In)
+### Services Layer
 
 **services/** contains per-equipment service classes that encapsulate the connect/disconnect lifecycle and business logic, separating it from GUI code:
 
@@ -94,7 +94,7 @@ The theming system supports "compact" mode for smaller screens, which scales dow
 - `fg_service.py` — `FGService`
 - `osc_service.py` — `OscService`
 
-**Status**: Service classes are created but NOT yet wired into tabs. See `notes.md` for migration plan.
+**Status**: Service layer is fully wired into all relevant tabs (`guiTab_2_DMM`, `guiTab_5_PS`, `guiTab_6_FG`, `guiTab_8_LOG`, `guiTab_10_OSC`). Remaining decoupling work (threading, hardcoded commands) is tracked in `todo.md`.
 
 ### Equipment Control Layer
 
@@ -154,13 +154,9 @@ All log files are written to the `data/` directory with timestamped filenames.
 
 **analysis/** contains data analysis modules:
 
-- `data_helper.py` — CSV/data manipulation utilities
-- `stats_analysis.py` — Statistical analysis
-- `afe_analysis.py` — Analog front-end data analysis
-- `clock_analysis.py` — Clock/timing measurements
-- `temp_analysis.py` — Temperature data analysis
-- `time_analysis.py` — Time-series analysis
-- `least_squares.py` — Least squares fitting
+- `data_helper.py` — CSV/data manipulation and type-conversion utilities
+- `stats_analysis.py` — Statistical analysis, linear regression, accuracy metrics, and time-series helpers (duration, sample rate)
+- `specific/` — Domain-specific analysis scripts (AFE, clock, IMU, least squares)
 
 ### IMU Utilities
 
@@ -244,9 +240,28 @@ git submodule update --init
 
 ## Key Project Files
 
-- **notes.md** — Development task tracker with open issues, refactoring priorities, and architecture improvement plans. This is the primary task/TODO list.
+- **todo.md** — Development task tracker with open issues, refactoring priorities, and architecture improvement plans. This is the primary task/TODO list.
 - **scripting.md** — Design notes for a planned scripting/automation system.
 - **docs/** — Screenshots and documentation assets.
+- **tests/** — pytest test suite (run with `pytest tests/`):
+  - `test_dmm_drivers.py` — AST-based check that each DMM driver's model name matches a `CommandRegistry` entry; no hardware needed
+  - `test_equipment_instantiation.py` — instantiates every `TestEquipment` subclass with connection I/O mocked out; catches unimplemented abstract methods
+  - New drivers are picked up automatically via `equipment_manager.get_instruments`
+- **conftest.py** — Adds project root to `sys.path` so pytest can import `EEequipment` and other packages
+
+## Known Quirks and Gotchas
+
+### Prompt timestamps use `time.strftime`, not `datetime.now`
+`Prompt.print()` and `Prompt.print_ansi()` use `time.strftime("%H:%M:%S")` instead of `datetime.now().strftime(...)`. On this Linux machine, `datetime.now()` returns UTC despite the system clock being set to local time — `time.strftime()` reliably returns local time. Do not switch back to `datetime.now()`.
+
+### `or "ERROR"` is wrong for numeric equipment reads
+In `_collect_data_row` (Logger tab), always use `val if val is not None else "ERROR"` to guard equipment reads — never `val or "ERROR"`. Clamped current/voltage can return `0.0`, which is falsy and would be replaced with the string `"ERROR"`, breaking the live plot.
+
+### SPD3303X: first VISA connect fails with EOVERFLOW (Errno 75)
+The SPD3303X leaves stale data in the USBTMC bulk-in endpoint on disconnect. `PyVISAHandler.connect()` calls `inst.clear()` after `open_resource()` to drain it. This is wrapped in try/except so it silently skips on backends that don't support it. Don't remove this.
+
+### USB tab serial output: ANSI escape codes from Zephyr
+The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).
 
 ## Development Notes
 
@@ -255,5 +270,38 @@ git submodule update --init
 - The application performs graceful shutdown, turning off power supplies and opening all relays when closing (shutdown logic is in `gui_driver.py` lines 236-271)
 - Serial port detection methods can be changed via dropdown (Auto/Windows/Linux/PyVISA)
 - The GUI adjusts to screen size, using compact mode for smaller displays
-- A services layer (`services/`) has been scaffolded but not yet integrated — see `notes.md` for migration plan
-- Known architectural debt: tabs currently mix view, controller, and business logic; see `notes.md` "GUI / Logic Decoupling" section for details
+- The services layer (`services/`) is wired into all relevant tabs; remaining architectural debt is documented in `todo.md` under "GUI / Logic Decoupling"
+
+
+
+
+## Threading
+
+**Status: resolved / acceptable.**
+
+- `guiTab_3_XDS110.py` -- uses bare `threading.Thread` via a `_run_in_thread(func, button)` helper. Correct for fire-and-forget one-shot actions (build/flash/check/toggle). `StoppableThread` would add no value here since the tasks complete naturally and don't loop.
+- `guiTab_4_USB.py` -- all `StoppableThread` (t1/t2/t3), properly stopped in `port_close()`. Clean.
+- `guiTab_8_LOG.py` -- `_record_thread` uses `StoppableThread`. `_dash_thread` uses bare `threading.Thread(daemon=True)`, which is correct since Dash's `app.run()` blocks with no external stop mechanism; daemon=True ensures it dies with the process.
+- `thread_record_timed` uses deadline-based sleep (`time.monotonic()`) — no busy-wait.
+
+
+## ATE Tab: Model Dropdown Audit
+
+**Q: Can the model dropdown be replaced with just a connection handler dropdown?**
+
+**Short answer: Not without losing benchmarking functionality.** The model is currently needed for two reasons:
+
+1. **Class instantiation** — `port_init()` does `ate_temp = self.registry[model_name]` then `self.ate = ate_temp(port)`. Different instrument classes have different `__init__` signatures and different connection handler implementations. Removing the model means we lose the Python class entirely.
+
+2. **`benchmark()` needs model-specific methods** — `ate_benchmark()` calls `self.ate.read_value` or `self.ate.test_conn`. Both are model-specific SCPI/serial sequences. Without a known model, there is no `read_value()` to call.
+
+**What IS already model-agnostic:**
+- `ate_command()` / `ate_query()` — just call `self.ate.write(cmd)` and `self.ate.query(cmd)` with a user-entered string. These could work fine with a generic connection handler and a user-typed address.
+- `run_accuracy_test()` — uses `cc.ps_service` and `cc.dmm_service` exclusively; the ATE device is not involved at all.
+
+**Possible future architecture (if model dropdown becomes a pain point):**
+- Keep the connection handler selector (PyVISA / Serial) for the address-based generic send/query.
+- Add a separate "benchmark command" text field so the user types the SCPI query string (e.g. `MEAS:VOLT:DC?`). The `benchmark()` helper can accept a callable or a raw command string.
+- This would eliminate the need to pick a fully known model just to do timing benchmarks on an arbitrary instrument.
+
+**Also note:** `port_close()` at line 516 calls `self.cc.set_ps(None)` — this appears to be a copy-paste bug. The ATE tab has no dedicated `cc` slot; it should either set `self.ate = None` or be left as-is if the intent was something else. Low priority since it doesn't affect correctness of the PS tab (PS tab manages its own state), but it is confusing.

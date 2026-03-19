@@ -8,13 +8,13 @@ class DMMService(EquipmentService):
 
     Handles:
         - Connection lifecycle (connect, test, disconnect)
-        - Sample speed configuration
+        - Rate configuration
         - Measurement reads with unit scaling
 
     Current tab usage this replaces (guiTab_2_DMM.py):
         - port_init (lines ~275-316)
         - port_close
-        - Inline calls to self.cc.dmm.read_val(), set_sample_speed(), etc.
+        - Inline calls to self.cc.dmm.read_val(), set_rate(), etc.
     """
 
     equipment_type = "dmm"
@@ -31,11 +31,11 @@ class DMMService(EquipmentService):
         return self.cc.dmm
 
     def _post_connect(self, instance):
-        """Set default sample speed after connecting."""
+        """Set default rate after connecting."""
         try:
-            instance.set_sample_speed("slow")
+            instance.set_rate("slow")
         except (*COMMUNICATION_ERRORS, AttributeError):
-            return "Could not set default sample speed"
+            return "Could not set default rate"
         return None
 
     # --- high-level operations ---
@@ -50,18 +50,18 @@ class DMMService(EquipmentService):
         if dmm is None:
             return (None, "DMM not connected")
         try:
-            raw = dmm.read_val()
+            raw = dmm.read_value()
             return (float(raw), str(raw))
         except COMMUNICATION_ERRORS as e:
             return (None, f"Read error: {e}")
         except (ValueError, TypeError):
             return (None, f"Could not parse DMM response")
 
-    def set_sample_speed(self, speed):
-        """Set DMM sample speed.
+    def set_rate(self, speed):
+        """Set DMM measurement rate.
 
         Args:
-            speed: Speed string (e.g. "SLOW", "MED", "FAST")
+            speed: Rate string ("slow", "medium", or "fast")
 
         Returns:
             True on success, False on failure.
@@ -70,7 +70,7 @@ class DMMService(EquipmentService):
         if dmm is None:
             return False
         try:
-            dmm.set_sample_speed(speed)
+            dmm.set_rate(speed)
             return True
         except COMMUNICATION_ERRORS:
             return False

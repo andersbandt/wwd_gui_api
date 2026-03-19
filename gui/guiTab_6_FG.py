@@ -1,6 +1,7 @@
 """Function generator control tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
@@ -10,12 +11,13 @@ import time
 # import user defined modules
 from common import path_helper
 from EEequipment import equipment_manager
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 # import user defined GUI modules
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import ColorCircle
+
+logger = logging.getLogger(__name__)
 
 
 class TabFG(guic.ThemedFrame):
@@ -50,13 +52,13 @@ class TabFG(guic.ThemedFrame):
         self.initTabContent()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+        self.fr_info.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -69,10 +71,11 @@ class TabFG(guic.ThemedFrame):
                                             status_cmd=lambda: self.cc.get_fg_status())
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
 
     def initTabContent(self):
-        print("Initializing tab 9 (FG) content")
+        logger.debug("Initializing tab 6 (FG) content")
+        self.create_tab_header("FG Control", columnspan=2)
         self.init_fr_info()
         self.init_fr_control()
 
@@ -93,7 +96,7 @@ class TabFG(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("FG_PyVISA")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous FG model: {previous_model}")
+            logger.info(f"Restored previous FG model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
@@ -209,9 +212,10 @@ class TabFG(guic.ThemedFrame):
             self.valueOffset.config(text='{:8s}'.format(str(self.offset)))
 
     def gui_refresh(self, event):
-        if event == "auto":
+        if event == "auto" and not self.fr_port.status:
             self.fr_port.refresh_ports()
-        # self.gui_refresh_info()
+        if self.fr_port.status:
+            self.update_FG()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -219,140 +223,109 @@ class TabFG(guic.ThemedFrame):
 
     def update_FG(self):
         if self.fr_port.status:
-            try:
-                self.frequency = self.cc.fg.query(
-                    self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
-                )
-                self.waveform = self.cc.fg.query(
-                    self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
-                )
-                # Only try to get duty cycle if it exists in the command registry
-                try:
-                    self.duty_cycle = self.cc.fg.query(
-                        self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_duty")
-                    )
-                except ValueError:
-                    self.duty_cycle = "N/A"
+            freq = self.cc.fg_service.get_frequency()
+            shape = self.cc.fg_service.get_shape()
+            if freq is None or shape is None:
+                guih.alert_user("Can't update FG", "Communication error reading FG parameters", "warning")
+                return
 
-                # Try to get amplitude if available
-                try:
-                    self.amplitude = self.cc.fg.query(
-                        self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_amplitude")
-                    )
-                except ValueError:
-                    self.amplitude = "N/A"
-
-                # Try to get offset if available
-                try:
-                    self.offset = self.cc.fg.query(
-                        self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_offset")
-                    )
-                except ValueError:
-                    self.offset = "N/A"
-
-                self.gui_refresh_info()
-            except COMMUNICATION_ERRORS as e:
-                guih.alert_user("Can't update FG", str(e), "warning")
+            self.frequency = freq
+            self.waveform = shape
+            self.duty_cycle = self.cc.fg_service.get_duty() or "N/A"
+            self.amplitude = self.cc.fg_service.get_amplitude() or "N/A"
+            self.offset = self.cc.fg_service.get_offset() or "N/A"
+            self.gui_refresh_info()
 
     def toggle_output(self):
         if not self.cc.get_fg_status():
             guih.alert_user("Can't toggle output", "No FG connection!", "error")
             return False
 
-        try:
-            # Note: Most function generators use SCPI command for output control
-            # This is a simplified version - may need model-specific implementation
-            if self.output_on:
-                self.cc.fg.write("OUTPut OFF")
+        if self.output_on:
+            success = self.cc.fg_service.output_off()
+            if success:
                 self.output_on = False
                 self.prompt.print("Output turned OFF")
             else:
-                self.cc.fg.write("OUTPut ON")
+                guih.alert_user("Can't toggle output", "Failed to turn output OFF", "error")
+        else:
+            success = self.cc.fg_service.output_on()
+            if success:
                 self.output_on = True
                 self.prompt.print("Output turned ON")
-        except Exception as e:
-            guih.alert_user("Can't toggle output", f"Error: {e}", "error")
+            else:
+                guih.alert_user("Can't toggle output", "Failed to turn output ON", "error")
 
         time.sleep(0.3)
         self.gui_refresh("call")
 
     def set_waveform(self, waveform):
-        if self.cc.get_fg_status():
-            try:
-                cmd = self.cc.fg.registry.get_command(self.cc.fg.model, "command", "set_shape")
-                cmd = cmd.format(value=waveform)
-                self.cc.fg.write(cmd)
-                self.waveform = waveform
-                self.prompt.print(f"Set waveform to {waveform}")
-                self.gui_refresh_info()
-            except Exception as e:
-                guih.alert_user("Can't set waveform", str(e), "error")
+        if self.cc.fg_service.set_shape(waveform):
+            self.waveform = waveform
+            self.prompt.print(f"Set waveform to {waveform}")
+            self.gui_refresh_info()
         else:
-            guih.alert_user("Can't set waveform", "No FG connection!", "error")
+            guih.alert_user("Can't set waveform", "No FG connection or communication error", "error")
 
     def set_frequency(self, frequency_str):
-        if self.cc.get_fg_status():
-            try:
-                frequency = float(frequency_str)
-                self.cc.fg.set_frequency(frequency)
-                self.frequency = frequency
-                self.prompt.print(f"Set frequency to {frequency} Hz")
-                self.gui_refresh_info()
-            except ValueError:
-                guih.alert_user("Invalid Input", "Frequency must be a number", "error")
-            except Exception as e:
-                guih.alert_user("Can't set frequency", str(e), "error")
+        try:
+            frequency = float(frequency_str)
+        except ValueError:
+            guih.alert_user("Invalid Input", "Frequency must be a number", "error")
+            return
+
+        if self.cc.fg_service.set_frequency(frequency):
+            self.frequency = frequency
+            self.prompt.print(f"Set frequency to {frequency} Hz")
+            self.gui_refresh_info()
         else:
-            guih.alert_user("Can't set frequency", "No FG connection!", "error")
+            guih.alert_user("Can't set frequency", "No FG connection or communication error", "error")
 
     def set_duty(self, duty_str):
-        if self.cc.get_fg_status():
-            try:
-                duty = float(duty_str)
-                if duty < 0 or duty > 100:
-                    guih.alert_user("Invalid Input", "Duty cycle must be 0-100%", "error")
-                    return
+        try:
+            duty = float(duty_str)
+        except ValueError:
+            guih.alert_user("Invalid Input", "Duty cycle must be a number", "error")
+            return
 
-                self.cc.fg.set_duty(duty)
-                self.duty_cycle = duty
-                self.prompt.print(f"Set duty cycle to {duty}%")
-                self.gui_refresh_info()
-            except ValueError:
-                guih.alert_user("Invalid Input", "Duty cycle must be a number", "error")
-            except Exception as e:
-                guih.alert_user("Can't set duty cycle", str(e), "error")
+        if duty < 0 or duty > 100:
+            guih.alert_user("Invalid Input", "Duty cycle must be 0-100%", "error")
+            return
+
+        if self.cc.fg_service.set_duty(duty):
+            self.duty_cycle = duty
+            self.prompt.print(f"Set duty cycle to {duty}%")
+            self.gui_refresh_info()
         else:
-            guih.alert_user("Can't set duty cycle", "No FG connection!", "error")
+            guih.alert_user("Can't set duty cycle", "No FG connection or communication error", "error")
 
     def set_amplitude(self, amplitude_str):
-        if self.cc.get_fg_status():
-            try:
-                amplitude = float(amplitude_str)
-                self.cc.fg.set_amplitude(amplitude)
-                self.amplitude = amplitude
-                self.prompt.print(f"Set amplitude to {amplitude} V")
-                self.gui_refresh_info()
-            except ValueError:
-                guih.alert_user("Invalid Input", "Amplitude must be a number", "error")
-            except Exception as e:
-                guih.alert_user("Can't set amplitude", str(e), "error")
+        try:
+            amplitude = float(amplitude_str)
+        except ValueError:
+            guih.alert_user("Invalid Input", "Amplitude must be a number", "error")
+            return
+
+        if self.cc.fg_service.set_amplitude(amplitude):
+            self.amplitude = amplitude
+            self.prompt.print(f"Set amplitude to {amplitude} V")
+            self.gui_refresh_info()
         else:
-            guih.alert_user("Can't set amplitude", "No FG connection!", "error")
+            guih.alert_user("Can't set amplitude", "No FG connection or communication error", "error")
 
     def set_offset(self, offset_str):
-        if self.cc.get_fg_status():
-            try:
-                offset = float(offset_str)
-                self.cc.fg.set_offset(offset)
-                self.offset = offset
-                self.prompt.print(f"Set offset to {offset} V")
-                self.gui_refresh_info()
-            except ValueError:
-                guih.alert_user("Invalid Input", "Offset must be a number", "error")
-            except Exception as e:
-                guih.alert_user("Can't set offset", str(e), "error")
+        try:
+            offset = float(offset_str)
+        except ValueError:
+            guih.alert_user("Invalid Input", "Offset must be a number", "error")
+            return
+
+        if self.cc.fg_service.set_offset(offset):
+            self.offset = offset
+            self.prompt.print(f"Set offset to {offset} V")
+            self.gui_refresh_info()
         else:
-            guih.alert_user("Can't set offset", "No FG connection!", "error")
+            guih.alert_user("Can't set offset", "No FG connection or communication error", "error")
 
     #################################
     #### SERIAL (COM)  ##############
@@ -379,6 +352,7 @@ class TabFG(guic.ThemedFrame):
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.fr_port.set_status(True)
         self.output_on = False
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

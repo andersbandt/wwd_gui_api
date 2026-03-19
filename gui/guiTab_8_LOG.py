@@ -2,6 +2,7 @@
 
 
 # import needed GUI modules
+import logging
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -24,7 +25,9 @@ from common import logger
 from common import plotter
 from common import path_helper
 from common.math_columns import MathColumn, MathConfig, MathEvaluator, save_math_config, load_math_config
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+
+_logger = logging.getLogger(__name__)
+
 
 
 class TabLog(guic.ThemedFrame):
@@ -48,6 +51,8 @@ class TabLog(guic.ThemedFrame):
         self.bus = None
         self._record_thread = None
         self._dash_thread = None
+        self._paused = False
+        self._record_start_time = None
         self._live_state = {}
         self.math_config = MathConfig()
         self.math_evaluator = None
@@ -69,12 +74,12 @@ class TabLog(guic.ThemedFrame):
         prompt_parent = self.fr_bottom if compact else self
         self.prompt = guic.Prompt(prompt_parent, self.theme_config, "Data Logger Output")
 
-        # place top row
-        self.fr_status.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
-        self.fr_setup.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+        # place top row (row 0 reserved for tab header)
+        self.fr_status.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
+        self.fr_setup.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
 
         # place bottom row container spanning full width
-        self.fr_bottom.grid(row=1, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+        self.fr_bottom.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
 
         # place items inside bottom row (independent column sizing)
         self.fr_stimulus.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nw")
@@ -87,25 +92,19 @@ class TabLog(guic.ThemedFrame):
             self.fr_bottom.rowconfigure(0, weight=1)
         else:
             # normal: prompt gets its own full-width row at the bottom
-            self.prompt.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
-            self.rowconfigure(2, weight=1)
+            self.prompt.grid(row=3, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nsew")
+            self.rowconfigure(3, weight=1)
 
         # parent weights
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
 
         # initialize tab content
         self.initTabContent()
 
     def initTabContent(self):
-        print("Initializing tab 8 (Logger) content")
-
-        # print welcome text_data (only in standard mode)
-        if not self.theme_config.get("compact", False):
-            l1 = ttk.Label(self, text="Data Logger", style="BW.TLabel",
-                           font=(self.theme_config["font"]["family"], 16))
-            l1.grid(row=0, column=0, columnspan=4)
-
+        _logger.debug("Initializing tab 8 (Logger) content")
+        self.create_tab_header("Logger", columnspan=2)
         self.init_fr_status()
         self.init_fr_setup()
         self.init_fr_stimulus()
@@ -202,9 +201,9 @@ class TabLog(guic.ThemedFrame):
                                  pady=self.theme_config["pad"]["ypad_s"])
 
         # add serial parameters box
-        self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial parameters")
+        self.lbl_use_ser = tk.Label(self.fr_setup, text="Serial columns (comma-separated):")
         self.serial_log_params = tk.Text(self.fr_setup, height=2, width=40)
-        self.serial_log_params.insert("1.0", "placeholder")
+        self.serial_log_params.insert("1.0", "col1,col2,col3")
         self.serial_log_params.tag_add("placeholder", "1.0", "end")
         self.serial_log_params.tag_config("placeholder", foreground="gray")
 
@@ -232,6 +231,17 @@ class TabLog(guic.ThemedFrame):
             [1, 2]
         )
         self.rec_ps_channel_drop[0].grid(row=5, column=2, padx=5, pady=2)
+
+        # PS voltage / current enable checkboxes
+        self.var_ps_log_v = tk.IntVar(value=1)
+        self.chk_ps_log_v = ttk.Checkbutton(self.fr_setup, text="Log V",
+                                             variable=self.var_ps_log_v, onvalue=1, offvalue=0)
+        self.chk_ps_log_v.grid(row=5, column=3, padx=5, pady=2, sticky='w')
+        self.var_ps_log_i = tk.IntVar(value=1)
+        self.chk_ps_log_i = ttk.Checkbutton(self.fr_setup, text="Log I",
+                                             variable=self.var_ps_log_i, onvalue=1, offvalue=0)
+        self.chk_ps_log_i.grid(row=5, column=4, padx=5, pady=2, sticky='w')
+
         self.toggle_use_ps()
 
         # set up button START recording
@@ -246,8 +256,19 @@ class TabLog(guic.ThemedFrame):
                                 bg=self.theme_config["error"], fg=self.theme_config["fg_light"], height=self.theme_config["size"]["h_button"], width=self.theme_config["size"]["w_button"])
         btn_stop_entry.grid(row=6, column=2, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
+        # set up button PAUSE/RESUME recording (disabled until recording starts)
+        self.btn_pause = tk.Button(self.fr_setup, text="Pause",
+                                   command=lambda: self.pause_record(),
+                                   bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                                   height=self.theme_config["size"]["h_button"],
+                                   width=self.theme_config["size"]["w_button"],
+                                   state=tk.DISABLED)
+        self.btn_pause.grid(row=6, column=4, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
+
         self.labelRNums = ttk.Label(self.fr_setup, text='', width=12, relief='sunken')
         self.labelRNums.grid(row=6, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
+        self.labelRRate = ttk.Label(self.fr_setup, text='', width=10, relief='sunken')
+        self.labelRRate.grid(row=7, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
 
         # add check button to graph data
         self.var_graph_data = tk.IntVar()
@@ -305,10 +326,17 @@ class TabLog(guic.ThemedFrame):
         self.lbl_time_window = ttk.Label(self.fr_setup, text="", style="TSpunkLabel.TLabel")
         self.lbl_time_window.grid(row=9, column=0, columnspan=2, padx=5, pady=2)
 
+        self.btn_export_html = tk.Button(self.fr_setup, text="Export HTML",
+                                         command=lambda: self.export_live_plot_html(),
+                                         fg=self.theme_config["fg_dark"],
+                                         bg=self.theme_config["light_4"])
+        self.btn_export_html.grid(row=8, column=2, padx=5, pady=2)
+
         # hide buffer options initially
         self.lbl_buf_size.grid_remove()
         self.entry_buf_size.grid_remove()
         self.lbl_time_window.grid_remove()
+        self.btn_export_html.grid_remove()
 
         # update time window label when sample rate changes
         self.entry_sample_val.bind("<KeyRelease>", lambda e: self._update_time_window_label())
@@ -458,6 +486,12 @@ class TabLog(guic.ThemedFrame):
         )
         self.stim2_channel_drop[0].grid(row=9, column=3, padx=5, pady=2)
 
+        # Samples per step
+        self.lbl_stim2_samples = ttk.Label(self.fr_stimulus, text="Samples / step:", style="TSpunkLabel.TLabel")
+        self.lbl_stim2_samples.grid(row=10, column=2, sticky='w', padx=5, pady=2)
+        self.stim2_samples_entry = tk.Entry(self.fr_stimulus, width=15)
+        self.stim2_samples_entry.grid(row=10, column=3, padx=5, pady=2)
+        self.stim2_samples_entry.insert(0, "1")
 
         # Store second stimulus widgets for easy show/hide
         self.stim2_widgets = [
@@ -466,7 +500,8 @@ class TabLog(guic.ThemedFrame):
             self.lbl_stim2_start, self.stim2_start_entry,
             self.lbl_stim2_stop, self.stim2_stop_entry,
             self.step2_mode_drop[0], self.stim2_step_entry,
-            self.lbl_stim2_channel, self.stim2_channel_drop[0]
+            self.lbl_stim2_channel, self.stim2_channel_drop[0],
+            self.lbl_stim2_samples, self.stim2_samples_entry,
         ]
 
         # Initially hide stimulus controls
@@ -479,11 +514,14 @@ class TabLog(guic.ThemedFrame):
             row=0, column=0, columnspan=3, pady=5, padx=10)
 
         # Listbox showing configured columns
-        self.math_listbox = tk.Listbox(self.fr_math, width=40, height=8,
+        self.math_listbox = tk.Listbox(self.fr_math, width=40, height=6,
                                        bg=self.theme_config["bg_light"],
                                        fg=self.theme_config["fg_light"],
                                        selectmode=tk.SINGLE)
-        self.math_listbox.grid(row=1, column=0, columnspan=3, padx=5, pady=5)
+        math_scrollbar = ttk.Scrollbar(self.fr_math, orient="vertical", command=self.math_listbox.yview)
+        self.math_listbox.config(yscrollcommand=math_scrollbar.set)
+        self.math_listbox.grid(row=1, column=0, columnspan=2, padx=(5, 0), pady=5, sticky="ns")
+        math_scrollbar.grid(row=1, column=2, padx=(0, 5), pady=5, sticky="ns")
 
         # Add / Edit / Remove buttons
         btn_frame = tk.Frame(self.fr_math, bg=self.theme_config["dark_2"])
@@ -577,9 +615,13 @@ class TabLog(guic.ThemedFrame):
         if self.var_use_ps.get():
             self.lbl_rec_ps_channel.grid()
             self.rec_ps_channel_drop[0].grid()
+            self.chk_ps_log_v.grid()
+            self.chk_ps_log_i.grid()
         else:
             self.lbl_rec_ps_channel.grid_remove()
             self.rec_ps_channel_drop[0].grid_remove()
+            self.chk_ps_log_v.grid_remove()
+            self.chk_ps_log_i.grid_remove()
 
     def toggle_use_osc(self):
         if self.var_use_osc.get():
@@ -592,11 +634,13 @@ class TabLog(guic.ThemedFrame):
             self.lbl_buf_size.grid()
             self.entry_buf_size.grid()
             self.lbl_time_window.grid()
+            self.btn_export_html.grid()
             self._update_time_window_label()
         else:
             self.lbl_buf_size.grid_remove()
             self.entry_buf_size.grid_remove()
             self.lbl_time_window.grid_remove()
+            self.btn_export_html.grid_remove()
 
     def _update_time_window_label(self):
         """Compute and display estimated time window from buffer size and sample rate."""
@@ -833,6 +877,7 @@ class TabLog(guic.ThemedFrame):
         # Available variables hint
         hint_text = ("Available variables: Time, DMM_Meas1, PS_Vset1, PS_Vmeas1, PS_Imeas1,\n"
                      "PS_Vset2, PS_Vmeas2, PS_Imeas2, FG_Freq, OSC_CH*_*, prior math cols\n"
+                     "Serial columns: use names you entered in 'Serial columns' field (e.g. col1, col2)\n"
                      "Functions: abs, round, min, max, sqrt, log, log10, exp, pow\n"
                      "Constants: pi, e")
         ttk.Label(dialog, text=hint_text, style="TLabel", wraplength=350).grid(
@@ -869,6 +914,8 @@ class TabLog(guic.ThemedFrame):
         if self.math_evaluator is not None:
             results = self.math_evaluator.evaluate_row(row)
             row.update(results)
+
+    # ── Recording functions ───────────────────────────────────────────────────
 
     def start_record(self):
         # Prevent double-start
@@ -977,6 +1024,11 @@ class TabLog(guic.ThemedFrame):
         self.prompt.print(f"Starting recording at: {self.data_dir}{self.recName}")
         self.prompt.print(f"Recording every {self.record_speed} seconds ...")
 
+        self.btn_pause.config(state=tk.NORMAL, text="Pause",
+                              bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.pause_record())
+        self._record_start_time = time.monotonic()
+
         # Start live plot if requested
         if self.var_live_plot.get():
             self._start_live_plot()
@@ -985,15 +1037,94 @@ class TabLog(guic.ThemedFrame):
         self._record_thread.start()
 
     def stop_record(self):
+        self._paused = False
         self.record_status = False
         if self._record_thread is not None:
             self._record_thread.stop()
         self.cc.recording = False  # Signal to ClassController that recording has stopped
+        self.btn_pause.config(state=tk.DISABLED, text="Pause",
+                              bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.pause_record())
+        self._record_start_time = None
+        self.labelRRate.config(text='')
         self.prompt.print("Stopped data record!")
 
         # plot data if requested
         if self.record_config.make_graph:
             self.final_plot()
+
+    def pause_record(self):
+        """Pause recording — stops the thread but keeps CSV and accumulated data intact."""
+        self._paused = True
+        self.record_status = False
+        if self._record_thread is not None:
+            self._record_thread.stop()
+        self.cc.recording = False
+        self.btn_pause.config(text="Resume",
+                              bg=self.theme_config["light_5"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.resume_record())
+        self.prompt.print("Recording paused")
+
+    def resume_record(self):
+        """Resume recording from paused state — continues writing to the existing CSV."""
+        if not self._paused:
+            return
+        self._paused = False
+        self.record_status = True
+        self.cc.recording = True
+        self.btn_pause.config(text="Pause",
+                              bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
+                              command=lambda: self.pause_record())
+        self._record_start_time = time.monotonic()  # reset rate tracking for resumed segment
+        self.prompt.print(f"Resuming recording ...")
+        self._record_thread = guic.StoppableThread(target=self.thread_record)
+        self._record_thread.start()
+
+    def export_live_plot_html(self):
+        """Export the recorded session data as a self-contained Plotly HTML file."""
+        if not self.recorded_data:
+            self.prompt.print("No data to export yet", print_type="warning")
+            return
+
+        # Default filename derived from CSV name (or timestamped fallback)
+        if self.recName:
+            default_name = os.path.splitext(self.recName)[0] + ".html"
+        else:
+            default_name = f"live_plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+
+        filepath = filedialog.asksaveasfilename(
+            initialdir=self.data_dir,
+            initialfile=default_name,
+            title="Export HTML Plot",
+            defaultextension=".html",
+            filetypes=[("HTML files", "*.html"), ("All files", "*.*")]
+        )
+        if not filepath:
+            return
+        html_path = filepath
+
+        # Determine x-key and channels matching the live plot config
+        if self.stimulus_config and self.stimulus_config.enabled:
+            if self.stimulus_config.is_dual:
+                stim_type = self.stimulus_config.outer_loop.stimulus_type
+            else:
+                stim_type = self.stimulus_config.stimulus_type
+            x_key = logger.get_stimulus_column_name(stim_type)
+            title = "Stimulus Sweep — Exported"
+        else:
+            x_key = logger.COL_TIME
+            title = "Live Plot — Exported"
+
+        channels = []
+        if self.record_config.use_dmm:
+            channels.append(logger.COL_DMM_MEAS1)
+        if self.record_config.use_ps:
+            channels.extend([logger.COL_PS_VMEAS1, logger.COL_PS_IMEAS1])
+        if self.record_config.use_osc and self.record_config.osc_config:
+            channels += logger.build_osc_columns(self.record_config.osc_config)
+
+        plotter.export_recorded_data_html(self.recorded_data, x_key, channels, title, html_path)
+        self.prompt.print(f"Exported HTML to: {html_path}")
 
     ##############################################################################
     ####      RECORDING FUNCTIONS        #########################################
@@ -1002,6 +1133,16 @@ class TabLog(guic.ThemedFrame):
     def set_record_directory(self):
         self.data_dir = filedialog.askdirectory()
         self.lbl_data_directory.config(text=self.data_dir)
+
+    def _update_record_counter(self):
+        """Update the record counter and effective sample rate labels."""
+        cnt = self.recCnt
+        self.after(0, lambda t=f'#{cnt:7d}': self.labelRNums.config(text=t))
+        if cnt % 10 == 0 and cnt > 0 and self._record_start_time is not None:
+            elapsed = time.monotonic() - self._record_start_time
+            if elapsed > 0:
+                rate = cnt / elapsed
+                self.after(0, lambda r=rate: self.labelRRate.config(text=f'{r:.2f} Hz'))
 
     def _get_sample_interval(self):
         """Return the sample interval in seconds from the rate entry + unit dropdown."""
@@ -1052,10 +1193,15 @@ class TabLog(guic.ThemedFrame):
                 )
 
                 # Create dual stimulus config
+                try:
+                    samples_per_step = max(1, int(self.stim2_samples_entry.get()))
+                except ValueError:
+                    samples_per_step = 1
                 self.stimulus_config = logger.DualStimulusConfig(
                     enabled=True,
                     outer_loop=outer_config,
-                    inner_loop=inner_config
+                    inner_loop=inner_config,
+                    samples_per_step=samples_per_step,
                 )
 
                 # Validate the config
@@ -1109,13 +1255,15 @@ class TabLog(guic.ThemedFrame):
             self.var_use_dmm.get(),
             self.var_use_ps.get(),
             self.var_use_fg.get(),
-            self.rec_ps_channel_drop[1].get(),
+            int(self.rec_ps_channel_drop[1].get()),
             self.serial_log_params.get("1.0", "end").strip(),
             self.var_graph_data.get(),
             use_osc=self.var_use_osc.get(),
-            osc_config=self.osc_record_config
+            osc_config=self.osc_record_config,
+            ps_log_voltage=bool(self.var_ps_log_v.get()),
+            ps_log_current=bool(self.var_ps_log_i.get()),
         )
-        self.record_config.print()
+        _logger.debug(self.record_config.pretty())
 
         # create stimulus config if enabled
         if self.var_use_stimulus.get():
@@ -1150,6 +1298,8 @@ class TabLog(guic.ThemedFrame):
 
     def thread_record_timed(self):
         while self.record_status:
+            t_start = time.monotonic()
+
             # Build a row of data based on what user wants
             row = self._collect_data_row()
             self._apply_math_columns(row)
@@ -1158,19 +1308,22 @@ class TabLog(guic.ThemedFrame):
             self.recorded_data.append(row)
             self._save_data_row(row)
 
-            # Update record counter and UI
+            # Update record counter and UI (thread-safe)
             self.recCnt += 1
-            self.labelRNums.config(text=f'#{self.recCnt:7d}')
+            self._update_record_counter()
 
-            # Wait for next sample
-            time.sleep(self.record_speed)
+            # Deadline-based sleep: only sleep the remaining time in the interval
+            elapsed = time.monotonic() - t_start
+            remaining = self.record_speed - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
 
     def start_record_stimulus(self):
         self.prompt.print(f"Starting stimulus sweep with {len(self.stimulus_generator)} steps")
 
         # turn on power supply if being used as a stimulus
         if self.stimulus_config.uses_ps():
-            self.cc.ps.output_on(self.stimulus_config.channel)
+            self.cc.ps_service.output_on(self.stimulus_config.channel)
 
         # start stimulus thread
         try:
@@ -1193,68 +1346,23 @@ class TabLog(guic.ThemedFrame):
 
     def thread_record_serial(self):
         """Serial-triggered data collection: collects test equipment data each time serial line is received"""
+        self.prompt.print("Starting serial recording thread ...")
         while self.record_status:
             try:
                 # Wait for serial data (blocks until \n is received)
-                serial_data = self.cc.ser.read_line()
+                serial_data = self.cc.ser.read_line().decode('utf-8').rstrip('\r\n')
 
-                # Build timestamp
-                row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
-
-                # Add the serial data we just received
-                if self.record_config.use_ser:
-                    row[logger.COL_SERIAL] = serial_data
-
-                # Collect DMM data if requested
-                if self.record_config.use_dmm:
-                    row[logger.COL_DMM_MEAS1] = self.cc.dmm.read_value()
-
-                # Collect Power Supply data if requested
-                if self.record_config.use_ps:
-                    try:
-                        row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
-                        row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
-                        row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-                        if self.record_config.ps_channel == 2:
-                            row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
-                            row[logger.COL_PS_VMEAS2] = self.cc.ps.get_voltage(2)
-                            row[logger.COL_PS_IMEAS2] = self.cc.ps.get_current(2)
-                    except COMMUNICATION_ERRORS as e:
-                        self.record_status = False
-                        guih.alert_user("Serial logger: PS comm error", str(e), "error")
-                        break
-
-                # Collect Function Generator data if requested
-                if self.record_config.use_fg:
-                    try:
-                        row[logger.COL_FG_FREQ] = self.cc.fg.query(
-                            self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
-                        )
-                        row[logger.COL_FG_WAVEFORM] = self.cc.fg.query(
-                            self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
-                        )
-                    except Exception:
-                        row[logger.COL_FG_FREQ] = "ERROR"
-                        row[logger.COL_FG_WAVEFORM] = "ERROR"
-
-                # Collect Oscilloscope data if requested
-                if self.record_config.use_osc and self.record_config.osc_config:
-                    try:
-                        osc_data = logger.collect_osc_measurements(self.cc.osc, self.record_config.osc_config)
-                        row.update(osc_data)
-                    except COMMUNICATION_ERRORS as e:
-                        guih.alert_user("Logger: OSC comm error", str(e), "error")
-                        break
-
+                # Collect all data using shared helper
+                row = self._collect_data_row(serial_data=serial_data)
                 self._apply_math_columns(row)
 
                 # Save row (locally and to sinks)
                 self.recorded_data.append(row)
                 self._save_data_row(row)
 
-                # Update record counter and UI
+                # Update record counter and UI (thread-safe)
                 self.recCnt += 1
-                self.labelRNums.config(text=f'#{self.recCnt:7d}')
+                self._update_record_counter()
 
             except Exception as e:
                 self.prompt.print(f"Error in serial-triggered recording: {e}")
@@ -1287,14 +1395,19 @@ class TabLog(guic.ThemedFrame):
             self.recorded_data.append(row)
             self._save_data_row(row)
 
-            # Update progress
+            # Update progress (thread-safe)
             self.recCnt += 1
             progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
-            self.labelRNums.config(text=progress_text)
+            self.after(0, lambda t=progress_text: self.labelRNums.config(text=t))
             self.prompt.print(f"Step {step_num}: Stimulus={stimulus_value:.3f}")
 
     def _thread_record_dual_stimulus(self):
         """Dual parameter stimulus sweep (nested loops)"""
+        outer_name = logger.get_stimulus_column_name(self.stimulus_config.outer_loop.stimulus_type)
+        inner_name = logger.get_stimulus_column_name(self.stimulus_config.inner_loop.stimulus_type)
+        n_samples = self.stimulus_config.samples_per_step
+        total_steps = len(self.stimulus_generator)
+
         for step_num, (outer_value, inner_value) in enumerate(self.stimulus_generator, 1):
             if not self.record_status:
                 break
@@ -1302,79 +1415,88 @@ class TabLog(guic.ThemedFrame):
             # Apply both stimuli
             self._apply_stimulus(outer_value, dual=1)
             self._apply_stimulus(inner_value, dual=2)
-            self.prompt.print(f"Step {step_num}: Outer={outer_value:.3f}, Inner={inner_value:.3f}")
+            self.prompt.print(f"Step {step_num}/{total_steps}: Outer={outer_value:.3f}, Inner={inner_value:.3f}"
+                              + (f" ({n_samples} samples)" if n_samples > 1 else ""))
 
             # Wait for settling (use outer loop settling time)
             time.sleep(self.stimulus_config.outer_loop.settling_time)
 
-            # Collect data
-            row = self._collect_data_row()
+            for sample_idx in range(1, n_samples + 1):
+                if not self.record_status:
+                    break
 
-            # Add stimulus values to the row (use actual parameter names)
-            outer_name = logger.get_stimulus_column_name(self.stimulus_config.outer_loop.stimulus_type)
-            inner_name = logger.get_stimulus_column_name(self.stimulus_config.inner_loop.stimulus_type)
-            row[outer_name] = outer_value
-            row[inner_name] = inner_value
-            row[logger.COL_STIMULUS_STEP] = step_num
-            self._apply_math_columns(row)
+                row = self._collect_data_row()
+                row[outer_name] = outer_value
+                row[inner_name] = inner_value
+                row[logger.COL_STIMULUS_STEP] = step_num
+                self._apply_math_columns(row)
 
-            # Save row (locally and to sinks)
-            self.recorded_data.append(row)
-            self._save_data_row(row)
+                self.recorded_data.append(row)
+                self._save_data_row(row)
 
-            # Update progress
-            self.recCnt += 1
-            progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
-            self.labelRNums.config(text=progress_text)
+                self.recCnt += 1
+                if n_samples > 1:
+                    progress_text = f'Step {step_num}/{total_steps} S{sample_idx}/{n_samples}'
+                else:
+                    progress_text = f'Step {step_num}/{total_steps}'
+                self.after(0, lambda t=progress_text: self.labelRNums.config(text=t))
 
-    def _collect_data_row(self):
+    def _collect_data_row(self, serial_data=None):
         row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}
 
         # Serial data if requested
-        if self.record_config.use_ser is True:
-            row[logger.COL_SERIAL] = self.cc.ser.read_line()
+        if self.record_config.use_ser:
+            if serial_data is None:
+                raw = self.cc.ser.read_line()
+                if isinstance(raw, bytes):
+                    raw = raw.decode('utf-8').rstrip('\r\n')
+                serial_data = raw
+            serial_cols = logger.parse_serial_params(self.record_config.serial_params)
+            if serial_cols:
+                parts = serial_data.split(",")
+                for i, col in enumerate(serial_cols):
+                    row[col] = parts[i].strip() if i < len(parts) else ""
+            else:
+                row[logger.COL_SERIAL] = serial_data
 
         # DMM data if requested
         if self.record_config.use_dmm:
-            row[logger.COL_DMM_MEAS1] = self.cc.dmm.read_value()
+            val, _ = self.cc.dmm_service.read_value()
+            row[logger.COL_DMM_MEAS1] = val if val is not None else "ERROR"
 
         # Power Supply data if requested
         if self.record_config.use_ps:
-            try:
-                row[logger.COL_PS_VSET1] = self.cc.ps.get_set_voltage(1)
-                row[logger.COL_PS_VMEAS1] = self.cc.ps.get_voltage(1)
-                row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-                if self.record_config.ps_channel == 2:
-                    row[logger.COL_PS_VSET2] = self.cc.ps.get_set_voltage(2)
-                    row[logger.COL_PS_VMEAS2] = self.cc.ps.get_set_voltage(2)
-                    row[logger.COL_PS_IMEAS1] = self.cc.ps.get_current(1)
-            except COMMUNICATION_ERRORS:
-                row[logger.COL_PS_VSET1] = "ERROR"
-                row[logger.COL_PS_VMEAS1] = "ERROR"
-                row[logger.COL_PS_IMEAS1] = "ERROR"
-                if self.record_config.ps_channel == 2:
-                    row[logger.COL_PS_VSET2] = "ERROR"
-                    row[logger.COL_PS_VMEAS2] = "ERROR"
+            if self.record_config.ps_log_voltage:
+                v1set = self.cc.ps_service.read_set_voltage(1)
+                v1 = self.cc.ps_service.read_voltage(1)
+                row[logger.COL_PS_VSET1] = v1set if v1set is not None else "ERROR"
+                row[logger.COL_PS_VMEAS1] = v1 if v1 is not None else "ERROR"
+            if self.record_config.ps_log_current:
+                i1 = self.cc.ps_service.read_current(1)
+                row[logger.COL_PS_IMEAS1] = i1 if i1 is not None else "ERROR"
+            if self.record_config.ps_channel == 2:
+                if self.record_config.ps_log_voltage:
+                    v2set = self.cc.ps_service.read_set_voltage(2)
+                    v2 = self.cc.ps_service.read_voltage(2)
+                    row[logger.COL_PS_VSET2] = v2set if v2set is not None else "ERROR"
+                    row[logger.COL_PS_VMEAS2] = v2 if v2 is not None else "ERROR"
+                if self.record_config.ps_log_current:
+                    i2 = self.cc.ps_service.read_current(2)
+                    row[logger.COL_PS_IMEAS2] = i2 if i2 is not None else "ERROR"
 
         # Function Generator data if requested
         if self.record_config.use_fg:
-            try:
-                row[logger.COL_FG_FREQ] = self.cc.fg.query(
-                    self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_frequency")
-                )
-                row[logger.COL_FG_WAVEFORM] = self.cc.fg.query(
-                    self.cc.fg.registry.get_command(self.cc.fg.model, "command", "get_shape")
-                )
-            except Exception:
-                row[logger.COL_FG_FREQ] = "ERROR"
-                row[logger.COL_FG_WAVEFORM] = "ERROR"
+            freq = self.cc.fg_service.get_frequency()
+            shape = self.cc.fg_service.get_shape()
+            row[logger.COL_FG_FREQ] = freq if freq is not None else "ERROR"
+            row[logger.COL_FG_WAVEFORM] = shape if shape is not None else "ERROR"
 
         # Oscilloscope data if requested
         if self.record_config.use_osc and self.record_config.osc_config:
             try:
                 osc_data = logger.collect_osc_measurements(self.cc.osc, self.record_config.osc_config)
                 row.update(osc_data)
-            except COMMUNICATION_ERRORS:
+            except Exception:
                 for col in logger.build_osc_headers(self.record_config.osc_config):
                     row[col] = "ERROR"
 
@@ -1392,13 +1514,13 @@ class TabLog(guic.ThemedFrame):
             return
 
         if loop_config.stimulus_type == logger.StimulusType.PS_VOLTAGE:
-            self.cc.ps.set_voltage(value, channel=loop_config.channel)
+            self.cc.ps_service.set_voltage(loop_config.channel, value)
 
         elif loop_config.stimulus_type == logger.StimulusType.FG_FREQUENCY:
-            self.cc.fg.set_frequency(value)
+            self.cc.fg_service.set_frequency(value)
 
         elif loop_config.stimulus_type == logger.StimulusType.FG_DUTY_CYCLE:
-            self.cc.fg.set_duty(value)
+            self.cc.fg_service.set_duty(value)
 
         else:
             raise ValueError(f"Unknown stimulus type: {loop_config.stimulus_type}")
@@ -1421,8 +1543,10 @@ class TabLog(guic.ThemedFrame):
         if self.record_config.use_dmm:
             y_channels.append((logger.COL_DMM_MEAS1, "DMM (V)"))
         if self.record_config.use_ps:
-            y_channels.append((logger.COL_PS_VMEAS1, "PS Voltage (V)"))
-            y_channels.append((logger.COL_PS_IMEAS1, "PS Current (A)"))
+            if self.record_config.ps_log_voltage:
+                y_channels.append((logger.COL_PS_VMEAS1, "PS Voltage (V)"))
+            if self.record_config.ps_log_current:
+                y_channels.append((logger.COL_PS_IMEAS1, "PS Current (A)"))
         if self.record_config.use_osc and self.record_config.osc_config:
             for col in logger.build_osc_columns(self.record_config.osc_config):
                 y_channels.append((col, col))
@@ -1517,13 +1641,23 @@ class TabLog(guic.ThemedFrame):
 
         # Build channels list from record config
         channels = []
+        if self.record_config.use_ser:
+            serial_cols = logger.parse_serial_params(self.record_config.serial_params)
+            if serial_cols:
+                channels.extend(serial_cols)
+            else:
+                channels.append(logger.COL_SERIAL)
         if self.record_config.use_dmm:
             channels.append(logger.COL_DMM_MEAS1)
         if self.record_config.use_ps:
-            channels.append(logger.COL_PS_VMEAS1)
-            channels.append(logger.COL_PS_IMEAS1)
+            if self.record_config.ps_log_voltage:
+                channels.append(logger.COL_PS_VMEAS1)
+            if self.record_config.ps_log_current:
+                channels.append(logger.COL_PS_IMEAS1)
         if self.record_config.use_osc and self.record_config.osc_config:
             channels += logger.build_osc_columns(self.record_config.osc_config)
+        if not self.math_config.is_empty():
+            channels += self.math_config.get_column_names()
 
         if not channels:
             self.prompt.print("No channels selected for live plot")

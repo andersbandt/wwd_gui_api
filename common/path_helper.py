@@ -1,7 +1,19 @@
 """Centralized path management for data directories."""
 
+import logging
 import os
 import configparser
+
+logger = logging.getLogger(__name__)
+
+# Module-level reference to the centralized ConfigService (set at startup)
+_config_svc = None
+
+
+def init_config_service(config_svc):
+    """Wire in the centralized ConfigService. Called once from gui_driver.main()."""
+    global _config_svc
+    _config_svc = config_svc
 
 
 def get_config_path():
@@ -11,6 +23,10 @@ def get_config_path():
 
 def get_logger_prefix():
     """Get the recording filename prefix from master.ini [LOGGER] section."""
+    if _config_svc is not None:
+        return _config_svc.get_logger_prefix()
+
+    # Fallback: read directly (before ConfigService is available)
     config_file_path = get_config_path()
     default_prefix = "AREC"
 
@@ -38,20 +54,22 @@ def get_data_dir(subdir=None, create=True):
         get_data_dir()              # Returns "data"
         get_data_dir("ps_data")     # Returns "data/ps_data"
     """
-    config_file_path = get_config_path()
-    default_data_dir = "data"
+    if _config_svc is not None:
+        data_dir = _config_svc.get_data_dir_name()
+    else:
+        # Fallback: read directly (before ConfigService is available)
+        config_file_path = get_config_path()
+        default_data_dir = "data"
 
-    # Read data directory from config
-    if os.path.exists(config_file_path):
-        config = configparser.ConfigParser()
-        config.read(config_file_path)
-
-        if "PATHS" in config:
-            data_dir = config["PATHS"].get("data_dir", default_data_dir).strip()
+        if os.path.exists(config_file_path):
+            config = configparser.ConfigParser()
+            config.read(config_file_path)
+            if "PATHS" in config:
+                data_dir = config["PATHS"].get("data_dir", default_data_dir).strip()
+            else:
+                data_dir = default_data_dir
         else:
             data_dir = default_data_dir
-    else:
-        data_dir = default_data_dir
 
     # Add subdirectory if specified
     if subdir:
@@ -62,7 +80,7 @@ def get_data_dir(subdir=None, create=True):
     # Create directory if it doesn't exist
     if create and not os.path.exists(full_path):
         os.makedirs(full_path, exist_ok=True)
-        print(f"Created data directory: {full_path}")
+        logger.info(f"Created data directory: {full_path}")
 
     return full_path
 

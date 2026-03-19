@@ -1,6 +1,8 @@
 """Automated test equipment sequencing tab."""
 
 # import needed GUI packages
+import logging
+import os
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -11,6 +13,8 @@ from gui import gui_class as guic
 
 # import user created modules
 from common import plotter
+from common.script_runner import ScriptRunner
+from analysis import stats_analysis
 
 # import needed packages
 from datetime import datetime
@@ -19,6 +23,8 @@ from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from common import logger
 import numpy as np
+
+_logger = logging.getLogger(__name__)
 
 
 
@@ -34,26 +40,17 @@ class TabATE(guic.ThemedFrame):
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_accuracy = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_script = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # set up serial / PS variables
         self.ate = None
 
+        # Script runner
+        self.scripts_dir = os.path.join("data", "scripts")
+        self.script_runner = ScriptRunner(self.cc, self._script_log)
+
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "ATE Output")
-        self.prompt.grid(row=10, column=0, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-
-        # initialize tab content
-        self.initTabContent()
-
-        # place everything in grid
-        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.fr_control.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.fr_accuracy.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
-        self.prompt.grid(row=2, column=1, columnspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
-
-        # configure grid weights so prompt expands to fill available space
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
 
         # set up serial port (has to be done after tab content is initialized)
         self.fr_port = guic.SerialConnFrame(self,
@@ -67,13 +64,30 @@ class TabATE(guic.ThemedFrame):
         self.fr_port.initialize_fr()
         if autoconnect:
             self.fr_port.connect_previous_port()
-        self.fr_port.grid(row=0, column=1, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+
+        # place everything in grid
+        self.fr_info.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_control.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_accuracy.grid(row=3, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.fr_script.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
+        self.prompt.grid(row=1, column=2, rowspan=4, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+
+        # configure grid weights so prompt expands to fill available space
+        self.columnconfigure(2, weight=1)
+        self.rowconfigure(1, weight=1)
+
+        # initialize tab content
+        self.initTabContent()
+
 
     def initTabContent(self):
-        print("Initializing tab 7 (ATE) content")
+        _logger.debug("Initializing tab 7 (ATE) content")
+        self.create_tab_header("ATE", columnspan=5)
         self.init_fr_info()
         self.init_fr_control()
         self.init_fr_accuracy()
+        self.init_fr_script()
 
     def init_fr_info(self):
         self.labelInfo = ttk.Label(self.fr_info, text='Generic ATE Info', style="TPinkLabel.TLabel", width=15)
@@ -90,16 +104,13 @@ class TabATE(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("Generic_ATE")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous ATE model: {previous_model}")
+            _logger.info(f"Restored previous ATE model: {previous_model}")
 
         # Add labels for device information
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
         self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
 
         self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
-        self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
-
-        self.labelVers = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
         self.labelTimeConnectedValue = tk.Label(self.fr_info, text='', width=25, relief='sunken', anchor='w')
 
         # Position the device information labels
@@ -109,6 +120,10 @@ class TabATE(guic.ThemedFrame):
         self.labelTimeConnected.grid(row=3, column=0, sticky='W', padx=5, pady=1)
         self.labelTimeConnectedValue.grid(row=3, column=1, sticky='W', padx=5, pady=1)
 
+        # Scan IDN button — queries *IDN? on all discovered PyVISA resources
+        self.btn_scan_idn = tk.Button(self.fr_info, text='Scan IDN', command=self.scan_idn)
+        self.btn_scan_idn.grid(row=4, column=0, columnspan=2, pady=5, padx=5, sticky='W')
+
     def init_fr_control(self):
         fr_m = self.fr_control
 
@@ -117,7 +132,7 @@ class TabATE(guic.ThemedFrame):
 
         # GENERAL CONTROLS
         self.cmd_label = ttk.Label(fr_m, text="Command", style="TLabel")
-        self.cmd_entry = tk.Entry(fr_m)
+        self.cmd_entry = tk.Entry(fr_m, width=15)
         self.cmd_button = tk.Button(fr_m, text="Send",
                                       command=lambda: self.ate_command(self.cmd_entry.get())
                                       )
@@ -126,17 +141,20 @@ class TabATE(guic.ThemedFrame):
                                       )
 
 
-        # MISC CONTROL
-        self.benchmark = tk.Button(fr_m, text="Benchmark",
-                                      command=lambda: self.ate_benchmark()
-                                      )
+        # BENCHMARK CONTROLS
+        self.bench_method_drop = guih.generate_drop_down(fr_m, ["read_value", "test_conn"])
+        self.bench_store_var = tk.BooleanVar()
+        self.bench_store_check = tk.Checkbutton(fr_m, text="Store Values", variable=self.bench_store_var)
+        self.benchmark = tk.Button(fr_m, text="Benchmark", command=self.ate_benchmark)
 
         # place everything on grid
         self.cmd_label.grid(row=1, column=0, padx=10, pady=10)
         self.cmd_entry.grid(row=1, column=1, padx=10, pady=10)
         self.cmd_button.grid(row=1, column=2, padx=10, pady=10)
         self.qry_button.grid(row=1, column=3, padx=10, pady=10)
-        self.benchmark.grid(row=2, column=0, padx=10, pady=10)
+        self.bench_method_drop[0].grid(row=2, column=0, padx=10, pady=10)
+        self.bench_store_check.grid(row=2, column=1, padx=10, pady=10, sticky='w')
+        self.benchmark.grid(row=2, column=2, padx=10, pady=10)
 
     def init_fr_accuracy(self):
         """Initialize the instrument accuracy testing frame"""
@@ -192,8 +210,114 @@ class TabATE(guic.ThemedFrame):
                                          height=2, width=20)
         self.acc_run_button.grid(row=2, column=2, rowspan=3, padx=20, pady=10)
 
+    def init_fr_script(self):
+        """Initialize the script runner frame."""
+        fr_m = self.fr_script
+
+        title_label = ttk.Label(fr_m, text='Script Runner', style="TPinkLabel.TLabel", width=20)
+        title_label.grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Script selection dropdown
+        ttk.Label(fr_m, text="Script:", style="TLabel").grid(row=1, column=0, sticky='e', padx=5, pady=5)
+        scripts = ScriptRunner.list_scripts(self.scripts_dir)
+        self.script_drop = guih.generate_drop_down(fr_m, scripts if scripts else ["(no scripts found)"])
+        self.script_drop[0].grid(row=1, column=1, padx=5, pady=5)
+
+        # Refresh button
+        self.script_refresh_btn = tk.Button(fr_m, text="Refresh",
+                                            command=self._refresh_script_list,
+                                            width=8)
+        self.script_refresh_btn.grid(row=1, column=2, padx=5, pady=5)
+
+        # Run / Stop buttons
+        self.script_run_btn = tk.Button(fr_m, text="Run Script",
+                                        command=self._run_script,
+                                        bg=self.theme_config["success"],
+                                        fg=self.theme_config["fg_dark"],
+                                        height=2, width=12)
+        self.script_run_btn.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+
+        self.script_stop_btn = tk.Button(fr_m, text="Stop",
+                                         command=self._stop_script,
+                                         bg=self.theme_config["error"],
+                                         fg=self.theme_config["fg_dark"],
+                                         height=2, width=12,
+                                         state=tk.DISABLED)
+        self.script_stop_btn.grid(row=2, column=2, padx=10, pady=10)
+
+    def _script_log(self, msg):
+        """Thread-safe log callback for the script runner."""
+        self.after(0, lambda: self.prompt.print(str(msg)))
+
+    def _run_script(self):
+        """Run the selected script."""
+        selected = self.script_drop[1].get()
+        if not selected or selected == "(no scripts found)":
+            guih.alert_user("No Script", "Please select a script to run.", "warning")
+            return
+
+        script_path = os.path.join(self.scripts_dir, selected)
+        started = self.script_runner.run(script_path)
+        if started:
+            self.script_run_btn.config(state=tk.DISABLED)
+            self.script_stop_btn.config(state=tk.NORMAL)
+            self._poll_script_done()
+
+    def _stop_script(self):
+        """Stop the running script."""
+        self.script_runner.stop()
+
+    def _poll_script_done(self):
+        """Check if the script thread has finished and re-enable buttons."""
+        if self.script_runner.is_running():
+            self.after(500, self._poll_script_done)
+        else:
+            self.script_run_btn.config(state=tk.NORMAL)
+            self.script_stop_btn.config(state=tk.DISABLED)
+
+    def _refresh_script_list(self):
+        """Rescan scripts directory and update the dropdown."""
+        scripts = ScriptRunner.list_scripts(self.scripts_dir)
+        menu = self.script_drop[0]["menu"]
+        menu.delete(0, "end")
+        var = self.script_drop[1]
+        if scripts:
+            for s in scripts:
+                menu.add_command(label=s, command=lambda v=s: var.set(v))
+            var.set(scripts[0])
+        else:
+            menu.add_command(label="(no scripts found)", command=lambda: var.set("(no scripts found)"))
+            var.set("(no scripts found)")
+
+    def scan_idn(self):
+        """Query *IDN? on all discovered PyVISA resources and print results."""
+        import pyvisa
+        self.prompt.print("--- Scanning PyVISA resources ---")
+        try:
+            rm = pyvisa.ResourceManager()
+            resources = [r for r in rm.list_resources() if not r.startswith('ASRL')]
+        except Exception as e:
+            self.prompt.print(f"Could not open ResourceManager: {e}", "error")
+            return
+
+        if not resources:
+            self.prompt.print("No PyVISA resources found.")
+            return
+
+        for addr in resources:
+            try:
+                inst = rm.open_resource(addr)
+                idn = inst.query("*IDN?").strip()
+                inst.close()
+                self.prompt.print(f"  {addr} -> {idn}")
+            except Exception as e:
+                self.prompt.print(f"  {addr} -> ERROR: {e}", "warning")
+
+        self.prompt.print(f"Scan complete. {len(resources)} resource(s) found.")
+
     def gui_refresh(self, event):
-        self.fr_port.refresh_ports()
+        if not self.fr_port.status:
+            self.fr_port.refresh_ports()
 
     ##############################################################################
     ####      ACTION FUNCTIONS        ############################################
@@ -297,22 +421,58 @@ Understanding Results:
             self.prompt.print(f"Got response: {res}")
 
     def ate_benchmark(self):
-        if self.ate is not None:
-            self.prompt.print("Running benchmark with the `test_conn` function")
-            time.sleep(0.2)
-            # bench_result = self.ate.benchmark(100, self.ate.test_conn)
-            bench_result = self.ate.benchmark(100, self.ate.read_value)
-            self.prompt.print(bench_result["string"])
+        if self.ate is None:
+            return
+        method_name = self.bench_method_drop[1].get()
+        method = self.ate.read_value if method_name == "read_value" else self.ate.test_conn
+        store = self.bench_store_var.get()
+
+        self.prompt.print(f"Running benchmark with {method_name} (store={store})...")
+        time.sleep(0.2)
+        try:
+            bench_result = self.ate.benchmark(100, method, store_values=store)
+        except COMMUNICATION_ERRORS as e:
+            self.prompt.print("Communication error: " + str(e), "error")
+            guih.alert_user("Communication error: ", str(e), "error")
+            return
+        self.prompt.print(bench_result["string"])
+
+        if store and bench_result["values"]:
+            self._show_benchmark_values(bench_result)
+        else:
             guih.alert_user("Benchmark complete!", bench_result["string"], "info")
+
+    def _show_benchmark_values(self, bench_result):
+        win = tk.Toplevel(self)
+        win.title("Benchmark Values")
+        win.geometry("420x500")
+
+        ttk.Label(win, text=bench_result["string"], style="TLabel", justify="left").pack(pady=10, padx=10, anchor='w')
+
+        frame = tk.Frame(win)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        scrollbar = tk.Scrollbar(frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        text = tk.Text(frame, yscrollcommand=scrollbar.set, width=50)
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=text.yview)
+
+        for i, val in enumerate(bench_result["values"]):
+            text.insert(tk.END, f"{i + 1}: {val}\n")
+        text.config(state=tk.DISABLED)
+
+        tk.Button(win, text="Close", command=win.destroy).pack(pady=10)
 
     def run_accuracy_test(self):
         """Run instrument accuracy test by sweeping PS and measuring with DMM"""
         # Check that PS and DMM are connected
-        if self.cc.ps is None:
+        if not self.cc.get_ps_status():
             guih.alert_user("PS Not Connected", "Please connect a power supply before running accuracy test", "error")
             return
 
-        if self.cc.dmm is None:
+        if not self.cc.get_dmm_status():
             guih.alert_user("DMM Not Connected", "Please connect a DMM before running accuracy test", "error")
             return
 
@@ -368,16 +528,19 @@ Understanding Results:
 
         # Perform sweep
         try:
-            self.cc.ps.output_on(ps_channel)
+            self.cc.ps_service.output_on(ps_channel)
             for step_num, voltage in enumerate(stimulus_gen, 1):
                 # Set PS voltage
-                self.cc.ps.set_voltage(voltage, channel=ps_channel)
+                self.cc.ps_service.set_voltage(ps_channel, voltage)
 
                 # Wait for settling
                 time.sleep(settling_time)
 
                 # Read DMM measurement
-                dmm_reading = self.cc.dmm.read_value()
+                dmm_reading, _ = self.cc.dmm_service.read_value()
+                if dmm_reading is None:
+                    self.prompt.print("DMM read error, aborting test", "error")
+                    break
 
                 # Calculate error
                 error = dmm_reading - voltage
@@ -391,71 +554,48 @@ Understanding Results:
                 self.prompt.print(f"Step {step_num}/{num_steps}: Set={voltage:.4f}V, Measured={dmm_reading:.4f}V, Error={error:.4f}V")
 
             # end test
-            self.cc.ps.output_off(ps_channel)
+            self.cc.ps_service.output_off(ps_channel)
 
             # Calculate statistics
-            errors_array = np.array(errors)
             set_array = np.array(set_voltages)
             measured_array = np.array(measured_voltages)
 
-            mean_error = np.mean(errors_array)
-            std_error = np.std(errors_array)
-            max_error = np.max(np.abs(errors_array))
-            rms_error = np.sqrt(np.mean(errors_array**2))
-
-            # Calculate percent errors
-            # Avoid division by zero by using full scale (stop - start)
-            full_scale = abs(stop_voltage - start_voltage)
-            if full_scale > 0:
-                mean_error_pct = (abs(mean_error) / full_scale) * 100
-                max_error_pct = (max_error / full_scale) * 100
-            else:
-                mean_error_pct = 0
-                max_error_pct = 0
-
-            # Format results
-            results = []
-            results.append("=" * 80)
-            results.append("INSTRUMENT ACCURACY TEST RESULTS")
-            results.append("=" * 80)
-            results.append(f"\nTest Configuration:")
-            results.append(f"  Voltage Range: {start_voltage}V to {stop_voltage}V")
-            results.append(f"  Number of Steps: {num_steps}")
-            results.append(f"  Settling Time: {settling_time}s")
-            results.append(f"  PS Channel: {ps_channel}")
-            results.append(f"\nStatistics:")
-            results.append(f"  Mean Error:          {mean_error:>10.6f} V  ({mean_error_pct:>6.3f}% of full scale)")
-            results.append(f"  Std Deviation:       {std_error:>10.6f} V")
-            results.append(f"  RMS Error:           {rms_error:>10.6f} V")
-            results.append(f"  Max Absolute Error:  {max_error:>10.6f} V  ({max_error_pct:>6.3f}% of full scale)")
-            results.append(f"\nDetailed Measurements:")
-            results.append(f"{'Step':<6} {'Set (V)':<12} {'Measured (V)':<12} {'Error (V)':<12} {'Error (%FS)':<12}")
-            results.append("-" * 80)
-
-            for i in range(len(set_voltages)):
-                error_pct = (abs(errors[i]) / full_scale) * 100 if full_scale > 0 else 0
-                results.append(f"{i+1:<6} {set_voltages[i]:<12.6f} {measured_voltages[i]:<12.6f} {errors[i]:<12.6f} {error_pct:<12.3f}")
-
-            results.append("=" * 80)
+            stats = stats_analysis.compute_accuracy_stats(set_array, measured_array)
+            report = stats_analysis.format_accuracy_report(
+                stats, set_voltages, measured_voltages,
+                config={
+                    "start_voltage": start_voltage,
+                    "stop_voltage": stop_voltage,
+                    "num_steps": num_steps,
+                    "settling_time": settling_time,
+                    "ps_channel": ps_channel,
+                })
 
             # Display results
-            self.prompt.print("\n".join(results), "normal")
+            self.prompt.print(report, "normal")
             self.prompt.print("Accuracy test complete!")
-            self.prompt.print(f"Mean Error: {mean_error:.6f}V ({mean_error_pct:.3f}% FS), Max Error: {max_error:.6f}V ({max_error_pct:.3f}% FS)")
+            self.prompt.print(f"Mean Error: {stats['mean_error']:.6f}V ({stats['mean_error_pct']:.3f}% FS), Max Error: {stats['max_error']:.6f}V ({stats['max_error_pct']:.3f}% FS)")
+
+            # Compute and display calibration coefficients
+            cal = stats_analysis.fit_cal_coeffs(set_array, measured_array)
+            self.prompt.print(
+                f"\n--- Calibration Coefficients (CH{ps_channel}) ---\n"
+                f"  fit: measured = {cal['fit_slope']:.6f}*set + {cal['fit_intercept']:.6f}  (R={cal['r']:.6f})\n"
+                f"  v_slope  = {cal['v_slope']}\n"
+                f"  v_offset = {cal['v_offset']}\n"
+                f"  Paste into EEequipment/SPD3303X/config.ini under [CH{ps_channel}]"
+            )
 
             # Plot results with residuals
             plotter.plot_accuracy_with_residuals(
                 set_array,
                 measured_array,
-                errors_array,
+                stats["errors"],
                 x_label="Set Voltage (V)",
                 y_label="Measured Voltage (V)",
                 title="Power Supply Accuracy Analysis")
 
 
-        except COMMUNICATION_ERRORS as e:
-            guih.alert_user("Communication Error", f"Error communicating with equipment: {str(e)}", "error")
-            self.prompt.print(f"Error during accuracy test: {str(e)}", "error")
         except Exception as e:
             guih.alert_user("Test Error", f"An error occurred during testing: {str(e)}", "error")
             self.prompt.print(f"Error during accuracy test: {str(e)}", "error")
@@ -504,7 +644,7 @@ Understanding Results:
         self.prompt.print(f"Closing PYVISA resource!")
         self.ate.disconnect()
         self.fr_port.set_status(False)
-        self.cc.set_ps(None)
+        self.ate = None
         self.prompt.print(f"Connection is closed.")
 
 

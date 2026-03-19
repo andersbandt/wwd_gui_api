@@ -1,6 +1,7 @@
 """Oscilloscope control tab."""
 
 # import needed GUI packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 
@@ -15,6 +16,8 @@ from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
+logger = logging.getLogger(__name__)
+
 
 
 class TabOSC(guic.ThemedFrame):
@@ -28,6 +31,7 @@ class TabOSC(guic.ThemedFrame):
         self.fr_port = None
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_channel = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_tb_trig = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # oscilloscope state
@@ -64,22 +68,25 @@ class TabOSC(guic.ThemedFrame):
             self.fr_port.connect_previous_port()
 
         # place everything in grid
-        self.fr_info.grid(row=0, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
-        self.fr_port.grid(row=0, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="N")
-        self.fr_control.grid(row=0, column=2, rowspan=3, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
-        self.fr_channel.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
-        self.prompt.grid(row=2, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
+        self.fr_info.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="N")
+        self.fr_control.grid(row=1, column=2, rowspan=3, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_channel.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_tb_trig.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.prompt.grid(row=3, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(3, weight=1)
 
 
     def initTabContent(self):
-        print("Initializing tab 10 (OSC) content")
+        logger.debug("Initializing tab 10 (OSC) content")
+        self.create_tab_header("OSC Control", columnspan=3)
         self.init_fr_info()
         self.init_fr_channel()
+        self.init_fr_tb_trig()
         self.init_fr_control()
 
     # =========================================================================
@@ -102,11 +109,11 @@ class TabOSC(guic.ThemedFrame):
         previous_model = self.cc.get_used_model("OSC_PyVISA")
         if previous_model and previous_model in self.registry:
             self.ate_drop[1].set(previous_model)
-            print(f"Restored previous OSC model: {previous_model}")
+            logger.info(f"Restored previous OSC model: {previous_model}")
 
         # Device ID
         self.labelID = ttk.Label(self.fr_info, text='Device ID:', style="TLabel", width=15, anchor='w')
-        self.labelIDValue = tk.Label(self.fr_info, text='', width=40, relief='sunken', anchor='w')
+        self.labelIDValue = tk.Label(self.fr_info, text='', width=25, height=2, relief='sunken', anchor='w', wraplength=170, justify='left')
 
         # Connected timestamp
         self.labelTimeConnected = ttk.Label(self.fr_info, text='Connected At:', style="TLabel", width=15, anchor='w')
@@ -186,7 +193,7 @@ class TabOSC(guic.ThemedFrame):
                       ).grid(row=row, column=6, padx=3, pady=3)
 
     # =========================================================================
-    # fr_control — Acquisition, Timebase, Trigger, Save/Recall, Measure
+    # fr_control — Acquisition (run/stop + type), Save/Recall, Measure
     # =========================================================================
     def init_fr_control(self):
         fr = self.fr_control
@@ -210,56 +217,37 @@ class TabOSC(guic.ThemedFrame):
             row=cur_row, column=2, padx=5, pady=3)
         cur_row += 1
 
-        # --- Timebase Controls ---
-        ttk.Label(fr, text="Timebase", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
-        cur_row += 1
-
-        self.tb_label = ttk.Label(fr, text=self._format_timebase(self.tb_steps[self.tb_index]),
-                                   style="TLabel", width=12, anchor="center")
-        self.tb_label.grid(row=cur_row, column=1, padx=5, pady=3)
-        tk.Button(fr, text="\u25C0", width=4, command=self.timebase_down).grid(
-            row=cur_row, column=0, padx=5, pady=3, sticky="e")
-        tk.Button(fr, text="\u25B6", width=4, command=self.timebase_up).grid(
-            row=cur_row, column=2, padx=5, pady=3, sticky="w")
-        cur_row += 1
-
-        ttk.Label(fr, text="Position (s)", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
-        self.tb_pos_entry = tk.Entry(fr, width=10)
-        self.tb_pos_entry.grid(row=cur_row, column=1, padx=5, pady=3)
+        # --- Acquisition Type ---
+        lbl_acq_type = ttk.Label(fr, text="Type", style="TLabel")
+        lbl_acq_type.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        guic.Tooltip(lbl_acq_type,
+                     "Acquisition type (:ACQuire:TYPE)\n\n"
+                     "NORMal      — standard sample mode\n"
+                     "AVERage     — averages N waveforms (N = Avg Count, 1–65536)\n"
+                     "              not available in segmented memory mode\n"
+                     "HRESolution — smoothing; averages oversampled points per\n"
+                     "              display point; useful at slow sweep speeds\n"
+                     "              to reduce noise\n"
+                     "PEAK        — peak detect; Avg Count has no meaning\n\n"
+                     "AVERage and HRESolution yield extra vertical resolution;\n"
+                     "use WORD or ASCii waveform format when reading data.")
+        self.acq_type_drop = guih.generate_drop_down(fr, ["NORMal", "AVERage", "HRESolution", "PEAK"])
+        self.acq_type_drop[1].set("NORMal")
+        self.acq_type_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
         tk.Button(fr, text="Set", width=6,
-                  command=lambda: self.set_timebase_position(self.tb_pos_entry.get())
+                  command=lambda: self.set_acq_type(self.acq_type_drop[1].get())
                   ).grid(row=cur_row, column=2, padx=5, pady=3)
         cur_row += 1
 
-        # --- Trigger Controls ---
-        ttk.Label(fr, text="Trigger", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
-        cur_row += 1
-
-        ttk.Label(fr, text="Source", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
-        self.trig_source_drop = guih.generate_drop_down(fr, ["CHANnel1", "CHANnel2", "CHANnel3", "CHANnel4"])
-        self.trig_source_drop[1].set("CHANnel1")
-        self.trig_source_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        # Avg Count (only meaningful for AVERage mode)
+        lbl_acq_count = ttk.Label(fr, text="Avg Count", style="TLabel")
+        lbl_acq_count.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        guic.Tooltip(lbl_acq_count, "Number of waveforms to average (1–65536).\nOnly applies in AVERage mode.")
+        self.acq_count_entry = tk.Entry(fr, width=10)
+        self.acq_count_entry.insert(0, "4")
+        self.acq_count_entry.grid(row=cur_row, column=1, padx=5, pady=3)
         tk.Button(fr, text="Set", width=6,
-                  command=lambda: self.set_trigger_source(self.trig_source_drop[1].get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
-        cur_row += 1
-
-        ttk.Label(fr, text="Level (V)", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
-        self.trig_level_entry = tk.Entry(fr, width=10)
-        self.trig_level_entry.grid(row=cur_row, column=1, padx=5, pady=3)
-        tk.Button(fr, text="Set", width=6,
-                  command=lambda: self.set_trigger_level(self.trig_level_entry.get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
-        cur_row += 1
-
-        ttk.Label(fr, text="Slope", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
-        self.trig_slope_drop = guih.generate_drop_down(fr, ["POSitive", "NEGative", "EITHer"])
-        self.trig_slope_drop[1].set("POSitive")
-        self.trig_slope_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
-        tk.Button(fr, text="Set", width=6,
-                  command=lambda: self.set_trigger_slope(self.trig_slope_drop[1].get())
+                  command=lambda: self.set_acq_count(self.acq_count_entry.get())
                   ).grid(row=cur_row, column=2, padx=5, pady=3)
         cur_row += 1
 
@@ -298,6 +286,72 @@ class TabOSC(guic.ThemedFrame):
             row=cur_row, column=2, padx=5, pady=3)
 
     # =========================================================================
+    # fr_tb_trig — Timebase + Trigger
+    # =========================================================================
+    def init_fr_tb_trig(self):
+        fr = self.fr_tb_trig
+        px = self.theme_config["pad"]["xpad_l"]
+        py = self.theme_config["pad"]["xpad_s"]
+
+        # clear existing widgets
+        for w in fr.winfo_children():
+            w.destroy()
+
+        cur_row = 0
+
+        # --- Timebase Controls ---
+        ttk.Label(fr, text="Timebase", style="TPinkLabel.TLabel").grid(
+            row=cur_row, column=0, columnspan=3, pady=py)
+        cur_row += 1
+
+        self.tb_label = ttk.Label(fr, text=self._format_timebase(self.tb_steps[self.tb_index]),
+                                   style="TLabel", width=12, anchor="center")
+        self.tb_label.grid(row=cur_row, column=1, padx=px, pady=py)
+        tk.Button(fr, text="\u25C0", width=4, command=self.timebase_down).grid(
+            row=cur_row, column=0, padx=px, pady=py, sticky="e")
+        tk.Button(fr, text="\u25B6", width=4, command=self.timebase_up).grid(
+            row=cur_row, column=2, padx=px, pady=py, sticky="w")
+        cur_row += 1
+
+        ttk.Label(fr, text="Position (s)", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
+        self.tb_pos_entry = tk.Entry(fr, width=10)
+        self.tb_pos_entry.grid(row=cur_row, column=1, padx=px, pady=py)
+        tk.Button(fr, text="Set", width=6,
+                  command=lambda: self.set_timebase_position(self.tb_pos_entry.get())
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
+        cur_row += 1
+
+        # --- Trigger Controls ---
+        ttk.Label(fr, text="Trigger", style="TPinkLabel.TLabel").grid(
+            row=cur_row, column=0, columnspan=3, pady=(px, py))
+        cur_row += 1
+
+        ttk.Label(fr, text="Source", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
+        self.trig_source_drop = guih.generate_drop_down(fr, ["CHANnel1", "CHANnel2", "CHANnel3", "CHANnel4"])
+        self.trig_source_drop[1].set("CHANnel1")
+        self.trig_source_drop[0].grid(row=cur_row, column=1, padx=px, pady=py)
+        tk.Button(fr, text="Set", width=6,
+                  command=lambda: self.set_trigger_source(self.trig_source_drop[1].get())
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
+        cur_row += 1
+
+        ttk.Label(fr, text="Level (V)", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
+        self.trig_level_entry = tk.Entry(fr, width=10)
+        self.trig_level_entry.grid(row=cur_row, column=1, padx=px, pady=py)
+        tk.Button(fr, text="Set", width=6,
+                  command=lambda: self.set_trigger_level(self.trig_level_entry.get())
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
+        cur_row += 1
+
+        ttk.Label(fr, text="Slope", style="TLabel").grid(row=cur_row, column=0, padx=px, pady=py)
+        self.trig_slope_drop = guih.generate_drop_down(fr, ["POSitive", "NEGative", "EITHer"])
+        self.trig_slope_drop[1].set("POSitive")
+        self.trig_slope_drop[0].grid(row=cur_row, column=1, padx=px, pady=py)
+        tk.Button(fr, text="Set", width=6,
+                  command=lambda: self.set_trigger_slope(self.trig_slope_drop[1].get())
+                  ).grid(row=cur_row, column=2, padx=px, pady=py)
+
+    # =========================================================================
     # gui_refresh
     # =========================================================================
     def update_osc(self):
@@ -328,8 +382,10 @@ class TabOSC(guic.ThemedFrame):
             guih.alert_user("Can't update OSC", str(e), "warning")
 
     def gui_refresh(self, event):
-        if event == "auto":
+        if event == "auto" and not self.fr_port.status:
             self.fr_port.refresh_ports()
+        if self.fr_port.status:
+            self.update_osc()
 
     # =========================================================================
     # Channel Actions
@@ -354,16 +410,25 @@ class TabOSC(guic.ThemedFrame):
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't toggle channel", str(e), "error")
 
+    @staticmethod
+    def _parse_si(value_str):
+        """Parse a numeric string with an optional SI suffix (e.g. '750m' → 0.75)."""
+        suffixes = {"n": 1e-9, "u": 1e-6, "µ": 1e-6, "m": 1e-3, "k": 1e3, "M": 1e6}
+        s = value_str.strip()
+        if s and s[-1] in suffixes:
+            return float(s[:-1]) * suffixes[s[-1]]
+        return float(s)
+
     def set_channel_scale(self, channel, value_str):
         if not self.cc.get_osc_status():
             guih.alert_user("Can't set scale", "No OSC connection!", "error")
             return
         try:
-            scale = float(value_str)
+            scale = self._parse_si(value_str)
             self.cc.osc.set_scale(channel, scale)
             self.prompt.print(f"CH{channel} scale set to {scale} V/div")
         except ValueError:
-            guih.alert_user("Invalid Input", "Scale must be a number", "error")
+            guih.alert_user("Invalid Input", "Scale must be a number (e.g. 0.5 or 750m)", "error")
         except COMMUNICATION_ERRORS as e:
             guih.alert_user("Can't set scale", str(e), "error")
 
@@ -393,6 +458,32 @@ class TabOSC(guic.ThemedFrame):
     # =========================================================================
     # Acquisition Actions
     # =========================================================================
+    def set_acq_type(self, acq_type):
+        if not self.cc.get_osc_status():
+            guih.alert_user("Can't set acq type", "No OSC connection!", "error")
+            return
+        try:
+            self.cc.osc.set_acq_type(acq_type)
+            self.prompt.print(f"Acquisition type: {acq_type}")
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't set acquisition type", str(e), "error")
+
+    def set_acq_count(self, count_str):
+        if not self.cc.get_osc_status():
+            guih.alert_user("Can't set acq count", "No OSC connection!", "error")
+            return
+        try:
+            count = int(count_str)
+            if not (1 <= count <= 65536):
+                guih.alert_user("Invalid Input", "Count must be between 1 and 65536", "error")
+                return
+            self.cc.osc.set_acq_count(count)
+            self.prompt.print(f"Acquisition count: {count}")
+        except ValueError:
+            guih.alert_user("Invalid Input", "Count must be an integer", "error")
+        except COMMUNICATION_ERRORS as e:
+            guih.alert_user("Can't set acquisition count", str(e), "error")
+
     def acq_run(self):
         if not self.cc.get_osc_status():
             guih.alert_user("Can't run", "No OSC connection!", "error")
@@ -616,15 +707,18 @@ class TabOSC(guic.ThemedFrame):
             return False
 
         self.channel_count = self.cc.osc.channel_count
+        self.chan_on = [False] * self.channel_count
         self.init_fr_info()
         self.init_fr_channel()
+        self.init_fr_tb_trig()
         self.init_fr_control()
 
         self.prompt.print(f"Connected to OSC with id: {result.device_id}")
         self.labelIDValue.config(text=result.device_id)
         self.labelTimeConnectedValue.config(text=result.timestamp)
+        self.fr_port.status = True
         self.fr_port.set_status(True)
-        self.update_osc()
+        self.gui_refresh("connect")
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

@@ -1,9 +1,12 @@
 """Data logging configuration and CSV/text file output."""
 
 # import needed modules
+import logging as _logging
 from common import csv_helper as csvh
 from time import strftime, localtime
 from dataclasses import dataclass
+
+_logger = _logging.getLogger(__name__)
 
 from common.csv_helper import CSVHelper
 from enum import Enum
@@ -187,6 +190,8 @@ class RecordConfig:
     use_fg: bool = False
     use_osc: bool = False
     ps_channel: int = 1
+    ps_log_voltage: bool = True
+    ps_log_current: bool = True
     serial_params: str = None
     make_graph: bool = False
     osc_config: OscRecordConfig = None
@@ -221,12 +226,13 @@ class RecordConfig:
         return "\n".join(lines)
 
     def print(self) -> None:
-        """Print the pretty summary to stdout."""
-        print(self.pretty())
+        """Log the pretty summary at DEBUG level."""
+        _logger.debug("\n" + self.pretty())
 
 
 def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channel, serial_params, make_graph,
-                         use_osc=False, osc_config=None):
+                         use_osc=False, osc_config=None,
+                         ps_log_voltage=True, ps_log_current=True):
     config = RecordConfig(use_ser=use_ser,
                           use_dmm=use_dmm,
                           use_ps=use_ps,
@@ -235,7 +241,9 @@ def create_record_config(use_ser, use_dmm, use_ps, use_fg, ps_channel, serial_pa
                           ps_channel=ps_channel,
                           serial_params=serial_params,
                           make_graph=make_graph,
-                          osc_config=osc_config)
+                          osc_config=osc_config,
+                          ps_log_voltage=ps_log_voltage,
+                          ps_log_current=ps_log_current)
     return config
 
 
@@ -318,6 +326,7 @@ class DualStimulusConfig:
     enabled: bool = False
     outer_loop: StimulusConfig = None  # Outer loop parameter
     inner_loop: StimulusConfig = None  # Inner loop parameter
+    samples_per_step: int = 1  # Number of samples to collect at each (outer, inner) combination
 
     def validate(self):
         """Validate the dual stimulus configuration"""
@@ -516,12 +525,13 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
     # SETUP CSV HEADER PARAMETERS
     headers = [COL_TIME]
 
-    # Serial/user-entered metadata (if selected)
+    # Serial columns (if selected)
     if record_config.use_ser:
         parts = parse_serial_params(record_config.serial_params)
-        if parts is None:
-            return False
-        headers += parts
+        if parts:
+            headers += parts
+        else:
+            headers += [COL_SERIAL]  # fallback when no column names entered
 
     # DMM selected?
     if record_config.use_dmm:
@@ -529,11 +539,16 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
 
     # Power Supply selected?
     if record_config.use_ps:
-        ps_params = [COL_PS_VSET1, COL_PS_VMEAS1, COL_PS_IMEAS1]
-
-        if record_config.channels > 1:
-            ps_params += [COL_PS_VSET2, COL_PS_VMEAS2, COL_PS_IMEAS2]
-
+        ps_params = []
+        if record_config.ps_log_voltage:
+            ps_params += [COL_PS_VSET1, COL_PS_VMEAS1]
+        if record_config.ps_log_current:
+            ps_params += [COL_PS_IMEAS1]
+        if record_config.ps_channel > 1:
+            if record_config.ps_log_voltage:
+                ps_params += [COL_PS_VSET2, COL_PS_VMEAS2]
+            if record_config.ps_log_current:
+                ps_params += [COL_PS_IMEAS2]
         headers += ps_params
 
     # Function Generator selected?

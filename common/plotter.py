@@ -1,28 +1,44 @@
 """Real-time and static plotting utilities."""
 
 # import plotter modules
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib import cm
+from matplotlib.ticker import MaxNLocator
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 from dash import Dash, dcc, html, Output, Input
+from datetime import datetime as _dt
 
 # import needed modules
 import threading
 import webbrowser
+from pathlib import Path
 from typing import Mapping, Sequence
 from collections import deque
 from queue import Queue, Empty
 
+# import user created modules
+from analysis.specific import filter_analysis
 
-# consistent color palette for multi-series / multi-subplot plots
+
+
+
+
+# Matplotlib default color cycle — shared across all plot types for visual consistency.
 COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
           '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
 # Line styles for distinguishing multiple files in combined labeling mode
 LINE_STYLES = ['-', '--', '-.', ':']  # solid, dashed, dash-dot, dotted
+
+
+def show_plots():
+    plt.show()
 
 
 #################################
@@ -38,7 +54,8 @@ def plot(
          legend=None,
          color=None,
          vertical_lines=None,
-         figsize=None):
+         figsize=None,
+         show_plot=True):
     if figsize is None:
         plt.figure()
     else:
@@ -64,7 +81,8 @@ def plot(
 
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.show()
+    if show_plot:
+        plt.show()
 
 
 def plot_grouped(df, x_var, y_var, group_var,
@@ -101,7 +119,7 @@ def plot_grouped(df, x_var, y_var, group_var,
     return fig, ax
 
 
-def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
+def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4, show_plot=True):
     """
     Stacked subplots with shared x-axis, one subplot per channel.
 
@@ -111,6 +129,7 @@ def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
         xlabel: Label for the shared x-axis (bottom only)
         title: Overall figure title
         figsize_per_row: Height per subplot row in inches
+        show_plot: If True, call plt.show() immediately
     """
     n = len(channels)
     fig, axes = plt.subplots(n, 1, figsize=(10, figsize_per_row * n),
@@ -127,7 +146,8 @@ def plot_subplots(x_data, channels, xlabel=None, title=None, figsize_per_row=4):
     if title:
         fig.suptitle(title)
     plt.tight_layout()
-    plt.show()
+    if show_plot:
+        plt.show()
     return fig, axes
 
 
@@ -274,7 +294,15 @@ def plot_multi_file_data(file_data_list,
     figsize=(10, 6),
     marker='o',
     markersize=3,
-    show_grid=True):
+    show_grid=True,
+    grid_alpha=0.3,
+    xtick_rotation=0,
+    ytick_rotation=0,
+    show_legend=True,
+    legend_loc='best',
+    linewidth=1.5,
+    alpha=1.0,
+    xtick_max=0):
     """
     Plot data from multiple files with flexible labeling options.
 
@@ -301,6 +329,13 @@ def plot_multi_file_data(file_data_list,
         marker: Marker style for plot (used when plot_style includes scatter)
         markersize: Size of markers (used when plot_style includes scatter)
         show_grid: Whether to show grid
+        grid_alpha: Opacity of grid lines (0.0–1.0, default 0.3)
+        xtick_rotation: X-axis tick label rotation in degrees
+        ytick_rotation: Y-axis tick label rotation in degrees
+        show_legend: Whether to show the legend (only applies when labeling_mode != 'none')
+        legend_loc: Matplotlib legend location string (e.g. 'best', 'upper right')
+        linewidth: Line width for all plotted series
+        alpha: Opacity of all plotted series (0.0–1.0)
 
     Returns:
         Tuple of (fig, ax) matplotlib objects
@@ -332,14 +367,12 @@ def plot_multi_file_data(file_data_list,
     if title:
         ax.set_title(title)
     if show_grid:
-        ax.grid(True, alpha=0.3)
+        ax.grid(True, alpha=grid_alpha)
 
     color_idx = 0
 
     # Preprocessing for 'data' and 'both' modes: color assignment
     data_value_to_color = {}
-    colormap = None
-    normalizer = None
     normalize_colors = label_config.get('normalize_colors', False)
 
     if labeling_mode in ['data', 'both']:
@@ -381,7 +414,7 @@ def plot_multi_file_data(file_data_list,
 
             except (ValueError, TypeError):
                 # If values aren't numeric, fall back to discrete colors
-                print("Warning: Data values are not numeric. Using discrete colors instead.")
+                logger.warning("Data values are not numeric. Using discrete colors instead.")
                 normalize_colors = False
                 for idx, data_val in enumerate(sorted_data_values):
                     data_value_to_color[data_val] = idx % len(COLORS)
@@ -411,25 +444,19 @@ def plot_multi_file_data(file_data_list,
 
         x_data = df[x_var]
         y_data = df[y_var]
+        x_is_numeric = np.issubdtype(df[x_var].dtype, np.number)
 
         # Apply labeling strategy
         if labeling_mode == 'filename':
-            # Label by filename parts
-            # NOTE: Currently uses full filename stem. Future enhancement could add support for:
-            #       - Single index: file_label_idx to extract parts[idx]
-            #       - Range notation: "3-5" to extract parts[3:5]
-            #       - Multiple indices: "0,3,4" to extract selected parts
-            #       - Slice notation: "3:" to extract parts[3:]
+            file_label_idx = label_config.get('file_label_idx', 0)
             try:
-                file_label_idx = label_config.get('file_label_idx', 0)
-                # Use full filename stem (without .csv extension)
-                from pathlib import Path
+                label = file_parts[file_label_idx] if file_label_idx else Path(filename).stem
+            except (IndexError, TypeError):
                 label = Path(filename).stem
-            except (ValueError, IndexError, TypeError):
-                label = filename
-            ax.plot(x_data * x_scale, y_data * y_scale,
+            ax.plot(x_data * x_scale if x_is_numeric else x_data, y_data * y_scale,
                    label=label, color=COLORS[color_idx % len(COLORS)],
-                   marker=plot_marker, markersize=markersize, linestyle=linestyle)
+                   marker=plot_marker, markersize=markersize, linestyle=linestyle,
+                   linewidth=linewidth, alpha=alpha)
             color_idx += 1
 
         elif labeling_mode == 'data':
@@ -451,9 +478,10 @@ def plot_multi_file_data(file_data_list,
                     color_idx_for_value = data_value_to_color.get(label_val, 0)
                     color = COLORS[color_idx_for_value]
 
-                ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
+                ax.plot(df_tmp[x_var] * x_scale if x_is_numeric else df_tmp[x_var], df_tmp[y_var] * y_scale,
                        label=label, color=color,
-                       marker=plot_marker, markersize=markersize, linestyle=linestyle)
+                       marker=plot_marker, markersize=markersize, linestyle=linestyle,
+                       linewidth=linewidth, alpha=alpha)
 
         elif labeling_mode == 'both':
             # Label by both filename and data column
@@ -466,12 +494,11 @@ def plot_multi_file_data(file_data_list,
             file_linestyle = LINE_STYLES[file_idx % len(LINE_STYLES)]
 
             # Get filename label
+            file_label_idx = label_config.get('file_label_idx', 0)
             try:
-                file_label_idx = label_config.get('file_label_idx', 0)
-                from pathlib import Path
+                file_label = file_parts[file_label_idx] if file_label_idx else Path(filename).stem
+            except (IndexError, TypeError):
                 file_label = Path(filename).stem
-            except (ValueError, IndexError, TypeError):
-                file_label = filename
 
             # Plot each data value with consistent color but file-specific line style
             for label_val in sorted(df[data_label_var].dropna().unique()):
@@ -485,35 +512,109 @@ def plot_multi_file_data(file_data_list,
                     color_idx_for_value = data_value_to_color.get(label_val, 0)
                     color = COLORS[color_idx_for_value]
 
-                ax.plot(df_tmp[x_var] * x_scale, df_tmp[y_var] * y_scale,
+                ax.plot(df_tmp[x_var] * x_scale if x_is_numeric else df_tmp[x_var], df_tmp[y_var] * y_scale,
                        label=label,
                        color=color,
                        marker=plot_marker,
                        markersize=markersize,
-                       linestyle=file_linestyle)
+                       linestyle=file_linestyle,
+                       linewidth=linewidth,
+                       alpha=alpha)
 
         else:
             # No label
-            ax.plot(x_data * x_scale, y_data * y_scale,
+            ax.plot(x_data * x_scale if x_is_numeric else x_data, y_data * y_scale,
                    color=COLORS[color_idx % len(COLORS)],
-                   marker=plot_marker, markersize=markersize, linestyle=linestyle)
+                   marker=plot_marker, markersize=markersize, linestyle=linestyle,
+                   linewidth=linewidth, alpha=alpha)
             color_idx += 1
 
         # Increment file index for line style assignment
         file_idx += 1
 
-    # Show legend if any labels were added
-    if labeling_mode in ['filename', 'data', 'both']:
-        ax.legend()
+    # Legend
+    if show_legend and labeling_mode in ['filename', 'data', 'both']:
+        ax.legend(loc=legend_loc)
+
+    # Tick rotation
+    if xtick_max and xtick_max > 0:
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=xtick_max))
+    if xtick_rotation:
+        ax.tick_params(axis='x', rotation=xtick_rotation)
+    if ytick_rotation:
+        ax.tick_params(axis='y', rotation=ytick_rotation)
 
     plt.tight_layout()
     plt.show()
     return fig, ax
 
 
+def plot_fft(channels, title="FFT Analysis"):
+    """Plot FFT magnitude vs frequency as stacked subplots, one per channel.
+
+    Args:
+        channels: list of (freqs_array, magnitudes_array, label_str) tuples
+        title: overall figure title
+    """
+    n = len(channels)
+    if n == 0:
+        return
+    fig, axes = plt.subplots(n, 1, figsize=(10, 3 * n), sharex=False)
+    if n == 1:
+        axes = [axes]
+    for i, (ax, (freqs, mag, label)) in enumerate(zip(axes, channels)):
+        ax.plot(freqs, mag, color=COLORS[i % len(COLORS)], linewidth=1.0)
+        ax.set_ylabel(f"|{label}|")
+        ax.set_xlabel("Frequency (Hz)")
+        ax.grid(True, alpha=0.3)
+    if title:
+        fig.suptitle(title)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_freq_response(b, a, cutoff, fs):
+    # Plot the frequency response.
+    w, h = filter_analysis.freq_response(b, a, fs=fs)
+    plt.subplot(2, 1, 1)
+    plt.plot(w, np.abs(h), 'b')
+    plt.plot(cutoff, 0.5 * np.sqrt(2), 'ko')
+    plt.axvline(cutoff, color='k')
+    plt.xlim(0, 0.5 * fs)
+    plt.title("Lowpass Filter Frequency Response")
+    plt.xlabel('Frequency [Hz]')
+    plt.grid()
+
+
+
+
 ###################################
 ### PLOTLY LIVE PLOTTING    #######
 ###################################
+
+def export_recorded_data_html(recorded_data: list, x_key: str, channels: list, title: str, html_path: str):
+    """Export a list-of-dict recording session as a self-contained Plotly HTML file.
+
+    Args:
+        recorded_data: List of row dicts (same format written to CSV during recording).
+        x_key: Column name to use as x-axis (e.g. 'Time' or a stimulus column).
+        channels: List of column names to plot as separate traces.
+        title: Plot title.
+        html_path: Full output path for the .html file.
+    """
+    x_vals = [row.get(x_key) for row in recorded_data]
+    fig = go.Figure()
+    for ch in channels:
+        y_raw = [row.get(ch) for row in recorded_data]
+        y_vals = []
+        for v in y_raw:
+            try:
+                y_vals.append(None if v is None else float(v))
+            except (ValueError, TypeError):
+                y_vals.append(None)
+        fig.add_trace(go.Scatter(x=x_vals, y=y_vals, name=ch, mode='lines'))
+    fig.update_layout(title=title, xaxis_title=x_key)
+    fig.write_html(html_path)
 
 
 def update_live_plot_state(state, data_bus, x_key, channels, buffer_size, x_label):
@@ -543,6 +644,7 @@ def start_live_plot(
         port=8050,
         debug=False,
         state: dict = None,
+        row_height: int = 300,
 ):
     # Initialize shared state dict (read by callback on every tick,
     # can be mutated from outside via update_live_plot_state())
@@ -575,7 +677,10 @@ def start_live_plot(
                     buf = cur_bufs.get(ch)
                     if buf is not None:
                         v = sample.get(ch)
-                        buf.append(None if v is None else float(v))
+                        try:
+                            buf.append(None if v is None else float(v))
+                        except (ValueError, TypeError):
+                            buf.append(None)
 
 
     # dash app definition
@@ -601,9 +706,12 @@ def start_live_plot(
                 ),
                 html.Button("Clear Data", id="btn-clear", n_clicks=0,
                             style={"display": "inline-block"}),
+                html.Button("Export HTML", id="btn-export-html", n_clicks=0,
+                            style={"display": "inline-block", "marginLeft": "10px"}),
             ], style={"marginBottom": "10px"}),
             dcc.Graph(id="graph"),
             dcc.Interval(id="tick", interval=refresh_ms, n_intervals=0),
+            dcc.Download(id="download-html"),
         ]
     )
 
@@ -665,17 +773,25 @@ def start_live_plot(
             x = list(cur_time_buf)
             for i, ch in enumerate(cur_channels):
                 buf = cur_bufs.get(ch)
+                buf_list = list(buf) if buf else []
                 fig.add_trace(
                     go.Scatter(
                         x=x,
-                        y=list(buf) if buf else [],
+                        y=buf_list,
                         mode="lines",
                         name=ch,
                         line=dict(color=COLORS[i % len(COLORS)], width=2),
                     ),
                     row=i + 1, col=1
                 )
-                fig.update_yaxes(title_text=ch, row=i + 1, col=1)
+                valid = [v for v in buf_list if v is not None]
+                if valid:
+                    ymin, ymax = min(valid), max(valid)
+                    span = ymax - ymin
+                    pad = span * 0.1 if span > 0 else abs(ymax) * 0.05 or 0.001
+                    fig.update_yaxes(title_text=ch, range=[ymin - pad, ymax + pad], row=i + 1, col=1)
+                else:
+                    fig.update_yaxes(title_text=ch, row=i + 1, col=1)
 
             # only label the bottom x-axis
             fig.update_xaxes(title_text=cur_x_label, row=n_ch, col=1)
@@ -684,10 +800,51 @@ def start_live_plot(
             template="plotly_white",
             margin=dict(l=60, r=40, t=35, b=50),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=300 * n_ch,
+            height=max(row_height * n_ch, 700),
         )
         return fig
 
+
+    @app.callback(
+        Output("download-html", "data"),
+        Input("btn-export-html", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def export_html(_):
+        cur_channels = state['channels']
+        cur_bufs = state['bufs']
+        cur_time_buf = state['time_buf']
+        cur_x_label = state.get('x_label', x_label)
+
+        if not cur_time_buf or not cur_channels:
+            return None
+
+        x = list(cur_time_buf)
+        n_ch = len(cur_channels)
+        fig = make_subplots(rows=n_ch, cols=1, shared_xaxes=True, vertical_spacing=0.08)
+        for i, ch in enumerate(cur_channels):
+            buf = cur_bufs.get(ch)
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=list(buf) if buf else [],
+                    mode="lines",
+                    name=ch,
+                    line=dict(color=COLORS[i % len(COLORS)], width=2),
+                ),
+                row=i + 1, col=1,
+            )
+            fig.update_yaxes(title_text=ch, row=i + 1, col=1)
+        fig.update_xaxes(title_text=cur_x_label, row=n_ch, col=1)
+        fig.update_layout(
+            template="plotly_white",
+            margin=dict(l=60, r=40, t=35, b=50),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=max(row_height * n_ch, 700),
+        )
+
+        filename = f"live_export_{_dt.now().strftime('%Y%m%d_%H%M%S')}.html"
+        return dcc.send_string(fig.to_html(full_html=True, include_plotlyjs=True), filename=filename)
 
     # auto-open browser after a short delay (server needs to be up first)
     url = f"http://{host}:{port}"

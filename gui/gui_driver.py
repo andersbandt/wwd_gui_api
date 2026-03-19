@@ -2,19 +2,22 @@
 
 
 # import needed packages
+import logging
 import tkinter as tk
 from tkinter import ttk
 import os
 import time
-import configparser
 
-from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+logger = logging.getLogger(__name__)
+
 # import ClassController
 from class_controller import ClassController
 from EEequipment.usbrelay import usbrelay_controller
+from EEequipment.TestEquipment import set_visa_backend
 
 # import tab classes
-from common.path_helper import get_config_path
+from common import path_helper
+from services.config_service import ConfigService
 from gui.gui_class import ThemedApp
 from gui import guiTab_1_mainDashboard
 from gui import guiTab_2_DMM
@@ -30,82 +33,22 @@ from gui import guiTab_10_OSC
 NUM_TABS = 10 # tag:HARDCODE
 
 
-def parse_autoconnect_config():
-    # initialize the config parser
-    config_file_path = get_config_path()
-    if os.path.exists(config_file_path):
-        config = configparser.ConfigParser()
-        config.read(config_file_path)
-    else:
-        print(f"Configuration file {config_file_path} does not exist.")
-        raise BaseException
-
-    # Ensure the section and option exist
-    if "AUTOCONNECT" not in config:
-        raise KeyError("Missing [AUTOCONNECT] section in config.")
-
-    # read in parameters from the config file
-    autoconn_vars = []
-    for i in range(1, NUM_TABS + 1):
-        tmp = config["AUTOCONNECT"][f"tab_{i}"]
-        if tmp.strip().upper() == "YES":
-            autoconn_vars.append(True)
-        else:
-            autoconn_vars.append(False)
-    return autoconn_vars
-
-
-def parse_theme_config():
-    """
-    Parse the theme configuration from master.ini.
-
-    Returns:
-        str: Path to the theme file (e.g., "config/darcula.json")
-    """
-    config_file_path = get_config_path()
-    default_theme = "config/darcula.json" # tag:HARDCODE - but not really an issue because this is fallback if read from config file fails
-
-    if not os.path.exists(config_file_path):
-        print(f"Configuration file {config_file_path} does not exist. Using default theme.")
-        return default_theme
-
-    config = configparser.ConfigParser()
-    config.read(config_file_path)
-
-    # Check if THEME section exists
-    if "THEME" not in config:
-        print("Missing [THEME] section in config. Using default theme.")
-        return default_theme
-
-    # Get theme_file setting
-    theme_file = config["THEME"].get("theme_file", "darcula.json").strip()
-
-    # Ensure it has the config/ prefix if not already present
-    if not theme_file.startswith("config/"):
-        theme_file = f"config/{theme_file}"
-
-    # Verify the theme file exists
-    if not os.path.exists(theme_file):
-        print(f"Theme file {theme_file} does not exist. Using default theme.")
-        return default_theme
-
-    print(f"Using theme: {theme_file}")
-    return theme_file
-
 
 class MainApplication(ThemedApp):
-    def __init__(self, window, height, width, theme_file, autoconnect, compact):
+    def __init__(self, window, height, width, theme_file, autoconnect, compact, config_svc):
         super().__init__(window, theme_file, compact=compact)
         self.autoconnect = autoconnect
+        self.config_svc = config_svc
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
         self.basefilepath = os.getcwd()
         self.controller = ClassController()
+        self.controller.config_svc = config_svc
 
         try:  # NOTE: I think I get weird libpath / StopIteration things if I don't have this thing properly installed
             usb_dev = usbrelay_controller.find()
         except Exception as e:
-            print(f"Can't locate USB_RELAY because of {e}")
+            logger.warning(f"Can't locate USB_RELAY because of {e}")
             usb_dev = None
         self.controller.set_relay(
             usbrelay_controller.USBRelayController(usb_dev)
@@ -116,11 +59,11 @@ class MainApplication(ThemedApp):
         self.setTabs()
 
     def setTabs(self):
-        print("Creating tab nav bar and initializing tab content")
+        logger.info("Creating tab nav bar and initializing tab content")
 
         # setup autoconnect array
         if self.autoconnect:
-            autoconnect = parse_autoconnect_config()
+            autoconnect = self.config_svc.get_autoconnect_flags()
         else:
             autoconnect = [False] * (NUM_TABS + 1)
 
@@ -153,7 +96,7 @@ class MainApplication(ThemedApp):
     def on_tab_changed(self, event):
         # Skip gui_refresh during active recording to prevent crashes
         if self.controller.recording:
-            print("Skipping gui_refresh: recording in progress")
+            logger.debug("Skipping gui_refresh: recording in progress")
             return
 
         selected_tab = event.widget.tab(event.widget.select(), "text")
@@ -181,7 +124,14 @@ class MainApplication(ThemedApp):
 
 # main function
 def main(autoconnect, force_compact=False):
-    print("Executing main function of gui_driver.py")
+    logger.info("Executing main function of gui_driver.py")
+
+    # Create centralized config service and wire into path_helper
+    config_svc = ConfigService()
+    path_helper.init_config_service(config_svc)
+
+    # Configure PyVISA backend from master.ini before any instrument connections
+    set_visa_backend(config_svc.get_visa_backend())
 
     # tag:HARDCODE
     desired_w = 1350
@@ -192,6 +142,14 @@ def main(autoconnect, force_compact=False):
     # setup window
     window = tk.Tk()
     window.title("WWD GUI API")
+
+    # Set window/taskbar icon (works on Linux and Windows; Tk 8.6+ PNG support)
+    try:
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'icon.png')
+        _icon_img = tk.PhotoImage(file=icon_path)
+        window.iconphoto(True, _icon_img)
+    except Exception as e:
+        logger.warning(f"Could not load app icon: {e}")
 
     # Get screen size
     ws = window.winfo_screenwidth()
@@ -204,12 +162,12 @@ def main(autoconnect, force_compact=False):
     # dynamic sizing check
     if force_compact:
         compact = True
-        print("Using compact sizing (forced by command-line argument)")
+        logger.info("Using compact sizing (forced by command-line argument)")
     elif (w < 0.8*desired_w) or (h < 0.8*desired_h):
         compact = True
-        print("Using compact sizing (auto-detected from screen size)")
+        logger.info("Using compact sizing (auto-detected from screen size)")
     else:
-        print("Using standard window size")
+        logger.info("Using standard window size")
         compact = False
 
     # Center placement
@@ -220,7 +178,7 @@ def main(autoconnect, force_compact=False):
     window.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
     # load theme configuration
-    theme_file = parse_theme_config()
+    theme_file = config_svc.get_theme_file()
 
     # place main app
     app = MainApplication(window,
@@ -228,7 +186,8 @@ def main(autoconnect, force_compact=False):
                           w,
                           theme_file,
                           autoconnect,
-                          compact)
+                          compact,
+                          config_svc)
 
     # run application
     window.mainloop()
@@ -236,38 +195,8 @@ def main(autoconnect, force_compact=False):
     #### USER HAS CLOSED APPLICATION WHEN CODE REACHES PAST THIS POINT ####
 
     # perform shutdown activities
-    print("TKINTER is shutting down!")
+    logger.info("TKINTER is shutting down!")
 
-    # disconnect all active connections in `class_controller.py`
-    if app.controller.ps is not None:
-        print("Disconnect from power supply (and turning outputs off)")
-        try:
-            app.controller.ps.output_off(1)
-            app.controller.ps.output_off(2)
-        except COMMUNICATION_ERRORS:
-            print("Failed to turn off power supply due to IO error")
-        try:
-            app.controller.ps.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            print("Failed to disconnect from power supply due to IO error (see below line)")
-            print(e)
-
-    if app.controller.dmm is not None:
-        print("Disconnect from DMM")
-        app.controller.dmm.disconnect()
-
-    if app.controller.fg is not None:
-        print("Disconnect from FG")
-        app.controller.fg.disconnect()
-
-    if app.controller.osc is not None:
-        print("Disconnect from OSC")
-        try:
-            app.controller.osc.disconnect()
-        except COMMUNICATION_ERRORS as e:
-            print(f"Failed to disconnect from OSC: {e}")
-
-    if app.controller.relay is not None:
-        app.controller.relay.open_all()
+    app.controller.shutdown()
 
     return

@@ -1,10 +1,10 @@
 """XDS110 JTAG debug probe interface tab."""
 
 # import needed packages
+import logging
 import time
 from tkinter import *
 from tkinter import filedialog
-import configparser
 import os
 
 # import user defined modules
@@ -12,9 +12,12 @@ from EEequipment.xds110 import xds110_api as xds110
 from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
 from common.path_helper import get_config_path
+from services.config_service import ConfigService
 from gui import gui_helper as guih
 from gui import gui_class as guic
 from gui.gui_class import *
+
+logger = logging.getLogger(__name__)
 
 
 class tabXDS110(guic.ThemedFrame):
@@ -26,10 +29,7 @@ class tabXDS110(guic.ThemedFrame):
         self.basefilepath = basefilepath
         self.after_call_id = None
 
-        # print welcome text_data
-        l1 = ttk.Label(self, text="XDS110 and target control", style="BW.TLabel",
-                       font=("Arial", 16))
-        l1.grid(column=0, row=0)
+        self.create_tab_header("XDS110 and target control", columnspan=4)
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "XDS110 Comms")
@@ -61,7 +61,7 @@ class tabXDS110(guic.ThemedFrame):
         self.parse_target_config(get_config_path())
 
     def initTabContent(self):
-        print("Initializing tab 4 (XDS110) content")
+        logger.debug("Initializing tab 3 (XDS110) content")
         self.init_fr_xds110()
         self.init_fr_target()
         self.init_fr_firmware()
@@ -212,7 +212,7 @@ class tabXDS110(guic.ThemedFrame):
         if self.var_usedmm.get():
             if self.cc.dmm is not None:
                 dmm_voltage = self.cc.dmm.read_voltage()
-                print(f"DMM got this for a measurement: {dmm_voltage}")
+                logger.debug(f"DMM got this for a measurement: {dmm_voltage}")
                 self.lbl_target_v.config(text=f"{dmm_voltage} V")
 
 
@@ -276,7 +276,7 @@ class tabXDS110(guic.ThemedFrame):
             return False
 
     def flash_firmware(self):
-        print("... executing loadti to flash firmware ...")
+        logger.info("... executing loadti to flash firmware ...")
 
         ### BUILD FIRMWARE
         build_status = self.build_firmware()
@@ -340,7 +340,7 @@ class tabXDS110(guic.ThemedFrame):
         """
         Open a configuration file and display its contents in the text widget.
         """
-        print("Loading target configuration")
+        logger.info("Loading target configuration")
         file_path = filedialog.askopenfilename(
             title="Open Configuration File",
             filetypes=(("Config Files", "*.ini *.cfg *.json *.yaml *.yml"), ("All Files", "*.*"))
@@ -354,7 +354,7 @@ class tabXDS110(guic.ThemedFrame):
 
     def autoload_config(self):
         cfg = self.defaultTarget_drop[1].get()
-        print(f"Autoloading with config num: {cfg}")
+        logger.info(f"Autoloading with config num: {cfg}")
         self.parse_target_config(os.path.join("config", f"{cfg}.ini"))
 
 
@@ -363,31 +363,25 @@ class tabXDS110(guic.ThemedFrame):
     ##############################################################################
 
     def parse_target_config(self, config_file_path):
-        # initialize the config parser
-        if os.path.exists(config_file_path):
-            config = configparser.ConfigParser()
-            config.read(config_file_path)
+        # Load target config via ConfigService
+        if config_file_path == get_config_path():
+            tc = self.cc.config_svc.get_target_config()
         else:
-            print(f"Configuration file {config_file_path} does not exist.")
-            raise BaseException
+            tc = ConfigService.load_target_config_from_file(config_file_path)
 
-        # read in parameters from the config file
-        power_type = int(config["Target"]["power_type"])
-        self.ps_channel = int(config["Target"]["ps_channel"])
-        debug_config = int(config["Target"]["debug_config"])
-        self.device_vdds = float(config["Target"]["vdds"])
-        self.device_usb_relay = int(config["Target"]["usb_relay"])
-        self.toggle_power_delay = int(config["Target"].get("toggle_power_delay", "6"))
+        # Apply parsed values to GUI variables
+        self.ps_channel = tc.ps_channel
+        self.device_vdds = tc.vdds
+        self.device_usb_relay = tc.usb_relay
+        self.toggle_power_delay = tc.toggle_power_delay
 
-        self.targetConfig_drop[1].set(self.tg_opt[power_type])
-        self.serialNumber_drop[1].set(self.db_opt[debug_config])
+        self.targetConfig_drop[1].set(self.tg_opt[tc.power_type])
+        self.serialNumber_drop[1].set(self.db_opt[tc.debug_config])
 
     def turn_power_on(self, flash_option):
         # CONFIG POWER
         if flash_option == "target_power" or flash_option == "probe_power":
-            try:
-                self.cc.ps.output_off(self.ps_channel)
-            except (AttributeError, ValueError):
+            if not self.cc.ps_service.output_off(self.ps_channel):
                 res = guih.promptYesNo("Can't access power supply!",
                                        "Can't access supply to turn off. Continue with flash?")
                 if not res:
@@ -395,7 +389,6 @@ class tabXDS110(guic.ThemedFrame):
                     return False
 
         if flash_option == "target_power":
-            pass
             try:
                 if self.device_usb_relay != 0:
                     self.cc.relay.set_state(self.device_usb_relay, 1)
@@ -408,12 +401,13 @@ class tabXDS110(guic.ThemedFrame):
             pass
         elif flash_option == "supply_power":
             self.cc.relay.set_state(self.device_usb_relay, 0)
-            try:
-                self.cc.ps.set_voltage(self.ps_channel, self.device_vdds)
-                self.cc.ps.output_on(self.ps_channel)
-            except (AttributeError, ValueError): # AttributeError covers PS not init case. ValueError covers disconnect case.
-                guih.alert_user("Can't access power supply!", "Can't access power supply. Aborting flash", "error")
-                self.flashStatus.set_color(self.theme_config["error"])  # RED
+            if not self.cc.ps_service.set_voltage(self.ps_channel, self.device_vdds):
+                guih.alert_user("Can't access power supply!", "Can't set voltage. Aborting flash", "error")
+                self.flashStatus.set_color(self.theme_config["error"])
+                return False
+            if not self.cc.ps_service.output_on(self.ps_channel):
+                guih.alert_user("Can't access power supply!", "Can't turn output on. Aborting flash", "error")
+                self.flashStatus.set_color(self.theme_config["error"])
                 return False
 
     def turn_power_off(self, flash_option):
@@ -422,4 +416,4 @@ class tabXDS110(guic.ThemedFrame):
         elif flash_option == "probe_power":
             return
         elif flash_option == "supply_power":
-            self.cc.ps.output_off(self.ps_channel)
+            self.cc.ps_service.output_off(self.ps_channel)

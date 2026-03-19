@@ -2,7 +2,10 @@
 
 > **Free, open-source lab automation and test equipment control for electrical engineers. Useful for a wide variety of lab tasks.**
 
-A Python-based GUI application for controlling test equipment, automating data collection, and analyzing measurements. Built for embedded systems engineers, electronics hobbyists, and anyone who needs to automate their lab without spending thousands on commercial software.
+A Python-based GUI application for controlling test equipment, automating data collection, and analyzing measurements. 
+
+Built for embedded systems engineers, electronics hobbyists, and anyone who needs to automate their lab setup.
+Being open-source, you can tweak it or add any integrations/hooks your heart desires!
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -13,29 +16,67 @@ A Python-based GUI application for controlling test equipment, automating data c
 ## Why This Exists
 
 **The Problem:**
-- I originally designed this application to assist in debugging an embedded wearable device I was designing
-- I wanted a single application where I could flash my program code, control power states, and toggle USB relays
-- Python scripts worked but are fragmented and lack integration, they also quickly become project specific
+I originally designed this application to assist in debugging an embedded wearable device I was designing. 
+It was such an early-prototype that I was doing things like power-cycling, reflashing, switching between USB/power supply power, taking current measurements quite often.
+
+When I do a repeated task over and over, my brain screams the word "automation" at me. I also know that I will continue to use lab bench equipment for a long while yet after that specific project, so wanted to invest some time into developing a custom solution for myself.
+
+
+
+I wanted a single application where I could easily do all my lab tasks. Python scripts worked but are fragmented and lack integration, they also quickly become project specific. 
+I have grown to despise GUIs and prefer the command line for many tasks, but for something simple like toggling a power supply between ON/OFF simple buttons make sense.
+
 
 **The Solution:**
-WWD GUI API gives you professional lab automation capabilities for **free**:
 - Control multiple instruments simultaneously
 - Automated data logging with synchronized timestamps
 - Parameter sweep testing (voltage, frequency, duty cycle)
 - Real-time plotting and analysis
 - Instrument accuracy testing
+- Open-source so you can set up hooks like turn on power supply before flashing program
 - Cross-platform (Windows, Linux)
+
+
+### Philosophy
+
+I believe open-source is the way to structure this 
+- **Open source** makes better software through community collaboration
+- **Free tools** democratize access to professional capabilities
+- **Python** is the right language for scientific instrumentation
+- **Simplicity** beats feature bloat
 
 ---
 
-## ✨ Key Features
 
-### **Multi-Instrument Control**
+---
 
-This is the list of currently supported equipment. I actually maintain a separate repository for the instrument specific control stuff
+## ✨ Features
 
-You can check out my [EEequipment repo](https://github.com/andersbandt/EEequipment/tree/master), or click the subrepository link in the files above.
+### **Instrument Control**
 
+I maintain a second repo [EEequipment repo](https://github.com/andersbandt/EEequipment/tree/master) for the actual API layer of controlling the instruments.
+
+At a high level, there is support for the following types of equipment
+
+- Multimeters
+- Power supplies
+- Function generators
+- Oscilloscopes
+
+There is also some "one off" pieces of equipment like USB relays and debug probes.
+
+Most equipment comes with a USB connection that you can simply plug into your host PC. Older equipment might just have GPIB/HPIB ports that will require some adapter interface. 
+If you want to setup some networking switch interface many also include an Ethernet port. I haven't explored this much.
+
+Adding equipment is quite easy, and involves editing a single `.ini` file with your SCPI command list.
+Please refer to the [EEequipment repo](https://github.com/andersbandt/EEequipment/tree/master) for a more complete picture of supported equipment and how to add your own.
+
+
+#### ****
+- Generic command/query interface
+- **Instrument testing**: Sweep PS and measure with DMM
+  - Reports accuracy statistics (mean error, std dev, max error, % FS)
+- Benchmark tools for equipment performance (mainly sample rate right now)
 
 
 ### **Automated Data Logging**
@@ -57,14 +98,8 @@ You can check out my [EEequipment repo](https://github.com/andersbandt/EEequipme
 - Advanced labeling features (by filename, data column, etc.)
 - Save/load graph configurations
 
-### **ATE (Automated Test Equipment)**
-- Generic command/query interface
-- **Instrument testing**: Sweep PS and measure with DMM
-  - Reports accuracy statistics (mean error, std dev, max error, % FS)
-- Benchmark tools for equipment performance (mainly sample rate right now)
-
 ### **Semi-Professional UI**
-*The UI could use some work, mainly in regard to formatting and sizing on some tabs*
+*The UI could use some work, mainly in regard to formatting and sizing on some tabs. It's also not "modern" by any means, but I don't think most engineers prioritize aesthetics*
 - Dark theme with customizable colors
 - Compact mode for smaller displays
 - Cross-platform native look
@@ -72,7 +107,7 @@ You can check out my [EEequipment repo](https://github.com/andersbandt/EEequipme
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 ### Main Dashboard
 *Main dashboard has USB relay (4 buttons, first one is green)*
@@ -103,7 +138,7 @@ You can check out my [EEequipment repo](https://github.com/andersbandt/EEequipme
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.8 or higher
@@ -147,11 +182,20 @@ In order to use `pyvisa` you will need to configure a backend for the VISA inter
 
 ## 📚 Usage Examples
 
+Being a GUI application, usage should be pretty simple and self explanatory.
+The one thing I'll note is that you can add the `-a` flag to automatically try and connect to your previous connections
+
+```commandline
+main.py -a
+```
+
+Other than that, here are some sample sequences one might follow to accomplish stuff using the app.
+
 ### Example 1: Log DMM Data
 ```python
 # In the Logger tab:
 1. Check "Use DMM" checkbox
-2. Click "Refresh" to find your DMM
+2. Click "Refresh" to find your DMM port, and select the right model
 3. Connect to the DMM
 4. Set recording speed (e.g., 1 second)
 5. Click "Start Record"
@@ -208,7 +252,7 @@ In order to use `pyvisa` you will need to configure a backend for the VISA inter
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 wwd_gui_api/
@@ -216,15 +260,7 @@ wwd_gui_api/
 ├── gui/
 │   ├── gui_driver.py       # Main window and notebook
 │   ├── gui_class.py        # Themed UI components
-│   ├── guiTab_1_mainDashboard.py
-│   ├── guiTab_2_LOG.py     # Logger with stimulus sweeps
-│   ├── guiTab_3_DMM.py     # DMM control
-│   ├── guiTab_4_XDS110.py  # JTAG debug
-│   ├── guiTab_5_USB.py     # USB serial
-│   ├── guiTab_6_PS.py      # Power supply
-│   ├── guiTab_7_ATE.py     # Automated testing
-│   ├── guiTab_8_GRAPH.py   # Data plotting
-│   └── guiTab_9_FG.py      # Function generator
+│   ├── guiTab_x ....       # file for each tab of the GUI
 ├── common/
 │   ├── logger.py           # Data logging and stimulus control
 │   ├── plotter.py          # Plotting utilities
@@ -246,116 +282,51 @@ wwd_gui_api/
 
 **ClassController Pattern**: Central controller manages all equipment references and shared state.
 
-**Named Tuples**: File data uses named tuples for clarity (`file.filename`, `file.df` vs. `file[0]`, `file[3]`).
-
 **Command Registry**: Equipment commands loaded from `config.ini` files for flexibility.
 
 **Stimulus Generator**: Reusable sweep logic across logger and ATE tabs.
 
 **Themed Components**: Consistent UI with theme JSON and base classes.
 
----
-
-## 🗺️ Roadmap
-
-### v1.0 - Core Stability (Current)
-- [x] Multi-instrument control
-- [x] Synchronized data logging
-- [x] Stimulus sweep testing (single and dual)
-- [x] Graph presets with named tuples
-- [x] Instrument accuracy testing
-- [x] Cross-platform support
-
-
-### v1.1 - Analysis Tools
-- [ ] Improved plotting / graphing from CSV
-- [ ] Automated report generation (PDF)
-- [ ] Oscilloscope integration
-
-
-### v1.3 - Advanced Features
-- [ ] Scripting/macro system
-- [ ] FFT analysis tools
-
-
-### v2.0 - Professional Features
-- [ ] Automated calibration procedures
-- [ ] Test sequence builder (LabVIEW-style)
+**Service Layer**: Per-equipment service classes in `services/` handle connect/disconnect lifecycle, equipment operations, and error handling — separating business logic from GUI code.
 
 ---
 
-## 🤝 Contributing
+
+## Contributing
 
 I welcome contributions. I consider just installing and testing the application a contribution!
-- 🔧 Adding support for new equipment
-- 🐛 Fixing bugs
-- 📝 Improving documentation
-- 💡 Suggesting features
+Some easy ways to contribute are
 
-### Easy Ways to Contribute
+
 1. **Add equipment drivers** - Have a piece of test equipment? Add support for it!
-2. **Test on different platforms** - Help verify cross-platform compatibility
+2. **Test on different platforms/machines** - Help verify cross-platform compatibility
 3. **Write tutorials** - Share your workflows and use cases
 4. **Report bugs** - Found something broken? Let us know!
 
----
-
-## 💬 Community & Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/wwd_gui_api/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/wwd_gui_api/discussions)
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 **TL;DR**: You can use this software for any purpose, including commercial, as long as you include the license and copyright notice.
 
+This also means it's free for educational use. I encourage usage in lab courses or student projects and research, when applications like LabVIEW are quite cost-prohibitive.
+
+
 ---
 
 
-## 🎓 For Educators
+## Useful Resources
 
-This software is **free for educational use**. I encourage:
-- Using it in lab courses
-- Teaching automation concepts
-- Student projects and research
+- [EEequipment repo](https://github.com/andersbandt/EEequipment/tree/master) 
+- [PyVISA docs](https://pyvisa.readthedocs.io/)
+- [Tkinter best practices](https://tkdocs.com/)
+- [Testing with pytest](https://docs.pytest.org/)
+- [SCPI commands](https://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments)
+- [personal blog post about this project](https://andersbandt.github.io/projects/Software_controlled_embedded_test_setup.html)
 
----
 
-## 🔬 Research & Publications
 
-If you use this software in your research, please cite:
-
-```bibtex
-@software{wwd_gui_api,
-  author = {Anders Bandt},
-  title = {WWD GUI API: Open-Source Lab Automation Software},
-  year = {2025},
-  url = {https://github.com/andersbandt/wwd_gui_api}
-}
-```
-
----
-
-## 💡 Philosophy
-
-> "Lab automation shouldn't cost more than the equipment you're automating."
-
-We believe:
-- **Open source** makes better software through community collaboration
-- **Free tools** democratize access to professional capabilities
-- **Python** is the right language for scientific instrumentation
-- **Simplicity** beats feature bloat
-
----
-
-## 🚧 Project Status
-
-**Active Development** - This project is actively maintained and welcoming contributions.
-
----
-
-**Made with ❤️ by engineers, for engineers**

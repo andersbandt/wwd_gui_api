@@ -83,7 +83,6 @@ class TabPS(guic.ThemedFrame):
         self.columnconfigure(2, weight=1)
         self.rowconfigure(2, weight=1)
 
-
     def initTabContent(self):
         logger.debug("Initializing tab 5 (PS) content")
         self.create_tab_header("PS Control", columnspan=3)
@@ -202,7 +201,6 @@ class TabPS(guic.ThemedFrame):
             self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
             self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
             self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
-
 
     def init_fr_status(self):
         # channel 1 CV/CC mode

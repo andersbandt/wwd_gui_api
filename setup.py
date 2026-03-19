@@ -2,6 +2,8 @@
 
 from setuptools import setup
 
+# TODO: do I need this file?
+
 setup(
     name='wwd_gui_api',
     version='',

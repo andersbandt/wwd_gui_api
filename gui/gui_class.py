@@ -203,6 +203,7 @@ class Prompt(ThemedFrame):
         self.set_bg(self.theme_config["light_4"])
         self.show_timestamps = True
 
+
         ttk.Label(self, text=title, style="TPinkLabel.TLabel").grid(row=0, column=0, pady=5, padx=10)
 
         # clear button

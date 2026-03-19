@@ -7,6 +7,7 @@
 ### Feature Work
 
 
+- [ ] add a minimum (realistic) value in that sample rate entry box
 - [ ] **Change tab color when something is active** — e.g. connection live, recording in progress. Probably a notebook style override or a colored indicator in the tab label.
 - [ ] **Mini status indicator in ATE tab** — next to the instrument accuracy test section, show pass/fail or in-progress state.
 - [ ] **Color normalization for filename labeling mode** (graph tab) — `normalize_colors` currently only runs in `data` and `both` labeling modes. To support `filename` mode: pre-pass to collect extracted `file_parts[idx]` values across all files, feed into the same normalizer/colormap pipeline, use the resulting color in the `filename` branch. `label_config` already carries `normalize_colors` in `both` mode; extend for `filename`.

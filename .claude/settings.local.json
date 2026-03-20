@@ -17,7 +17,11 @@
       "Bash(pip3 show:*)",
       "Bash(done)",
       "Bash(/mnt/c/Users/ander/AppData/Local/Programs/Python/Python312/python.exe:*)",
-      "Bash(python -m pytest:*)"
+      "Bash(python -m pytest:*)",
+      "Skill(update-config)",
+      "Bash(python mcp_server.py --help)",
+      "Bash(python mcp_server.py)",
+      "mcp__lab__*"
     ]
   }
 }

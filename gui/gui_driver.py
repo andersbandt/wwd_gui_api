@@ -91,7 +91,17 @@ class MainApplication(ThemedApp):
         self.nb.grid(column=0, row=0, sticky="nsew")
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
+
+        self.root.bind("<Shift-Right>", lambda e: self._shift_tab(1))
+        self.root.bind("<Shift-Left>", lambda e: self._shift_tab(-1))
+
         return True
+
+    def _shift_tab(self, direction):
+        tabs = self.nb.tabs()
+        current = self.nb.index(self.nb.select())
+        next_idx = (current + direction) % len(tabs)
+        self.nb.select(next_idx)
 
     def on_tab_changed(self, event):
         # Skip gui_refresh during active recording to prevent crashes

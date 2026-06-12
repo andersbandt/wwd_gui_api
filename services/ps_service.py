@@ -123,7 +123,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_voltage(channel)
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
             return None
 
     def read_current(self, channel):
@@ -137,7 +137,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_current(channel)
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
             return None
 
     def read_set_voltage(self, channel):
@@ -151,7 +151,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_set_voltage(channel)
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
             return None
 
     def read_set_current(self, channel):
@@ -165,7 +165,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_set_current(channel)
-        except (*COMMUNICATION_ERRORS, Exception):
+        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
             return None
 
     def get_status(self):

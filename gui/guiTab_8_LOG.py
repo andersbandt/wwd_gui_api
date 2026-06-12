@@ -1468,34 +1468,36 @@ class TabLog(guic.ThemedFrame):
 
         # Power Supply data if requested
         if self.record_config.use_ps:
-            if self.record_config.ps_log_voltage:
-                v1set = self.cc.ps_service.read_set_voltage(1)
-                v1 = self.cc.ps_service.read_voltage(1)
-                row[logger.COL_PS_VSET1] = v1set if v1set is not None else "ERROR"
-                row[logger.COL_PS_VMEAS1] = v1 if v1 is not None else "ERROR"
-            if self.record_config.ps_log_current:
-                i1 = self.cc.ps_service.read_current(1)
-                i1set = self.cc.ps_service.read_set_current(1)
-                row[logger.COL_PS_IMEAS1] = i1 if i1 is not None else "ERROR"
-                row[logger.COL_PS_ISET1] = i1set if i1set is not None else "ERROR"
-            if self.record_config.ps_channel == 2:
+            try:
+                def _ps(val):
+                    return val if val is not None else "ERROR"
                 if self.record_config.ps_log_voltage:
-                    v2set = self.cc.ps_service.read_set_voltage(2)
-                    v2 = self.cc.ps_service.read_voltage(2)
-                    row[logger.COL_PS_VSET2] = v2set if v2set is not None else "ERROR"
-                    row[logger.COL_PS_VMEAS2] = v2 if v2 is not None else "ERROR"
+                    row[logger.COL_PS_VSET1]  = _ps(self.cc.ps_service.read_set_voltage(1))
+                    row[logger.COL_PS_VMEAS1] = _ps(self.cc.ps_service.read_voltage(1))
                 if self.record_config.ps_log_current:
-                    i2 = self.cc.ps_service.read_current(2)
-                    i2set = self.cc.ps_service.read_set_current(2)
-                    row[logger.COL_PS_IMEAS2] = i2 if i2 is not None else "ERROR"
-                    row[logger.COL_PS_ISET2] = i2set if i2set is not None else "ERROR"
+                    row[logger.COL_PS_IMEAS1] = _ps(self.cc.ps_service.read_current(1))
+                    row[logger.COL_PS_ISET1]  = _ps(self.cc.ps_service.read_set_current(1))
+                if self.record_config.ps_channel == 2:
+                    if self.record_config.ps_log_voltage:
+                        row[logger.COL_PS_VSET2]  = _ps(self.cc.ps_service.read_set_voltage(2))
+                        row[logger.COL_PS_VMEAS2] = _ps(self.cc.ps_service.read_voltage(2))
+                    if self.record_config.ps_log_current:
+                        row[logger.COL_PS_IMEAS2] = _ps(self.cc.ps_service.read_current(2))
+                        row[logger.COL_PS_ISET2]  = _ps(self.cc.ps_service.read_set_current(2))
+            except Exception as e:
+                _logger.warning(f"PS read error during recording: {e}")
+                for col in [logger.COL_PS_VSET1, logger.COL_PS_VMEAS1,
+                            logger.COL_PS_IMEAS1, logger.COL_PS_ISET1,
+                            logger.COL_PS_VSET2, logger.COL_PS_VMEAS2,
+                            logger.COL_PS_IMEAS2, logger.COL_PS_ISET2]:
+                    row.setdefault(col, "ERROR")
 
         # Function Generator data if requested
         if self.record_config.use_fg:
-            freq = self.cc.fg_service.get_frequency()
-            shape = self.cc.fg_service.get_shape()
-            row[logger.COL_FG_FREQ] = freq if freq is not None else "ERROR"
-            row[logger.COL_FG_WAVEFORM] = shape if shape is not None else "ERROR"
+            fg_freq = self.cc.fg_service.get_frequency()
+            fg_shape = self.cc.fg_service.get_shape()
+            row[logger.COL_FG_FREQ] = fg_freq if fg_freq is not None else "ERROR"
+            row[logger.COL_FG_WAVEFORM] = fg_shape if fg_shape is not None else "ERROR"
 
         # Oscilloscope data if requested
         if self.record_config.use_osc and self.record_config.osc_config:

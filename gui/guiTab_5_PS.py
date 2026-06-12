@@ -46,6 +46,8 @@ class TabPS(guic.ThemedFrame):
         self.ps_v2r = 0
         self.ps_i1 = 0
         self.ps_i2 = 0
+        self.ps_i1s = "?"
+        self.ps_i2s = "?"
 
         # channel status cache — avoid querying the instrument on every tab switch
         self._STATUS_CACHE_TTL = 10.0  # seconds
@@ -126,30 +128,35 @@ class TabPS(guic.ThemedFrame):
         self.labelTimeConnectedValue.grid(row=2, column=1, sticky='W', padx=5, pady=2)
 
         # Add labels for range and measurements
-        self.labelV1_s = ttk.Label(self.fr_info, width=10, text='Voltage 1', style="TLabel", anchor='w')
-        self.labelV1_r = ttk.Label(self.fr_info, width=15, text='Voltage 1 (read)', style="TLabel", anchor='w')
-        self.labelI1 = ttk.Label(self.fr_info, width=10, text='Current 1', style="TLabel", anchor='w')
-        self.labelV2_s = ttk.Label(self.fr_info, width=10, text='Voltage 2', style="TLabel", anchor='w')
-        self.labelV2_r = ttk.Label(self.fr_info, width=15, text='Voltage 2 (read)', style="TLabel", anchor='w')
-        self.labelI2 = ttk.Label(self.fr_info, width=10, text='Current 2', style="TLabel", anchor='w')
+        self.labelV1_s = ttk.Label(self.fr_info, width=16, text='Voltage 1', style="TLabel", anchor='w')
+        self.labelV1_r = ttk.Label(self.fr_info, width=16, text='Voltage 1 (read)', style="TLabel", anchor='w')
+        self.labelI1 = ttk.Label(self.fr_info, width=16, text='Current 1 (meas)', style="TLabel", anchor='w')
+        self.labelI1_s = ttk.Label(self.fr_info, width=16, text='Current 1 limit', style="TLabel", anchor='w')
+        self.labelV2_s = ttk.Label(self.fr_info, width=16, text='Voltage 2', style="TLabel", anchor='w')
+        self.labelV2_r = ttk.Label(self.fr_info, width=16, text='Voltage 2 (read)', style="TLabel", anchor='w')
+        self.labelI2 = ttk.Label(self.fr_info, width=16, text='Current 2 (meas)', style="TLabel", anchor='w')
+        self.labelI2_s = ttk.Label(self.fr_info, width=16, text='Current 2 limit', style="TLabel", anchor='w')
 
         # Position the range and measurement labels
         self.labelV1_s.grid(row=3, column=0, sticky='W', padx=5, pady=2)
         self.labelV1_r.grid(row=4, column=0, sticky='W', padx=5, pady=2)
         self.labelI1.grid(row=5, column=0, sticky='W', padx=5, pady=2)
+        self.labelI1_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
         if self.channel_count == 2:
-            self.labelV2_s.grid(row=6, column=0, sticky='W', padx=5, pady=2)
-            self.labelV2_r.grid(row=7, column=0, sticky='W', padx=5, pady=2)
-            self.labelI2.grid(row=8, column=0, sticky='W', padx=5, pady=2)
+            self.labelV2_s.grid(row=7, column=0, sticky='W', padx=5, pady=2)
+            self.labelV2_r.grid(row=8, column=0, sticky='W', padx=5, pady=2)
+            self.labelI2.grid(row=9, column=0, sticky='W', padx=5, pady=2)
+            self.labelI2_s.grid(row=10, column=0, sticky='W', padx=5, pady=2)
 
         # Add value labels for range and measurements
         self.valueV1_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueV1_r = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI1 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueI1_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueV2_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueV2_r = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
         self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
-        self.valueI2 = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
+        self.valueI2_s = tk.Label(self.fr_info, width=10, text='', relief='sunken', anchor='w')
 
         # add some drop-downs for unit handling
         self.unitCH1_drop = guih.generate_drop_down(self.fr_info,
@@ -164,15 +171,17 @@ class TabPS(guic.ThemedFrame):
         self.valueV1_r.grid(row=4, column=1, sticky='E', padx=5, pady=2)
         self.valueI1.grid(row=5, column=1, sticky='E', padx=5, pady=2)
         self.unitCH1_drop[0].grid(row=5, column=2, sticky='W', padx=5, pady=2)
+        self.valueI1_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
         if self.channel_count == 2:
-            self.valueV2_s.grid(row=6, column=1, sticky='E', padx=5, pady=2)
-            self.valueV2_r.grid(row=7, column=1, sticky='E', padx=5, pady=2)
-            self.valueI2.grid(row=8, column=1, sticky='E', padx=5, pady=2)
-            self.unitCH2_drop[0].grid(row=8, column=2, sticky='W', padx=5, pady=2)
+            self.valueV2_s.grid(row=7, column=1, sticky='E', padx=5, pady=2)
+            self.valueV2_r.grid(row=8, column=1, sticky='E', padx=5, pady=2)
+            self.valueI2.grid(row=9, column=1, sticky='E', padx=5, pady=2)
+            self.unitCH2_drop[0].grid(row=9, column=2, sticky='W', padx=5, pady=2)
+            self.valueI2_s.grid(row=10, column=1, sticky='E', padx=5, pady=2)
 
         # ADD A REFRESH
         self.btn_update = tk.Button(self.fr_info, text='UPDATE PS', command=self.update_PS)
-        self.btn_update.grid(row=9, column=2, pady=5, padx=3, sticky='W')
+        self.btn_update.grid(row=11, column=2, pady=5, padx=3, sticky='W')
 
     def init_fr_control(self):
         fr_m = self.fr_control
@@ -182,25 +191,41 @@ class TabPS(guic.ThemedFrame):
         self.ch1_voltage = tk.Entry(fr_m)
         self.ch1_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(1, self.ch1_voltage.get()))
-
         self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
-        self.ch1_label.grid(row=0, column=0, padx=10, pady=10)
-        self.ch1_voltage.grid(row=0, column=1, padx=10, pady=10)
-        self.ch1_set_btn.grid(row=0, column=2, padx=10, pady=10)
-        self.ch1_toggle_btn.grid(row=0, column=3, padx=10, pady=10)
+
+        self.ch1_ilabel = ttk.Label(fr_m, text="  I limit", style="TLabel")
+        self.ch1_current = tk.Entry(fr_m)
+        self.ch1_setI_btn = tk.Button(fr_m, text="Set Current",
+                                       command=lambda: self.set_current(1, self.ch1_current.get()))
+
+        self.ch1_label.grid(row=0, column=0, padx=10, pady=(10, 2))
+        self.ch1_voltage.grid(row=0, column=1, padx=10, pady=(10, 2))
+        self.ch1_set_btn.grid(row=0, column=2, padx=10, pady=(10, 2))
+        self.ch1_toggle_btn.grid(row=0, column=3, padx=10, pady=(10, 2))
+        self.ch1_ilabel.grid(row=1, column=0, padx=10, pady=(2, 10))
+        self.ch1_current.grid(row=1, column=1, padx=10, pady=(2, 10))
+        self.ch1_setI_btn.grid(row=1, column=2, padx=10, pady=(2, 10))
 
         # CHANNEL 2 CONTROLS
         self.ch2_label = ttk.Label(fr_m, text="Channel 2", style="TLabel")
         self.ch2_voltage = tk.Entry(fr_m)
         self.ch2_set_btn = tk.Button(fr_m, text="Set Voltage",
-                                      command=lambda: self.set_voltage(2, self.ch2_voltage.get())
-                                      )
+                                      command=lambda: self.set_voltage(2, self.ch2_voltage.get()))
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
+
+        self.ch2_ilabel = ttk.Label(fr_m, text="  I limit", style="TLabel")
+        self.ch2_current = tk.Entry(fr_m)
+        self.ch2_setI_btn = tk.Button(fr_m, text="Set Current",
+                                       command=lambda: self.set_current(2, self.ch2_current.get()))
+
         if self.channel_count == 2:
-            self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
-            self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
-            self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
-            self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
+            self.ch2_label.grid(row=2, column=0, padx=10, pady=(10, 2))
+            self.ch2_voltage.grid(row=2, column=1, padx=10, pady=(10, 2))
+            self.ch2_set_btn.grid(row=2, column=2, padx=10, pady=(10, 2))
+            self.ch2_toggle_btn.grid(row=2, column=3, padx=10, pady=(10, 2))
+            self.ch2_ilabel.grid(row=3, column=0, padx=10, pady=(2, 10))
+            self.ch2_current.grid(row=3, column=1, padx=10, pady=(2, 10))
+            self.ch2_setI_btn.grid(row=3, column=2, padx=10, pady=(2, 10))
 
     def init_fr_status(self):
         # channel 1 CV/CC mode
@@ -223,9 +248,11 @@ class TabPS(guic.ThemedFrame):
             self.valueV1_s.config(text='{:8s}'.format(str(self.ps_v1s)))
             self.valueV1_r.config(text='{:8s}'.format(str(self.ps_v1r)))
             self.valueI1.config(text='{:8s}'.format(str(self.ps_i1)))
+            self.valueI1_s.config(text='{:8s}'.format(str(self.ps_i1s)))
             self.valueV2_s.config(text='{:8s}'.format(str(self.ps_v2s)))
             self.valueV2_r.config(text='{:8s}'.format(str(self.ps_v2r)))
             self.valueI2.config(text='{:8s}'.format(str(self.ps_i2)))
+            self.valueI2_s.config(text='{:8s}'.format(str(self.ps_i2s)))
 
     def _get_status_cached(self):
         """Return cached channel status, querying the instrument only when the cache is stale."""
@@ -327,10 +354,12 @@ class TabPS(guic.ThemedFrame):
             self.ps_v1r = self.cc.ps.get_voltage(1)
             self.ps_i1 = self.cc.ps.get_current(1)
             self.ps_i1 = self.ps_i1 * self.ch1_scale
+            self.ps_i1s = self.cc.ps_service.read_set_current(1)
             if self.channel_count == 2:
                 self.ps_v2r = self.cc.ps.get_voltage(2)
                 self.ps_i2 = self.cc.ps.get_current(2)
                 self.ps_i2 = self.ps_i2 * self.ch2_scale
+                self.ps_i2s = self.cc.ps_service.read_set_current(2)
             self.gui_refresh_info()
 
     def toggle_channel(self, channel):
@@ -389,6 +418,20 @@ class TabPS(guic.ThemedFrame):
             self.gui_refresh_info()
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
+
+    def set_current(self, channel, current_str):
+        if self.cc.get_ps_status():
+            current = float(current_str)
+            self.cc.ps_service.set_current(channel, current)
+            self.prompt.print(f"Set current limit on channel {channel} to {current} A")
+            if channel == 1:
+                self.ps_i1s = current
+            elif channel == 2:
+                self.ps_i2s = current
+            self.update_PS()
+            self.gui_refresh_info()
+        else:
+            guih.alert_user("Can't set current", "No PS connection!", "error")
 
     #################################
     #### SERIAL (COM)  ##############

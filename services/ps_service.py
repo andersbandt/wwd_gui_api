@@ -154,6 +154,20 @@ class PSService(EquipmentService):
         except COMMUNICATION_ERRORS:
             return None
 
+    def read_set_current(self, channel):
+        """Read the set current limit on the given channel.
+
+        Returns:
+            float or None on failure.
+        """
+        ps = self._get_from_controller()
+        if ps is None:
+            return None
+        try:
+            return ps.get_set_current(channel)
+        except (*COMMUNICATION_ERRORS, Exception):
+            return None
+
     def get_status(self):
         """Check if PS is connected and responsive."""
         return self.cc.get_ps_status()

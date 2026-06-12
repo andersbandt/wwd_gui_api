@@ -875,9 +875,11 @@ class TabLog(guic.ThemedFrame):
             entry_desc.insert(0, existing.description)
 
         # Available variables hint
-        hint_text = ("Available variables: Time, DMM_Meas1, PS_Vset1, PS_Vmeas1, PS_Imeas1,\n"
-                     "PS_Vset2, PS_Vmeas2, PS_Imeas2, FG_Freq, OSC_CH*_*, prior math cols\n"
-                     "Serial columns: use names you entered in 'Serial columns' field (e.g. col1, col2)\n"
+        hint_text = ("Available variables: Time, DMM_Meas1,\n"
+                     "PS_Vset1, PS_Vmeas1, PS_Imeas1, PS_Iset1,\n"
+                     "PS_Vset2, PS_Vmeas2, PS_Imeas2, PS_Iset2,\n"
+                     "FG_Freq, OSC_CH*_*, prior math cols\n"
+                     "Serial columns: use names from 'Serial columns' field\n"
                      "Functions: abs, round, min, max, sqrt, log, log10, exp, pow\n"
                      "Constants: pi, e")
         ttk.Label(dialog, text=hint_text, style="TLabel", wraplength=350).grid(
@@ -1473,7 +1475,9 @@ class TabLog(guic.ThemedFrame):
                 row[logger.COL_PS_VMEAS1] = v1 if v1 is not None else "ERROR"
             if self.record_config.ps_log_current:
                 i1 = self.cc.ps_service.read_current(1)
+                i1set = self.cc.ps_service.read_set_current(1)
                 row[logger.COL_PS_IMEAS1] = i1 if i1 is not None else "ERROR"
+                row[logger.COL_PS_ISET1] = i1set if i1set is not None else "ERROR"
             if self.record_config.ps_channel == 2:
                 if self.record_config.ps_log_voltage:
                     v2set = self.cc.ps_service.read_set_voltage(2)
@@ -1482,7 +1486,9 @@ class TabLog(guic.ThemedFrame):
                     row[logger.COL_PS_VMEAS2] = v2 if v2 is not None else "ERROR"
                 if self.record_config.ps_log_current:
                     i2 = self.cc.ps_service.read_current(2)
+                    i2set = self.cc.ps_service.read_set_current(2)
                     row[logger.COL_PS_IMEAS2] = i2 if i2 is not None else "ERROR"
+                    row[logger.COL_PS_ISET2] = i2set if i2set is not None else "ERROR"
 
         # Function Generator data if requested
         if self.record_config.use_fg:

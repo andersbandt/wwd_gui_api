@@ -185,7 +185,7 @@ Each tab is in `gui/guiTab_N_*.py`:
 2. **DMM Control** (`guiTab_2_DMM.py`, `TabDMM`) — Digital multimeter control and data acquisition
 3. **XDS110 JTAG** (`guiTab_3_XDS110.py`, `tabXDS110`) — JTAG debug probe interface
 4. **USB COMM** (`guiTab_4_USB.py`, `TabUSB`) — USB serial communication
-5. **PS Control** (`guiTab_5_PS.py`, `TabPS`) — Power supply control (voltage/current settings)
+5. **PS Control** (`guiTab_5_PS.py`, `TabPS`) — Power supply control: per-channel voltage and current-limit setpoints (current entry honors the A/mA/uA unit dropdown; SPD3303X applies its calibration offset automatically)
 6. **FG Control** (`guiTab_6_FG.py`, `TabFG`) — Function generator control (waveform, frequency, duty cycle)
 7. **ATE** (`guiTab_7_ATE.py`, `TabATE`) — Automated test equipment sequencing
 8. **Logger** (`guiTab_8_LOG.py`, `TabLog`) — Data logging with various modes (timestamp, raw, data, math columns)
@@ -259,6 +259,9 @@ In `_collect_data_row` (Logger tab), always use `val if val is not None else "ER
 
 ### SPD3303X: first VISA connect fails with EOVERFLOW (Errno 75)
 The SPD3303X leaves stale data in the USBTMC bulk-in endpoint on disconnect. `PyVISAHandler.connect()` calls `inst.clear()` after `open_resource()` to drain it. This is wrapped in try/except so it silently skips on backends that don't support it. Don't remove this.
+
+### SPD3303X: calibration offset direction is inverted between set and read
+The SPD3303X applies per-channel calibration constants from its `config.ini` (`v_slope`/`v_offset`, `i_offset`). Voltage and current setpoints **add** the offset (`set_voltage`, `set_current` override in `SPD3303X.py`) while readbacks **subtract** it (`get_current` does `max(0.0, raw - i_offset)`). This is intentional and must stay symmetric: a requested 30 mA limit sends `0.030 + i_offset` so the effective regulated limit matches what the user asked for. Only the SPD3303X overrides `set_current`; the base `PowerSupply.set_current` sends the raw value with no offset. The PS tab's "Set Current" entry is interpreted in the channel's selected A/mA/uA unit before conversion to amps.
 
 ### USB tab serial output: ANSI escape codes from Zephyr
 The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).

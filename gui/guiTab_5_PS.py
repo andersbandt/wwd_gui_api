@@ -182,12 +182,17 @@ class TabPS(guic.ThemedFrame):
         self.ch1_voltage = tk.Entry(fr_m)
         self.ch1_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(1, self.ch1_voltage.get()))
+        self.ch1_current = tk.Entry(fr_m)
+        self.ch1_set_i_btn = tk.Button(fr_m, text="Set Current",
+                                       command=lambda: self.set_current(1, self.ch1_current.get()))
 
         self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
         self.ch1_label.grid(row=0, column=0, padx=10, pady=10)
         self.ch1_voltage.grid(row=0, column=1, padx=10, pady=10)
         self.ch1_set_btn.grid(row=0, column=2, padx=10, pady=10)
-        self.ch1_toggle_btn.grid(row=0, column=3, padx=10, pady=10)
+        self.ch1_current.grid(row=0, column=3, padx=10, pady=10)
+        self.ch1_set_i_btn.grid(row=0, column=4, padx=10, pady=10)
+        self.ch1_toggle_btn.grid(row=0, column=5, padx=10, pady=10)
 
         # CHANNEL 2 CONTROLS
         self.ch2_label = ttk.Label(fr_m, text="Channel 2", style="TLabel")
@@ -195,12 +200,17 @@ class TabPS(guic.ThemedFrame):
         self.ch2_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(2, self.ch2_voltage.get())
                                       )
+        self.ch2_current = tk.Entry(fr_m)
+        self.ch2_set_i_btn = tk.Button(fr_m, text="Set Current",
+                                       command=lambda: self.set_current(2, self.ch2_current.get()))
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
         if self.channel_count == 2:
             self.ch2_label.grid(row=1, column=0, padx=10, pady=10)
             self.ch2_voltage.grid(row=1, column=1, padx=10, pady=10)
             self.ch2_set_btn.grid(row=1, column=2, padx=10, pady=10)
-            self.ch2_toggle_btn.grid(row=1, column=3, padx=10, pady=10)
+            self.ch2_current.grid(row=1, column=3, padx=10, pady=10)
+            self.ch2_set_i_btn.grid(row=1, column=4, padx=10, pady=10)
+            self.ch2_toggle_btn.grid(row=1, column=5, padx=10, pady=10)
 
     def init_fr_status(self):
         # channel 1 CV/CC mode
@@ -377,7 +387,7 @@ class TabPS(guic.ThemedFrame):
         if self.cc.get_ps_status():
             # have to format input text_data box into float
             voltage = float(voltage_str)
-            self.cc.ps.set_voltage(voltage)
+            self.cc.ps.set_voltage(voltage, channel=channel)
             self.prompt.print(f"Set voltage on channel {channel} to {voltage} V")
             if channel == 1:
                 self.ps_v1s = voltage
@@ -389,6 +399,29 @@ class TabPS(guic.ThemedFrame):
             self.gui_refresh_info()
         else:
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
+
+    def set_current(self, channel, current_str):
+        if not self.cc.get_ps_status():
+            guih.alert_user("Can't set current", "No PS connection!", "error")
+            return
+
+        # interpret the entry in the channel's selected unit (A / mA / uA),
+        # converting to amps before sending to the driver
+        scale = self.ch1_scale if channel == 1 else self.ch2_scale
+        try:
+            current = float(current_str) / scale
+        except ValueError:
+            guih.alert_user("Can't set current", f"Invalid current: '{current_str}'", "error")
+            return
+
+        # driver applies the per-channel calibration offset automatically
+        if self.cc.ps_service.set_current(channel, current):
+            self.prompt.print(f"Set current limit on channel {channel} to {current_str} "
+                              f"({current} A, before cal offset)")
+            self.update_PS()
+            self.gui_refresh_info()
+        else:
+            self.prompt.print(f"Failed to set current limit on channel {channel}", "error")
 
     #################################
     #### SERIAL (COM)  ##############

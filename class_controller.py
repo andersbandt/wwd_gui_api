@@ -4,12 +4,13 @@ import logging
 import os
 import xml.etree.ElementTree as ET
 
+from common.path_helper import resolve_path
 from services import DMMService, PSService, FGService, OscService
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 
 logger = logging.getLogger(__name__)
 
-_PORTS_XML = os.path.join("config", "ports_used.xml")
+_PORTS_XML = resolve_path("config", "ports_used.xml")
 
 
 def _write_xml(tree, root):

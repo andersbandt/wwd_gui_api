@@ -25,16 +25,16 @@ import sys
 import threading
 import xml.etree.ElementTree as ET
 
-# Anchor working directory to repo root so all relative config paths work
-# (ClassController: config/ports_used.xml, relay: EEequipment/usbrelay/config.ini)
+# Make the repo importable regardless of where this server is launched from.
+# App resources (config/, EEequipment/) resolve via common.path_helper, so no
+# working-directory juggling is needed.
 _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_REPO_ROOT)
 sys.path.insert(0, _REPO_ROOT)
 
 from mcp.server.fastmcp import FastMCP
 
 from class_controller import ClassController
-from common.path_helper import init_config_service
+from common.path_helper import init_config_service, resolve_path
 from common.serial_api import SerialGeneral, get_ports
 from common.logging_session import LoggingSession
 from common import logger as lgr, path_helper
@@ -104,7 +104,7 @@ def _auto_connect() -> None:
     import time
 
     try:
-        root = ET.parse("config/ports_used.xml").getroot()
+        root = ET.parse(resolve_path("config", "ports_used.xml")).getroot()
     except Exception:
         logger.info("No ports_used.xml — skipping auto-connect")
         return

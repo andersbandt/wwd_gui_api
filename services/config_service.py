@@ -6,7 +6,7 @@ import configparser
 from dataclasses import dataclass
 from typing import List
 
-from common.path_helper import get_config_path
+from common.path_helper import get_config_path, resolve_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ class ConfigService:
     # ------------------------------------------------------------------
 
     def get_theme_file(self) -> str:
-        """Return the path to the theme JSON file (e.g. 'config/darcula.json')."""
-        default_theme = "config/darcula.json"
+        """Return the absolute path to the theme JSON file (e.g. '<root>/config/darcula.json')."""
+        default_theme = resolve_path("config", "darcula.json")
 
         if "THEME" not in self._config:
             logger.warning("Missing [THEME] section in config. Using default theme.")
@@ -53,6 +53,7 @@ class ConfigService:
 
         if not theme_file.startswith("config/"):
             theme_file = f"config/{theme_file}"
+        theme_file = resolve_path(theme_file)
 
         if not os.path.exists(theme_file):
             logger.warning(f"Theme file {theme_file} does not exist. Using default theme.")

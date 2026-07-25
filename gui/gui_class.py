@@ -25,6 +25,7 @@ _ANSI_RE = re.compile(r'\x1b\[([0-9;]*)m')
 # import user created modules
 from gui import gui_helper as guih
 from common import serial_api
+from common.path_helper import resolve_path
 
 
 def scale_theme(theme_cfg: dict, factor: float, *key_paths: str) -> dict:
@@ -612,7 +613,7 @@ class SerialConnFrame(ConnFrame):
         # Create the root element
         root = ET.Element("PortsUsed")
         try:
-            tree = ET.ElementTree(root, file="config/ports_used.xml")
+            tree = ET.ElementTree(root, file=resolve_path("config", "ports_used.xml"))
         except (FileNotFoundError, xml.etree.ElementTree.ParseError):
             return False
 

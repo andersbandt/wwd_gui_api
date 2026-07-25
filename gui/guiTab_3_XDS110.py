@@ -11,7 +11,7 @@ import os
 from EEequipment.xds110 import xds110_api as xds110
 from EEequipment.xds110.xds110_api import base_project_path, gmake_cmd
 from common import subprocessor as subp
-from common.path_helper import get_config_path
+from common.path_helper import get_config_path, resolve_path
 from services.config_service import ConfigService
 from gui import gui_helper as guih
 from gui import gui_class as guic
@@ -355,7 +355,7 @@ class tabXDS110(guic.ThemedFrame):
     def autoload_config(self):
         cfg = self.defaultTarget_drop[1].get()
         logger.info(f"Autoloading with config num: {cfg}")
-        self.parse_target_config(os.path.join("config", f"{cfg}.ini"))
+        self.parse_target_config(resolve_path("config", f"{cfg}.ini"))
 
 
     ##############################################################################

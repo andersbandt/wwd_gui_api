@@ -146,7 +146,7 @@ All log files are written to the `data/` directory with timestamped filenames.
 - `plotter.py` — Real-time plotting utilities
 - `csv_helper.py` — CSV file operations
 - `math_columns.py` — User-defined computed columns using safe expression evaluation (`simpleeval`)
-- `path_helper.py` — Centralized path management (`get_data_dir()`, `get_full_data_path()`)
+- `path_helper.py` — Centralized path management (`get_project_root()`, `resolve_path()`, `get_config_path()`, `get_data_dir()`, `get_full_data_path()`). All bundled resources (`config/`, `data/`, `EEequipment/`) resolve against the project root — derived from `__file__`, never `os.getcwd()` — so the app can be launched from any working directory. Never hardcode a relative path like `"config/master.ini"`; use `resolve_path()`.
 - `subprocessor.py` — Subprocess execution utilities
 - `usb_api.py` — USB device enumeration
 

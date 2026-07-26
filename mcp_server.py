@@ -533,15 +533,22 @@ def log_tail(n_rows: int = 10) -> list:
 # ── GDB via J-Link GDB Server ─────────────────────────────────────────────────
 
 @mcp.tool()
-def gdb_query(commands: list[str]) -> str:
-    """Run GDB commands against the live nRF52832 target via J-Link.
+def gdb_query(commands: list[str], timeout_s: int = 30) -> str:
+    """Run GDB commands against the live nRF52833 target via J-Link.
 
     Starts J-Link GDB server, connects arm-none-eabi-gdb in batch mode,
-    halts the target, executes all commands in order, then detaches.
-    The ELF must exist at ~/Documents/NCS/WWD-n/build/zephyr/zephyr.elf.
+    executes all commands in order, then detaches. The ELF defaults to
+    ~/Documents/NCS/WWD-n/build_n33/zephyr/zephyr.elf (set by the wrapper
+    script, overridable there via the ELF env var).
+
+    NOTE: JLinkGDBServer is launched without -noreset, so connecting RESETS
+    the target. State that only occurs on a cold power-on cannot be observed
+    this way — have the firmware print it instead.
 
     Args:
         commands: List of GDB command strings to execute.
+        timeout_s: Seconds to wait. Raise well above the default when using
+            breakpoints, since the run blocks until each one is hit.
 
     Examples:
         gdb_query(["p rtc_seconds"])
@@ -557,14 +564,17 @@ def gdb_query(commands: list[str]) -> str:
             ["/bin/bash", _GDB_SCRIPT] + commands,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout_s,
         )
         out = result.stdout
         if result.stderr:
             out += f"\n[stderr]:\n{result.stderr}"
         return out
     except subprocess.TimeoutExpired:
-        return "Timeout after 30 s — is J-Link connected and target powered?"
+        return (
+            f"Timeout after {timeout_s} s — is J-Link connected and target powered? "
+            "If the commands set a breakpoint, raise timeout_s."
+        )
     except FileNotFoundError:
         return f"GDB script not found: {_GDB_SCRIPT}"
     except Exception as exc:

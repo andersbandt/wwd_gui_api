@@ -8,6 +8,17 @@ This project provides a GUI-based control system for interfacing with embedded t
 
 The application is called "WWD GUI API" and provides a tabbed interface for different control functions.
 
+### Companion firmware repo
+
+`/home/anders/Documents/NCS/WWD-n` is the Zephyr firmware for the WWD-n board this GUI
+talks to. The USB COMM tab's "Device Protocol" panel (`common/device_protocol.py`) is a
+hand-written client for a binary protocol whose canonical spec lives there:
+`src/comm/protocol.h`. **There is no shared source of truth or codegen between the two
+repos** — if `protocol.h`'s `enum protocol_cmd`/`enum protocol_err` changes, update
+`device_protocol.py`'s `CMD_*`/`ERR_NAMES` to match by hand, or the host will silently
+misparse. That repo has its own `CLAUDE.md`; read `src/comm/protocol_notes.md` there
+before doing protocol work from either side.
+
 ## Running the Application
 
 ### Installation
@@ -149,6 +160,16 @@ All log files are written to the `data/` directory with timestamped filenames.
 - `path_helper.py` — Centralized path management (`get_project_root()`, `resolve_path()`, `get_config_path()`, `get_data_dir()`, `get_full_data_path()`). All bundled resources (`config/`, `data/`, `EEequipment/`) resolve against the project root — derived from `__file__`, never `os.getcwd()` — so the app can be launched from any working directory. Never hardcode a relative path like `"config/master.ini"`; use `resolve_path()`.
 - `subprocessor.py` — Subprocess execution utilities
 - `usb_api.py` — USB device enumeration
+- `device_protocol.py` — binary client for the WWD-n firmware's host command protocol
+  (`DeviceProtocol` class: ping/dump/erase/get_rate/set_rate). Hand-mirrors
+  `src/comm/protocol.h` in the companion firmware repo — see "Companion firmware repo"
+  above. Raises `ProtocolError` (framing/CRC/device-side errors) or its subclass
+  `ConnectionLostError` (the serial port itself dropped mid-operation — callers should
+  treat this as "tear down the connection," not just "retry").
+- `dump_decoder.py` — decodes a raw flash dump (`.bin`, from the Dump to File button)
+  into a pandas DataFrame (`decode_dump()`) and a basic accel/gyro/temperature plot
+  (`plot_dump()`). Mirrors the on-flash record layout in the firmware's `src/memory/nvs.h`
+  by hand, same sync caveat as `device_protocol.py`.
 
 ### Analysis
 
@@ -184,7 +205,11 @@ Each tab is in `gui/guiTab_N_*.py`:
 1. **MAIN** (`guiTab_1_mainDashboard.py`, `TabMainDashboard`) — Main dashboard with overview status
 2. **DMM Control** (`guiTab_2_DMM.py`, `TabDMM`) — Digital multimeter control and data acquisition
 3. **XDS110 JTAG** (`guiTab_3_XDS110.py`, `tabXDS110`) — JTAG debug probe interface
-4. **USB COMM** (`guiTab_4_USB.py`, `TabUSB`) — USB serial communication
+4. **USB COMM** (`guiTab_4_USB.py`, `TabUSB`) — USB serial console (ttyACM0) plus a
+   "Device Protocol" panel driving a second, independent serial connection (ttyACM1,
+   `cdc_acm_uart1` on the firmware side) for the binary command protocol: Ping, Dump to
+   File (+ View Dump decoder/plotter, + filename postfix field), Erase Flash, Set Data
+   Rates. See "Companion firmware repo" above and `common/device_protocol.py`.
 5. **PS Control** (`guiTab_5_PS.py`, `TabPS`) — Power supply control: per-channel voltage and current-limit setpoints (current entry honors the A/mA/uA unit dropdown; SPD3303X applies its calibration offset automatically)
 6. **FG Control** (`guiTab_6_FG.py`, `TabFG`) — Function generator control (waveform, frequency, duty cycle)
 7. **ATE** (`guiTab_7_ATE.py`, `TabATE`) — Automated test equipment sequencing
@@ -265,6 +290,30 @@ The SPD3303X applies per-channel calibration constants from its `config.ini` (`v
 
 ### USB tab serial output: ANSI escape codes from Zephyr
 The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).
+
+### Device Protocol dump/erase are not cancelable — don't hammer reconnect
+`DeviceProtocol.dump()`/`.erase()` are synchronous, blocking calls to the firmware with
+no cancel frame in the protocol. If a caller (or a quick test script) gives up early —
+short timeout, closing the port, retrying immediately — the firmware keeps
+streaming/erasing regardless, and the *next* connection's first read can pick up the
+tail of the previous operation's frames interleaved with new ones. This looks exactly
+like data corruption but isn't. Let an operation finish (or power-cycle the board)
+before starting a new one, especially when debugging the protocol directly rather than
+through the GUI buttons (which already serialize this via `_protocol_busy`). A full
+~2.2 MB dump takes on the order of a minute — see `src/comm/protocol_notes.md` in the
+companion firmware repo for why (`uart_poll_out` throughput, not a bug) and the
+`uart_fifo_fill` corruption bug that was tried and reverted there.
+
+### Background-thread errors need explicit handling, not just `except ProtocolError`
+Every Device Protocol command that runs on a background thread (Dump, Erase, Ping,
+Get/Set Rate) routes failures through `TabUSB._handle_protocol_exception()`, which
+catches `ConnectionLostError` specially (tears down the stale `DeviceProtocol`, resets
+the connection indicator) and falls back to a generic `except Exception` so an
+unanticipated failure surfaces in the prompt instead of dying silently in the thread
+(Tkinter does not propagate background-thread exceptions to the GUI — they just print a
+traceback to the terminal and vanish otherwise). If you add a new Device Protocol
+command handler, route it through this helper rather than a bare
+`except (ProtocolError, TimeoutError)`.
 
 ## Development Notes
 

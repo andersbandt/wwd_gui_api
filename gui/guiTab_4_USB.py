@@ -17,7 +17,8 @@ from common.path_helper import get_data_dir
 from common.logger import build_log_name
 from common import device_protocol
 from common.device_protocol import DeviceProtocol, ProtocolError, ConnectionLostError
-from common.dump_decoder import decode_dump, summarize, plot_dump
+from common.dump_decoder import (decode_dump, summarize, plot_dump, format_header, export_datastream,
+                                  DumpViewConfig, load_imu_processor)
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -54,6 +55,9 @@ class TabUSB(guic.ThemedFrame):
         self.dp_obj = None
         self._protocol_busy = False
         self._protocol_conn_watch_id = None
+
+        # View Dump display/processing options, set via "Configure View..."
+        self.dump_view_config = DumpViewConfig()
 
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close(),
@@ -185,19 +189,30 @@ class TabUSB(guic.ThemedFrame):
                                height=1, width=15)
         self.btn_dump.grid(row=2, column=1, padx=5, pady=5)
 
+        lbl_postfix = Label(self.fr_protocol_actions, text="Dump filename postfix")
+        lbl_postfix.grid(row=2, column=2, padx=(15, 5), pady=5, sticky="w")
+        self.dump_postfix_entry = Entry(self.fr_protocol_actions, width=18)
+        self.dump_postfix_entry.grid(row=2, column=3, padx=5, pady=5, sticky="w")
+        guic.Tooltip(lbl_postfix, "Optional text appended to the dump filename, e.g.\n"
+                                   "\"shaky_end\" -> DUMP_20260726120000_shaky_end.bin")
+
         btn_view_dump = Button(self.fr_protocol_actions, text="View Dump...",
                                command=self.on_view_dump,
                                fg=self.theme_config["fg_dark"], bg=self.theme_config["light_6"],
                                height=1, width=15)
-        btn_view_dump.grid(row=2, column=2, padx=5, pady=5)
-        guic.Tooltip(btn_view_dump, "Decode a .bin dump file and plot accel/gyro/temperature.\nDoes not need a live connection.")
+        btn_view_dump.grid(row=2, column=4, padx=5, pady=5)
+        guic.Tooltip(btn_view_dump, "Decode a .bin dump file, plot accel/gyro/temperature, and write\n"
+                                     "companion _header.txt (time anchors, counts, sample rate) and\n"
+                                     "_data.txt (full decoded record stream) files next to it.\n"
+                                     "Does not need a live connection.")
 
-        lbl_postfix = Label(self.fr_protocol_actions, text="Dump filename postfix")
-        lbl_postfix.grid(row=2, column=3, padx=(15, 5), pady=5, sticky="w")
-        self.dump_postfix_entry = Entry(self.fr_protocol_actions, width=18)
-        self.dump_postfix_entry.grid(row=2, column=4, padx=5, pady=5, sticky="w")
-        guic.Tooltip(lbl_postfix, "Optional text appended to the dump filename, e.g.\n"
-                                   "\"shaky_end\" -> DUMP_20260726120000_shaky_end.bin")
+        btn_view_dump_config = Button(self.fr_protocol_actions, text="Configure View...",
+                                      command=self.open_dump_view_config_dialog,
+                                      fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"],
+                                      height=1, width=15)
+        btn_view_dump_config.grid(row=2, column=5, padx=5, pady=5)
+        guic.Tooltip(btn_view_dump_config, "Configure temperature units and optional IMU data\n"
+                                            "processing (e.g. a filtering script) for View Dump.")
 
         self.btn_erase = Button(self.fr_protocol_actions, text="Erase Flash",
                            command=self.on_erase,
@@ -563,7 +578,8 @@ class TabUSB(guic.ThemedFrame):
                 self.dp_obj.erase()
                 self.after(0, lambda: self.prompt.print("ERASE -> OK, flash log cleared"))
             except Exception as e:
-                self.after(0, lambda: self._handle_protocol_exception(e, "ERASE"))
+                err = e
+                self.after(0, lambda: self._handle_protocol_exception(err, "ERASE"))
             finally:
                 def reset_btn():
                     self._protocol_busy = False
@@ -677,8 +693,9 @@ class TabUSB(guic.ThemedFrame):
                 self.after(0, lambda: self.prompt.print(
                     f"DUMP complete: {len(data)} bytes in {elapsed:.1f}s, crc32=0x{device_crc:08x} -> {outpath}"))
             except Exception as e:
+                err = e
                 def report():
-                    self._handle_protocol_exception(e, "DUMP")
+                    self._handle_protocol_exception(err, "DUMP")
                     if received_so_far[0]:
                         self.prompt.print(
                             f"  ({received_so_far[0]} bytes were received before the failure — not saved)",
@@ -721,8 +738,105 @@ class TabUSB(guic.ThemedFrame):
         for line in summarize(df).splitlines():
             self.prompt.print(line)
 
+        base, _ = os.path.splitext(filepath)
+        header_path = base + "_header.txt"
+        data_path = base + "_data.txt"
         try:
-            plot_dump(df, title=os.path.basename(filepath))
-        except ValueError as e:
+            with open(header_path, "w") as f:
+                f.write(format_header(df, size_bytes=len(data)))
+            export_datastream(df, data_path)
+            self.prompt.print(f"Wrote {os.path.basename(header_path)} and {os.path.basename(data_path)}")
+        except OSError as e:
+            self.prompt.print(f"ERROR: couldn't write text export: {e}", "error")
+
+        imu_processor = None
+        cfg = self.dump_view_config
+        if cfg.imu_processing_enabled and cfg.imu_script_path:
+            try:
+                imu_processor = load_imu_processor(cfg.imu_script_path, cfg.imu_func_name)
+            except Exception as e:
+                self.prompt.print(f"ERROR: couldn't load IMU processing script: {e}", "error")
+                logger.exception("IMU processor load failed")
+                return
+
+        try:
+            plot_dump(df, title=os.path.basename(filepath), temp_unit=cfg.temp_unit, imu_processor=imu_processor)
+        except Exception as e:
             self.prompt.print(f"ERROR: {e}", "error")
+            logger.exception("plot_dump failed")
+
+    def open_dump_view_config_dialog(self):
+        """Modal popup to configure View Dump's display/processing options
+        (temperature unit, optional IMU processing script). Mirrors the
+        Logger tab's "Configure OSC..." dialog pattern."""
+        cfg = self.dump_view_config
+
+        dialog = tk.Toplevel(self)
+        dialog.title("View Dump Configuration")
+        dialog.configure(bg=self.theme_config["bg_light"])
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="View Dump Options", style="TPinkLabel.TLabel",
+                  font=(self.theme_config["font"]["family"], 12, "bold")).grid(
+            row=0, column=0, columnspan=3, pady=10, padx=10)
+
+        # -- Temperature unit --
+        ttk.Label(dialog, text="Temperature unit:", style="TLabel").grid(
+            row=1, column=0, padx=10, pady=5, sticky="w")
+        temp_unit_var = tk.StringVar(value=cfg.temp_unit)
+        fr_temp = tk.Frame(dialog, bg=self.theme_config["bg_light"])
+        fr_temp.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky="w")
+        ttk.Radiobutton(fr_temp, text="Celsius", variable=temp_unit_var, value="C").pack(side="left", padx=5)
+        ttk.Radiobutton(fr_temp, text="Fahrenheit", variable=temp_unit_var, value="F").pack(side="left", padx=5)
+
+        # -- IMU processing --
+        ttk.Label(dialog, text="IMU processing", style="TPinkLabel.TLabel",
+                  font=(self.theme_config["font"]["family"], 11, "bold")).grid(
+            row=2, column=0, columnspan=3, pady=(15, 5), padx=10, sticky="w")
+
+        imu_enabled_var = tk.IntVar(value=1 if cfg.imu_processing_enabled else 0)
+        ttk.Checkbutton(dialog, text="Apply a Python function to IMU data before plotting",
+                         variable=imu_enabled_var, onvalue=1, offvalue=0).grid(
+            row=3, column=0, columnspan=3, padx=10, pady=5, sticky="w")
+
+        ttk.Label(dialog, text="Script:", style="TLabel").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        script_var = tk.StringVar(value=cfg.imu_script_path)
+        script_entry = ttk.Entry(dialog, textvariable=script_var, width=40)
+        script_entry.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+
+        def browse_script():
+            path = filedialog.askopenfilename(
+                title="Select IMU processing script",
+                filetypes=[("Python files", "*.py"), ("All files", "*.*")])
+            if path:
+                script_var.set(path)
+
+        tk.Button(dialog, text="Browse...", command=browse_script,
+                  fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"]).grid(
+            row=4, column=2, padx=5, pady=5)
+
+        ttk.Label(dialog, text="Function name:", style="TLabel").grid(
+            row=5, column=0, padx=10, pady=5, sticky="w")
+        func_name_var = tk.StringVar(value=cfg.imu_func_name)
+        ttk.Entry(dialog, textvariable=func_name_var, width=20).grid(
+            row=5, column=1, padx=5, pady=5, sticky="w")
+
+        guic.Tooltip(script_entry, "A .py file defining a top-level function that takes and\n"
+                                    "returns a DataFrame of IMU_FIFO rows (accel_x/y/z, gyro_x/y/z,\n"
+                                    "imu_timestamp, seconds_since_boot, ...), e.g. a filter.")
+
+        # -- OK / Cancel --
+        def on_ok():
+            cfg.temp_unit = temp_unit_var.get()
+            cfg.imu_processing_enabled = bool(imu_enabled_var.get())
+            cfg.imu_script_path = script_var.get().strip()
+            cfg.imu_func_name = func_name_var.get().strip() or "process"
+            dialog.destroy()
+
+        btn_frame = tk.Frame(dialog, bg=self.theme_config["bg_light"])
+        btn_frame.grid(row=6, column=0, columnspan=3, pady=10)
+        tk.Button(btn_frame, text="OK", width=10, command=on_ok,
+                  bg=self.theme_config["success"], fg=self.theme_config["fg_light"]).pack(side="left", padx=10)
+        tk.Button(btn_frame, text="Cancel", width=10, command=dialog.destroy,
+                  bg=self.theme_config["error"], fg=self.theme_config["fg_light"]).pack(side="left", padx=10)
 

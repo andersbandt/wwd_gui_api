@@ -9,8 +9,10 @@ back-to-back, terminated by 0xFF padding (erased NAND) or a record that
 would overrun the page.
 """
 
+import importlib.util
 import logging
 import struct
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -19,9 +21,14 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 2176  # cfg->bytes_per_page on the MT29F2G01 (2048 data + 128 spare)
 
-# Kernel tick rate — see prj.conf / CONFIG_SYS_CLOCK_TICKS_PER_SEC. Used to
-# convert TIME_ANCHOR raw_ticks and accumulated dt_ticks into seconds.
-TICKS_PER_SEC = 32768
+# Kernel tick rate — must match WWD-n's prj.conf CONFIG_SYS_CLOCK_TICKS_PER_SEC
+# exactly (pinned there as of 2026-07-30 specifically so this doesn't drift
+# out of sync again — it used to be an unset default that happened to land on
+# 128, while this constant wrongly assumed 32768, i.e. the LFCLK/HW-cycle
+# rate rather than the kernel tick rate. That mismatch made every
+# reconstructed seconds_since_boot ~256x too slow). Used to convert
+# TIME_ANCHOR raw_ticks and accumulated dt_ticks into seconds.
+TICKS_PER_SEC = 128
 
 # enum record_type order in nvs.h — must match exactly.
 RECORD_TYPE_NAMES = {
@@ -74,6 +81,15 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
     time_valid = False
     ticks_since_anchor = 0
 
+    # seconds_since_boot is only contiguous *within* one anchor's reference
+    # frame — CMD_ERASE resets NVS's write pointer but not the boot-relative
+    # tick counter or the anchor-logging schedule, so a TIME_ANCHOR record
+    # can land mid-dump and jump the timebase by the device's real uptime
+    # (see nvs_erase_uptime_anchor notes). `segment` marks each such
+    # contiguous run so callers can compute durations/rates without bridging
+    # that jump.
+    segment = 0
+
     n_pages = len(data) // page_size
     for page_idx in range(n_pages):
         page = data[page_idx * page_size:(page_idx + 1) * page_size]
@@ -106,6 +122,7 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
                 fmt = PAYLOAD_FMT["TIME_ANCHOR"]
                 if struct.calcsize(fmt) == len(payload):
                     raw_ticks, year, month, day, hours, minutes, seconds, tv = struct.unpack(fmt, payload)
+                    segment += 1
                     anchor_ticks = raw_ticks
                     ticks_since_anchor = 0
                     time_valid = bool(tv)
@@ -141,6 +158,8 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
                     row["power_mode"] = mode
                     row["power_mv"] = mv
 
+            row["segment"] = segment
+
             ticks_since_boot = anchor_ticks + (0 if type_name == "TIME_ANCHOR" else ticks_since_anchor)
             row["seconds_since_boot"] = ticks_since_boot / TICKS_PER_SEC
             row["wall_time"] = (anchor_walltime + timedelta(seconds=ticks_since_anchor / TICKS_PER_SEC)
@@ -153,21 +172,79 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
     return pd.DataFrame(rows)
 
 
-def plot_dump(df, title=None):
-    """Basic 3-panel view: accel (g), gyro (dps), temperature (C) vs. seconds
+@dataclass
+class DumpViewConfig:
+    """Display/processing options for the USB tab's "View Dump" action, set
+    via the "Configure View..." dialog. temp_unit is applied directly;
+    imu_script_path/imu_func_name are only used if imu_processing_enabled is
+    True, and are resolved to a callable via load_imu_processor() right
+    before plotting.
+    """
+    temp_unit: str = "C"
+    imu_processing_enabled: bool = False
+    imu_script_path: str = ""
+    imu_func_name: str = "process"
+
+
+def load_imu_processor(path, func_name="process"):
+    """Dynamically loads a user-supplied Python function to use as
+    plot_dump()'s imu_processor hook (e.g. a filtering routine).
+
+    The file at `path` must define a top-level function `func_name(df)`
+    that takes and returns a DataFrame in the same shape as the IMU_FIFO
+    rows produced by decode_dump() (accel_x/y/z, gyro_x/y/z, imu_timestamp,
+    seconds_since_boot, ...) — typically returning a copy with the same
+    columns but filtered/transformed values.
+
+    Raises ImportError/AttributeError/TypeError on a bad path, missing
+    function, or non-callable attribute — callers should catch and surface
+    these rather than letting a bad script crash the plot.
+    """
+    spec = importlib.util.spec_from_file_location("_dump_imu_processor", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load a Python module from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    if not hasattr(module, func_name):
+        raise AttributeError(f"{path} has no function named '{func_name}'")
+    func = getattr(module, func_name)
+    if not callable(func):
+        raise TypeError(f"'{func_name}' in {path} is not callable")
+    return func
+
+
+def plot_dump(df, title=None, temp_unit="C", imu_processor=None):
+    """Basic 3-panel view: accel (g), gyro (dps), temperature vs. seconds
     since boot, each on its own stacked subplot. Skips panels with no data.
     Opens a matplotlib window (blocking show()).
+
+    temp_unit: "C" or "F" — temp_c is converted for display only; the
+    underlying DataFrame (and _data.txt export) always stays in Celsius,
+    since that's what's on the wire.
+
+    imu_processor: optional callable(imu_df) -> imu_df, applied to the
+    IMU_FIFO subset right before plotting (e.g. a filtering function). Left
+    as a hook for future processing options; identity by default.
     """
     import matplotlib.pyplot as plt
+
+    if temp_unit not in ("C", "F"):
+        raise ValueError(f"temp_unit must be 'C' or 'F', got {temp_unit!r}")
 
     panels = []
     imu = df[df.record_type == "IMU_FIFO"]
     if not imu.empty:
+        if imu_processor is not None:
+            imu = imu_processor(imu)
         panels.append(("accel", imu, [("accel_x", "X"), ("accel_y", "Y"), ("accel_z", "Z")], "Accel (g)"))
         panels.append(("gyro", imu, [("gyro_x", "X"), ("gyro_y", "Y"), ("gyro_z", "Z")], "Gyro (dps)"))
     temp = df[df.record_type == "TEMPERATURE"]
     if not temp.empty:
-        panels.append(("temp", temp, [("temp_c", "Temp")], "Temp (C)"))
+        if temp_unit == "F":
+            temp = temp.copy()
+            temp["temp_c"] = temp["temp_c"] * 9.0 / 5.0 + 32.0
+        panels.append(("temp", temp, [("temp_c", "Temp")], f"Temp ({temp_unit})"))
     steps = df[df.record_type == "STEP_COUNT"]
     if not steps.empty:
         panels.append(("steps", steps, [("steps", "Steps")], "Steps"))
@@ -194,6 +271,75 @@ def plot_dump(df, title=None):
     return fig, axes
 
 
+def format_header(df, size_bytes=None):
+    """Builds a human-readable metadata summary suitable for a companion
+    "_header.txt" file: dump size, per-type record counts, every TIME_ANCHOR
+    seen (with wall-clock time if valid), uptime span, and an average IMU
+    sample rate. Complements export_datastream()'s raw record dump.
+    """
+    if df.empty:
+        return "No records decoded."
+
+    lines = []
+    if size_bytes is not None:
+        lines.append(f"Dump size: {size_bytes} bytes")
+    lines.append(f"Pages: {df['page'].nunique()}")
+    lines.append(f"Total records: {len(df)}")
+    lines.append("")
+    lines.append("Record counts:")
+    for type_name, count in df["record_type"].value_counts().items():
+        lines.append(f"  {type_name}: {count}")
+
+    anchors = df[df.record_type == "TIME_ANCHOR"]
+    lines.append("")
+    lines.append(f"Time anchors ({len(anchors)}):")
+    for _, row in anchors.iterrows():
+        wall_time = row["wall_time"]
+        wall_str = wall_time.strftime("%Y-%m-%d %H:%M:%S") if pd.notna(wall_time) else "invalid"
+        lines.append(f"  seq={int(row['seq']):>6}  t={row['seconds_since_boot']:.3f}s  "
+                     f"wall={wall_str}  valid={row['time_valid']}")
+
+    # seconds_since_boot can jump mid-dump if CMD_ERASE ran without a reboot
+    # (the anchor schedule stays boot-relative — see
+    # nvs_erase_uptime_anchor notes). Summing per-segment durations instead
+    # of a naive max-min avoids counting that jump as elapsed time.
+    lines.append("")
+    logged_duration = sum(
+        (seg["seconds_since_boot"].max() - seg["seconds_since_boot"].min())
+        for _, seg in df.groupby("segment")
+    )
+    n_segments = df["segment"].nunique()
+    if n_segments > 1:
+        lines.append(f"Logged duration: {logged_duration:.3f} s  "
+                      f"({n_segments} anchor segments — timebase jumps between them, see anchors above)")
+    else:
+        lines.append(f"Logged duration: {logged_duration:.3f} s")
+
+    imu = df[df.record_type == "IMU_FIFO"]
+    if len(imu) > 1:
+        sample_count = 0
+        imu_duration = 0.0
+        for _, seg in imu.groupby("segment"):
+            if len(seg) < 2:
+                continue
+            seg_duration = seg["seconds_since_boot"].iloc[-1] - seg["seconds_since_boot"].iloc[0]
+            if seg_duration > 0:
+                sample_count += len(seg) - 1
+                imu_duration += seg_duration
+        if imu_duration > 0:
+            rate = sample_count / imu_duration
+            lines.append(f"IMU sample rate (avg): {rate:.2f} Hz  ({len(imu)} samples)")
+
+    return "\n".join(lines)
+
+
+def export_datastream(df, path):
+    """Writes the full decoded record stream (one row per record, same
+    columns as decode_dump()'s DataFrame) to a CSV-formatted text file.
+    """
+    df.to_csv(path, index=False, float_format="%.6f")
+
+
 def summarize(df):
     """One-line-per-type record count summary, for printing to the GUI prompt."""
     if df.empty:
@@ -202,6 +348,12 @@ def summarize(df):
     lines = [f"{len(df)} records decoded, {df['page'].nunique()} page(s):"]
     for type_name, count in counts.items():
         lines.append(f"  {type_name}: {count}")
-    span = df["seconds_since_boot"].max() - df["seconds_since_boot"].min()
-    lines.append(f"  span: {span:.1f} s of device uptime")
+    # See format_header()'s comment: sum per-segment durations rather than a
+    # naive max-min, since seconds_since_boot can jump mid-dump at an
+    # anchor boundary if CMD_ERASE ran without a reboot.
+    logged_duration = sum(
+        (seg["seconds_since_boot"].max() - seg["seconds_since_boot"].min())
+        for _, seg in df.groupby("segment")
+    )
+    lines.append(f"  logged duration: {logged_duration:.1f} s")
     return "\n".join(lines)

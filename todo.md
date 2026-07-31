@@ -14,6 +14,7 @@
 - [ ] **Hardcoded serial commands in USB tab** — `ACTIVATE_TEST_CMD = "DAGA"` and `TEST_TYPE_COMMANDS` dict are hardcoded in `guiTab_4_USB.py`. Consider moving to `config/master.ini` or a config file so they can be changed without touching code.
 - [x] **ATE tab `port_close()` bug** — calls `self.cc.set_ps(None)` which is clearly a copy-paste from the PS tab. ATE has no dedicated `cc` slot, so this is confusing (though not actively harmful since the PS tab manages its own state). Should be `self.ate = None` or removed.
 - [ ] Simulator mode — use `np.random()` or similar to generate fake instrument data for testing live plot / logging / math columns without hardware
+- [ ] **Standardize unexpected-disconnect detection across ConnFrames** — USB tab's `_watch_connection`/`_watch_protocol_connection` poll `serStatus`/`os.path.exists()` on the tty and call `port_close()` on loss (fixed 2026-07-30 to also clear `active_connections`, or reconnect fails with "already in use"). Only the USB tab has this; DMM/PS/FG/OSC tabs (PyVISA, not raw serial) have no equivalent, so an unplugged instrument there won't be noticed until the next command fails. A shared watcher belongs in `ConnFrame`/`SerialConnFrame` (`gui_class.py`) so cleanup stays centralized, but needs a per-connection-type liveness check (tty existence doesn't apply to VISA) — real design work, not a copy-paste.
 
 ---
 

@@ -456,6 +456,7 @@ class TabUSB(guic.ThemedFrame):
     def port_close(self):
         self._stop_connection_watch()
         if self.ser_obj is not None:
+            port = self.ser_obj.port
             if self.t1 is not None:
                 self.t1.stop()
             if self.t2 is not None:
@@ -469,6 +470,12 @@ class TabUSB(guic.ThemedFrame):
             self.prompt.print(f"Port closed: {num_lines} lines wrote")
             self.ser_obj = None
             self.cc.set_ser(None)
+            # Also needed on the unexpected-disconnect path (_watch_connection
+            # calls port_close() directly, bypassing SerialConnFrame.disconnect()
+            # which is the only other place this gets cleared) — otherwise the
+            # port stays marked active and the next connect() attempt refuses
+            # with "already in use".
+            self.cc.remove_active_connection(port)
         self._recording = False
         self.btn_record.config(text="Start Recording", bg=self.theme_config["light_3"])
         self.fr_port.set_status(False)
@@ -517,8 +524,13 @@ class TabUSB(guic.ThemedFrame):
     def protocol_port_close(self):
         self._stop_protocol_connection_watch()
         if self.dp_obj is not None:
+            port = self.dp_obj.port
             self.dp_obj.close()
             self.dp_obj = None
+            # Same "already in use" fix as port_close(): both the unexpected-
+            # disconnect watcher and _handle_protocol_exception() call this
+            # directly rather than through SerialConnFrame.disconnect().
+            self.cc.remove_active_connection(port)
         self.fr_protocol_port.set_status(False)
         self._protocol_busy = False
 

@@ -288,6 +288,18 @@ The SPD3303X leaves stale data in the USBTMC bulk-in endpoint on disconnect. `Py
 ### SPD3303X: calibration offset direction is inverted between set and read
 The SPD3303X applies per-channel calibration constants from its `config.ini` (`v_slope`/`v_offset`, `i_offset`). Voltage and current setpoints **add** the offset (`set_voltage`, `set_current` override in `SPD3303X.py`) while readbacks **subtract** it (`get_current` does `max(0.0, raw - i_offset)`). This is intentional and must stay symmetric: a requested 30 mA limit sends `0.030 + i_offset` so the effective regulated limit matches what the user asked for. Only the SPD3303X overrides `set_current`; the base `PowerSupply.set_current` sends the raw value with no offset. The PS tab's "Set Current" entry is interpreted in the channel's selected A/mA/uA unit before conversion to amps.
 
+### Equipment I/O is shared between threads — never write-then-read unguarded
+The Logger record thread and the PS tab's 10 s status poll (`_schedule_status_poll`)
+talk to the *same* instrument session concurrently. `ConnectionHandler` now owns a
+per-instance reentrant `io_lock`; `write()`/`read()`/`query()` take it, so a `query()`
+is atomic. A bare `conn.write(cmd)` followed by `conn.read()` is **not** atomic — the
+two halves can be split by another thread, which hands the wrong reply to the wrong
+caller (e.g. `SYST:STAT`'s `'0x4'` reaching `get_set_voltage`'s `float()`) and leaves an
+orphaned response in the USBTMC endpoint that surfaces later as `[Errno 75] Overflow`.
+Use `conn.query(cmd)`, or `with self.conn.transaction():` for genuine multi-step
+exchanges. Reader helpers in `services/` also catch `ValueError` so a malformed reply
+returns `None` (logged as `"ERROR"`) instead of killing the record thread.
+
 ### USB tab serial output: ANSI escape codes from Zephyr
 The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).
 

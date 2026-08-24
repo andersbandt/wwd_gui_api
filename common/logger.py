@@ -31,9 +31,11 @@ COL_DMM_MEAS1 = "DMM_Meas1"
 COL_PS_VSET1 = "PS_Vset1"
 COL_PS_VMEAS1 = "PS_Vmeas1"
 COL_PS_IMEAS1 = "PS_Imeas1"
+COL_PS_ISET1 = "PS_Iset1"
 COL_PS_VSET2 = "PS_Vset2"
 COL_PS_VMEAS2 = "PS_Vmeas2"
 COL_PS_IMEAS2 = "PS_Imeas2"
+COL_PS_ISET2 = "PS_Iset2"
 
 # Function Generator columns
 COL_FG_FREQ = "FG_Freq"
@@ -543,12 +545,12 @@ def build_headers(record_config: RecordConfig, stimulus_config: StimulusConfig =
         if record_config.ps_log_voltage:
             ps_params += [COL_PS_VSET1, COL_PS_VMEAS1]
         if record_config.ps_log_current:
-            ps_params += [COL_PS_IMEAS1]
+            ps_params += [COL_PS_IMEAS1, COL_PS_ISET1]
         if record_config.ps_channel > 1:
             if record_config.ps_log_voltage:
                 ps_params += [COL_PS_VSET2, COL_PS_VMEAS2]
             if record_config.ps_log_current:
-                ps_params += [COL_PS_IMEAS2]
+                ps_params += [COL_PS_IMEAS2, COL_PS_ISET2]
         headers += ps_params
 
     # Function Generator selected?

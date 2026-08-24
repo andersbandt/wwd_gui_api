@@ -132,7 +132,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_voltage(channel)
-        except COMMUNICATION_ERRORS + (ValueError,):  # ValueError: malformed/desynced reply
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def read_current(self, channel):
@@ -146,7 +146,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_current(channel)
-        except COMMUNICATION_ERRORS + (ValueError,):  # ValueError: malformed/desynced reply
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def read_set_voltage(self, channel):
@@ -160,7 +160,21 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_set_voltage(channel)
-        except COMMUNICATION_ERRORS + (ValueError,):  # ValueError: malformed/desynced reply
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
+            return None
+
+    def read_set_current(self, channel):
+        """Read the set current limit on the given channel.
+
+        Returns:
+            float or None on failure.
+        """
+        ps = self._get_from_controller()
+        if ps is None:
+            return None
+        try:
+            return ps.get_set_current(channel)
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def get_status(self):

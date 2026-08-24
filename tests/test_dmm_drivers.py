@@ -18,6 +18,7 @@ DMM_DRIVERS = [
     "EEequipment/hp3478A/hp3478A.py",
     "EEequipment/fluke8842A/fluke8842A.py",
     "EEequipment/XDM1041/xdm1041main.py",
+    "EEequipment/HP34401A/HP34401A.py",
 ]
 
 ROOT = pathlib.Path(__file__).parent.parent

@@ -142,6 +142,16 @@ class ConfigService:
         return self._config["VISA"].get("backend", "").strip()
 
     # ------------------------------------------------------------------
+    # Power supply
+    # ------------------------------------------------------------------
+
+    def get_ps_output_off_on_connect(self) -> bool:
+        """Return whether PS outputs should be forced off right after connecting (default True)."""
+        if "PS" not in self._config:
+            return True
+        return self._config["PS"].getboolean("output_off_on_connect", True)
+
+    # ------------------------------------------------------------------
     # Shutdown
     # ------------------------------------------------------------------
 

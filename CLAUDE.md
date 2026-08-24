@@ -190,7 +190,7 @@ All log files are written to the `data/` directory with timestamped filenames.
 ### Configuration
 
 **config/** directory contains:
-- `master.ini` — Main config with sections: `[THEME]`, `[PATHS]`, `[AUTOCONNECT]`, `[DMM]`, `[USB]`, `[Target]`
+- `master.ini` — Main config with sections: `[THEME]`, `[PATHS]`, `[AUTOCONNECT]`, `[VISA]`, `[DMM]`, `[USB]`, `[LOGGER]`, `[PS]`, `[SHUTDOWN]`, `[Target]`. All reads go through `services/config_service.py` (`ConfigService`) so the file is parsed once; add a getter there rather than reading the file directly. `[PS] output_off_on_connect` (default YES) controls whether `PSService._post_connect` forces both outputs off on connect — set NO to adopt the supply's existing state.
 - `darcula.json` — Dark theme configuration
 - `light.json` — Light theme configuration
 - `ports_used.xml` — Tracks last used port and model for each equipment type (auto-generated)

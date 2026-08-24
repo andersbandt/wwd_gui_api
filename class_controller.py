@@ -41,6 +41,10 @@ class ClassController:
         # Recording status flag - set by logging tab to prevent gui_refresh during active recording
         self.recording = False
 
+        # Set by gui_driver after construction; None when the controller is
+        # used outside the GUI (tests, scripts) so consumers must guard on it.
+        self.config_svc = None
+
         self.ports_used = {}  # Tracks last used ports (for XML config)
         self.active_connections = {}  # Tracks currently active connections {port: usage_name}
 

@@ -38,6 +38,8 @@ RECORD_TYPE_NAMES = {
     3: "TEMPERATURE",
     4: "STEP_COUNT",
     5: "POWER",
+    6: "SOC_TEMP",
+    7: "WEAR_STATE",
 }
 
 HDR_FMT = "<HHH"  # record_type, length, dt_ticks
@@ -48,6 +50,8 @@ PAYLOAD_FMT = {
     "IMU_FIFO": "<6hH",       # accel[3], gyro[3], timestamp
     "TEMPERATURE": "<h",      # raw
     "STEP_COUNT": "<I",       # steps
+    "SOC_TEMP": "<h",         # centi_c (hundredths of a degree C)
+    "WEAR_STATE": "<B",       # worn (1 = on-wrist, 0 = off-wrist)
     "POWER": "<BH",           # mode, voltage_mv
     # RESET_MARKER has no payload
 }
@@ -153,6 +157,18 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
                 elif type_name == "STEP_COUNT" and struct.calcsize(PAYLOAD_FMT["STEP_COUNT"]) == len(payload):
                     (steps,) = struct.unpack(PAYLOAD_FMT["STEP_COUNT"], payload)
                     row["steps"] = steps
+                elif type_name == "SOC_TEMP" and struct.calcsize(PAYLOAD_FMT["SOC_TEMP"]) == len(payload):
+                    # Already engineering units on the device, unlike
+                    # TEMPERATURE's raw IMU counts — see struct record_soc_temp
+                    # in nvs.h for why the two are stored differently.
+                    (centi_c,) = struct.unpack(PAYLOAD_FMT["SOC_TEMP"], payload)
+                    row["soc_temp_c"] = centi_c / 100.0
+                elif type_name == "WEAR_STATE" and struct.calcsize(PAYLOAD_FMT["WEAR_STATE"]) == len(payload):
+                    # Written only on a change. A gap in IMU_FIFO coverage
+                    # should be preceded by worn=0; a gap without one has a
+                    # different cause (reset, dump pause, full log).
+                    (worn,) = struct.unpack(PAYLOAD_FMT["WEAR_STATE"], payload)
+                    row["worn"] = bool(worn)
                 elif type_name == "POWER" and struct.calcsize(PAYLOAD_FMT["POWER"]) == len(payload):
                     mode, mv = struct.unpack(PAYLOAD_FMT["POWER"], payload)
                     row["power_mode"] = mode

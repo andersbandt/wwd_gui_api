@@ -40,6 +40,14 @@ RECORD_TYPE_NAMES = {
     5: "POWER",
     6: "SOC_TEMP",
     7: "WEAR_STATE",
+    8: "ACTIVITY",
+}
+
+# activity_id_t in src/activity/activity.h — must match exactly. Append only:
+# these values are on flash, so renumbering rewrites the meaning of old dumps.
+ACTIVITY_NAMES = {
+    0: "none",
+    1: "running",
 }
 
 HDR_FMT = "<HHH"  # record_type, length, dt_ticks
@@ -52,6 +60,7 @@ PAYLOAD_FMT = {
     "STEP_COUNT": "<I",       # steps
     "SOC_TEMP": "<h",         # centi_c (hundredths of a degree C)
     "WEAR_STATE": "<B",       # worn (1 = on-wrist, 0 = off-wrist)
+    "ACTIVITY": "<BBHI",      # event, activity_id, session_seq, nand_offset
     "POWER": "<BH",           # mode, voltage_mv
     # RESET_MARKER has no payload
 }
@@ -169,6 +178,21 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
                     # different cause (reset, dump pause, full log).
                     (worn,) = struct.unpack(PAYLOAD_FMT["WEAR_STATE"], payload)
                     row["worn"] = bool(worn)
+                elif type_name == "ACTIVITY" and struct.calcsize(PAYLOAD_FMT["ACTIVITY"]) == len(payload):
+                    # Session boundary. Pair START with the STOP carrying the
+                    # same session_seq to get a span; every IMU_FIFO record
+                    # between them belongs to that session, which is how a run
+                    # gets its analysis bounds.
+                    #
+                    # session_seq is unique only WITHIN A BOOT SEGMENT (it is
+                    # RAM-only on the device and restarts at 0 after a reset),
+                    # so pair within `segment`, not across the whole dump.
+                    event, act_id, seq, offset = struct.unpack(PAYLOAD_FMT["ACTIVITY"], payload)
+                    row["activity"] = ACTIVITY_NAMES.get(act_id, f"unknown_{act_id}")
+                    row["activity_id"] = act_id
+                    row["activity_event"] = "start" if event else "stop"
+                    row["session_seq"] = seq
+                    row["session_offset"] = offset
                 elif type_name == "POWER" and struct.calcsize(PAYLOAD_FMT["POWER"]) == len(payload):
                     mode, mv = struct.unpack(PAYLOAD_FMT["POWER"], payload)
                     row["power_mode"] = mode

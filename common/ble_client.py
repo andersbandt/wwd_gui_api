@@ -178,10 +178,29 @@ def print_status(s):
 
 
 def cmd_scan(args):
+    """Report whether the watch is ACTUALLY advertising right now.
+
+    BlueZ caches devices it has ever seen, so a plain lookup happily reports
+    "found" for a radio that has since been switched off — which is exactly
+    what it did the first time this was used to check the BLE on/off toggle.
+    Removing the cached object first makes a hit mean a genuine, fresh
+    advertisement.
+    """
     bus = _bus()
+
+    cached = find_device(bus, args.address, discover_secs=0)
+    if cached:
+        try:
+            adapter = dbus.Interface(bus.get_object(BLUEZ, _adapter_path(bus)),
+                                     ADAPTER_IFACE)
+            adapter.RemoveDevice(cached)
+        except dbus.DBusException:
+            pass  # connected or already gone; the scan below still stands
+
     path = find_device(bus, args.address, discover_secs=args.seconds)
     if not path:
-        print(f"{DEVICE_NAME} not found. Is it powered and advertising?")
+        print(f"{DEVICE_NAME} not advertising (nothing seen in {args.seconds}s). "
+              f"Powered off, or BLE toggled off in System Settings?")
         return 1
     props = dbus.Interface(bus.get_object(BLUEZ, path), PROP_IFACE)
     addr = props.Get(DEVICE_IFACE, "Address")
@@ -189,7 +208,7 @@ def cmd_scan(args):
         rssi = int(props.Get(DEVICE_IFACE, "RSSI"))
         print(f"found {DEVICE_NAME} at {addr}  RSSI {rssi} dBm")
     except dbus.DBusException:
-        print(f"found {DEVICE_NAME} at {addr}  (no RSSI — cached, not seen this scan)")
+        print(f"found {DEVICE_NAME} at {addr}  (no RSSI reported)")
     return 0
 
 

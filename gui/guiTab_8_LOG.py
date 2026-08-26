@@ -31,6 +31,9 @@ _logger = logging.getLogger(__name__)
 
 
 class TabLog(guic.ThemedFrame):
+
+    # shown in the session-stats panel before a run produces a value
+    _STAT_PLACEHOLDER = "--"
     def __init__(self, master, class_controller, basefilepath, theme_config):
         super().__init__(master, theme_config)
         self.master = master
@@ -52,7 +55,12 @@ class TabLog(guic.ThemedFrame):
         self._record_thread = None
         self._dash_thread = None
         self._paused = False
+        # Runtime accounting: _record_start_time marks the start of the current
+        # active segment (None when stopped/paused); _elapsed_before_pause banks
+        # the seconds from previous segments so a pause doesn't skew rate or runtime.
         self._record_start_time = None
+        self._elapsed_before_pause = 0.0
+        self._runtime_after_id = None
         self._live_state = {}
         self.math_config = MathConfig()
         self.math_evaluator = None
@@ -265,10 +273,7 @@ class TabLog(guic.ThemedFrame):
                                    state=tk.DISABLED)
         self.btn_pause.grid(row=6, column=4, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"])
 
-        self.labelRNums = ttk.Label(self.fr_setup, text='', width=12, relief='sunken')
-        self.labelRNums.grid(row=6, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
-        self.labelRRate = ttk.Label(self.fr_setup, text='', width=10, relief='sunken')
-        self.labelRRate.grid(row=7, column=3, padx=self.theme_config["pad"]["xpad_s"], pady=self.theme_config["pad"]["ypad_s"], sticky='W')
+        self._init_session_stats()
 
         # add check button to graph data
         self.var_graph_data = tk.IntVar()
@@ -295,7 +300,7 @@ class TabLog(guic.ThemedFrame):
                         variable=self.var_subplots,
                         onvalue=1,
                         offvalue=0)
-        self.chk_subplots.grid(row=7, column=3)
+        self.chk_subplots.grid(row=8, column=3)
         self.chk_subplots.grid_remove()
 
         # add check button to graph data
@@ -304,7 +309,7 @@ class TabLog(guic.ThemedFrame):
                         text="Save data",
                         variable=self.var_save_data,
                         onvalue=1,
-                        offvalue=0).grid(row=7, column=3)
+                        offvalue=0).grid(row=7, column=4)
 
         # live plot checkbox
         self.var_live_plot = tk.IntVar()
@@ -330,7 +335,7 @@ class TabLog(guic.ThemedFrame):
                                          command=lambda: self.export_live_plot_html(),
                                          fg=self.theme_config["fg_dark"],
                                          bg=self.theme_config["light_4"])
-        self.btn_export_html.grid(row=8, column=2, padx=5, pady=2)
+        self.btn_export_html.grid(row=9, column=2, padx=5, pady=2)
 
         # hide buffer options initially
         self.lbl_buf_size.grid_remove()
@@ -641,6 +646,89 @@ class TabLog(guic.ThemedFrame):
             self.entry_buf_size.grid_remove()
             self.lbl_time_window.grid_remove()
             self.btn_export_html.grid_remove()
+
+    ##############################################################################
+    ####      SESSION STATS              #########################################
+    ##############################################################################
+
+    def _init_session_stats(self):
+        """Build the session-stats panel: sample count, effective rate, runtime.
+
+        These used to be two bare labels grid'd directly into fr_setup, where the
+        rate shared row 7 / column 3 with the Subplots and Save data checkboxes and
+        was drawn underneath them.
+        """
+        pad = self.theme_config["pad"]
+        self.fr_session = tk.LabelFrame(self.fr_setup, text="Session",
+                                        bg=self.theme_config["dark_2"],
+                                        fg=self.theme_config["fg_light"],
+                                        padx=4, pady=2)
+        self.fr_session.grid(row=6, column=3, rowspan=2,
+                             padx=pad["xpad_s"], pady=pad["ypad_s"], sticky='nw')
+
+        def _stat_row(r, caption, width):
+            cap = ttk.Label(self.fr_session, text=caption, style="TSpunkLabel.TLabel")
+            cap.grid(row=r, column=0, sticky='w', padx=(0, 4))
+            value = ttk.Label(self.fr_session, text=self._STAT_PLACEHOLDER,
+                              width=width, relief='sunken', anchor='e')
+            value.grid(row=r, column=1, sticky='e', pady=1)
+            return cap, value
+
+        _, self.labelRNums = _stat_row(0, "Sample:", 10)
+        _, self.labelRRate = _stat_row(1, "Rate:", 10)
+        _, self.labelRTime = _stat_row(2, "Runtime:", 10)
+        # Step progress is only meaningful for stimulus sweeps; hidden otherwise.
+        self._step_caption, self.labelRStep = _stat_row(3, "Step:", 10)
+        self._show_step_stat(False)
+
+    def _show_step_stat(self, visible):
+        """Show or hide the stimulus step-progress row."""
+        for w in (self._step_caption, self.labelRStep):
+            w.grid() if visible else w.grid_remove()
+
+    def _active_seconds(self):
+        """Total time spent actively recording, excluding paused stretches."""
+        elapsed = self._elapsed_before_pause
+        if self._record_start_time is not None:
+            elapsed += time.monotonic() - self._record_start_time
+        return elapsed
+
+    @staticmethod
+    def _format_runtime(seconds):
+        """Format a duration as H:MM:SS."""
+        total = int(seconds)
+        return f"{total // 3600}:{(total % 3600) // 60:02d}:{total % 60:02d}"
+
+    def _reset_session_stats(self):
+        """Clear the stats panel and the runtime accounting for a fresh session."""
+        self._elapsed_before_pause = 0.0
+        self._record_start_time = None
+        for label in (self.labelRNums, self.labelRRate, self.labelRTime, self.labelRStep):
+            label.config(text=self._STAT_PLACEHOLDER)
+        self._show_step_stat(False)
+
+    def _tick_runtime(self):
+        """Refresh the runtime label once a second while recording is active."""
+        self.labelRTime.config(text=self._format_runtime(self._active_seconds()))
+        if self._record_start_time is not None:
+            self._runtime_after_id = self.after(1000, self._tick_runtime)
+        else:
+            self._runtime_after_id = None
+
+    def _start_runtime_tick(self):
+        if self._runtime_after_id is not None:
+            self.after_cancel(self._runtime_after_id)
+        self._tick_runtime()
+
+    def _stop_runtime_tick(self):
+        """Stop ticking and bank the current segment's elapsed time."""
+        if self._runtime_after_id is not None:
+            self.after_cancel(self._runtime_after_id)
+            self._runtime_after_id = None
+        if self._record_start_time is not None:
+            self._elapsed_before_pause += time.monotonic() - self._record_start_time
+            self._record_start_time = None
+        self.labelRTime.config(text=self._format_runtime(self._elapsed_before_pause))
 
     def _update_time_window_label(self):
         """Compute and display estimated time window from buffer size and sample rate."""
@@ -1029,7 +1117,9 @@ class TabLog(guic.ThemedFrame):
         self.btn_pause.config(state=tk.NORMAL, text="Pause",
                               bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
                               command=lambda: self.pause_record())
+        self._reset_session_stats()
         self._record_start_time = time.monotonic()
+        self._start_runtime_tick()
 
         # Start live plot if requested
         if self.var_live_plot.get():
@@ -1047,9 +1137,9 @@ class TabLog(guic.ThemedFrame):
         self.btn_pause.config(state=tk.DISABLED, text="Pause",
                               bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
                               command=lambda: self.pause_record())
-        self._record_start_time = None
-        self.labelRRate.config(text='')
-        self.prompt.print("Stopped data record!")
+        self._stop_runtime_tick()
+        self.prompt.print(f"Stopped data record! {self.recCnt} samples "
+                          f"over {self._format_runtime(self._elapsed_before_pause)}")
 
         # plot data if requested
         if self.record_config.make_graph:
@@ -1062,6 +1152,7 @@ class TabLog(guic.ThemedFrame):
         if self._record_thread is not None:
             self._record_thread.stop()
         self.cc.recording = False
+        self._stop_runtime_tick()
         self.btn_pause.config(text="Resume",
                               bg=self.theme_config["light_5"], fg=self.theme_config["fg_dark"],
                               command=lambda: self.resume_record())
@@ -1077,7 +1168,10 @@ class TabLog(guic.ThemedFrame):
         self.btn_pause.config(text="Pause",
                               bg=self.theme_config["warning"], fg=self.theme_config["fg_dark"],
                               command=lambda: self.pause_record())
-        self._record_start_time = time.monotonic()  # reset rate tracking for resumed segment
+        # New segment; _elapsed_before_pause keeps the earlier segments' time so
+        # rate and runtime stay correct across the pause.
+        self._record_start_time = time.monotonic()
+        self._start_runtime_tick()
         self.prompt.print(f"Resuming recording ...")
         self._record_thread = guic.StoppableThread(target=self.thread_record)
         self._record_thread.start()
@@ -1139,9 +1233,9 @@ class TabLog(guic.ThemedFrame):
     def _update_record_counter(self):
         """Update the record counter and effective sample rate labels."""
         cnt = self.recCnt
-        self.after(0, lambda t=f'#{cnt:7d}': self.labelRNums.config(text=t))
-        if cnt % 10 == 0 and cnt > 0 and self._record_start_time is not None:
-            elapsed = time.monotonic() - self._record_start_time
+        self.after(0, lambda t=f'{cnt}': self.labelRNums.config(text=t))
+        if cnt % 10 == 0 and cnt > 0:
+            elapsed = self._active_seconds()
             if elapsed > 0:
                 rate = cnt / elapsed
                 self.after(0, lambda r=rate: self.labelRRate.config(text=f'{r:.2f} Hz'))
@@ -1322,6 +1416,8 @@ class TabLog(guic.ThemedFrame):
 
     def start_record_stimulus(self):
         self.prompt.print(f"Starting stimulus sweep with {len(self.stimulus_generator)} steps")
+        # runs on the record thread, so bounce the widget change to the GUI thread
+        self.after(0, lambda: self._show_step_stat(True))
 
         # turn on power supply if being used as a stimulus
         if self.stimulus_config.uses_ps():
@@ -1399,8 +1495,9 @@ class TabLog(guic.ThemedFrame):
 
             # Update progress (thread-safe)
             self.recCnt += 1
-            progress_text = f'Step {step_num}/{len(self.stimulus_generator)}'
-            self.after(0, lambda t=progress_text: self.labelRNums.config(text=t))
+            progress_text = f'{step_num}/{len(self.stimulus_generator)}'
+            self.after(0, lambda t=progress_text: self.labelRStep.config(text=t))
+            self.after(0, lambda c=self.recCnt: self.labelRNums.config(text=f'{c}'))
             self.prompt.print(f"Step {step_num}: Stimulus={stimulus_value:.3f}")
 
     def _thread_record_dual_stimulus(self):
@@ -1438,10 +1535,11 @@ class TabLog(guic.ThemedFrame):
 
                 self.recCnt += 1
                 if n_samples > 1:
-                    progress_text = f'Step {step_num}/{total_steps} S{sample_idx}/{n_samples}'
+                    progress_text = f'{step_num}/{total_steps} S{sample_idx}/{n_samples}'
                 else:
-                    progress_text = f'Step {step_num}/{total_steps}'
-                self.after(0, lambda t=progress_text: self.labelRNums.config(text=t))
+                    progress_text = f'{step_num}/{total_steps}'
+                self.after(0, lambda t=progress_text: self.labelRStep.config(text=t))
+                self.after(0, lambda c=self.recCnt: self.labelRNums.config(text=f'{c}'))
 
     def _collect_data_row(self, serial_data=None):
         row = {logger.COL_TIME: datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}

@@ -258,12 +258,10 @@ def cmd_status(args):
 
 
 def cmd_set_time(args):
-    # --epoch is passed through verbatim (it exists for testing odd boundaries,
-    # e.g. driving the clock to just before midnight); the default is local
-    # wall clock, not UTC -- see local_wallclock_epoch().
-    epoch = args.epoch if args.epoch else local_wallclock_epoch()
-    if epoch < MIN_EPOCH:
-        print(f"refusing to send {epoch}: before 2025, firmware would reject it")
+    # An explicit --epoch is sent verbatim; it exists for driving odd boundaries
+    # (e.g. just before midnight, to test the step rollover) and must not move.
+    if args.epoch and args.epoch < MIN_EPOCH:
+        print(f"refusing to send {args.epoch}: before 2025, firmware would reject it")
         return 1
 
     bus = _bus()
@@ -273,6 +271,19 @@ def cmd_set_time(args):
     connect(bus, path)
     try:
         chrc = find_chrc(bus, path, UUID_TIME)
+
+        # Sample the clock HERE, immediately before the write -- not at the top
+        # of this function.
+        #
+        # find_device() discovers for up to 8 s and connect() waits up to 20 s,
+        # and in practice scan + connect + service resolution ran to 76 s on a
+        # cold cache. Reading the host clock before all that sets the watch to
+        # when the COMMAND STARTED rather than when the write LANDED, and the
+        # device ends up that far behind -- measured at exactly 76 s on SN3.
+        # Everything downstream inherits the error: TIME_ANCHOR, the dump time
+        # axis, and the step badge's midnight rollover.
+        epoch = args.epoch if args.epoch else local_wallclock_epoch()
+
         payload = struct.pack("<I", epoch)
         chrc.WriteValue([dbus.Byte(b) for b in payload], {})
         # gmtime() here is correct and not a bug: the value is a wall clock, so

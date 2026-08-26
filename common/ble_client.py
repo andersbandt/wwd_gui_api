@@ -12,13 +12,14 @@ switching to bleak without checking it is installed.
 Usage:
     python3 -m common.ble_client scan
     python3 -m common.ble_client status
-    python3 -m common.ble_client set-time            # sets watch to host UTC
+    python3 -m common.ble_client set-time            # sets watch to host LOCAL time
     python3 -m common.ble_client watch --seconds 30  # live notifications
 
 The watch advertises as "WWD-n". Pass --address to skip the name lookup.
 """
 
 import argparse
+import calendar
 import struct
 import sys
 import time
@@ -54,6 +55,35 @@ ACTIVITY_NAMES = {0: "none", 1: "running"}
 # in ble.c): a bogus early timestamp would set the clock to 1970 AND make
 # rv3028_time_is_set() report false, silently reverting dumps to relative time.
 MIN_EPOCH = 1735689600  # 2025-01-01T00:00:00Z
+
+
+def local_wallclock_epoch(now=None):
+    """Seconds value that, decoded as UTC, reads as LOCAL wall-clock time.
+
+    *** This is deliberately NOT a real UTC epoch. Do not "fix" it. ***
+
+    The watch has no concept of a timezone. rv3028 stores plain calendar
+    fields, and the firmware turns whatever number we send into those fields
+    with gmtime_r() (write_time(), ble.c). So the number on the wire is not a
+    moment in time, it is a wall clock: send true UTC and the watch face reads
+    UTC, which is what it used to do.
+
+    Two visible consequences of getting this wrong, which is why it is worth a
+    docstring:
+      - the clock face shows the wrong time
+      - the step badge's midnight rollover (steps_today(), main.c) fires at
+        whatever midnight the RTC keeps, so a UTC clock rolls the day over in
+        the local evening
+
+    Using calendar.timegm() on a LOCAL struct_time does the shift and gets DST
+    right for free, because timegm() reads the fields as if they were UTC --
+    which is exactly the reinterpretation the firmware will perform.
+
+    dump_decoder.py needs no matching change: it builds a naive datetime
+    straight from the record's calendar fields and applies no conversion, so
+    dumps simply render in local time now.
+    """
+    return calendar.timegm(time.localtime(now if now is not None else time.time()))
 
 
 def _bus():
@@ -228,7 +258,10 @@ def cmd_status(args):
 
 
 def cmd_set_time(args):
-    epoch = args.epoch if args.epoch else int(time.time())
+    # --epoch is passed through verbatim (it exists for testing odd boundaries,
+    # e.g. driving the clock to just before midnight); the default is local
+    # wall clock, not UTC -- see local_wallclock_epoch().
+    epoch = args.epoch if args.epoch else local_wallclock_epoch()
     if epoch < MIN_EPOCH:
         print(f"refusing to send {epoch}: before 2025, firmware would reject it")
         return 1
@@ -242,8 +275,10 @@ def cmd_set_time(args):
         chrc = find_chrc(bus, path, UUID_TIME)
         payload = struct.pack("<I", epoch)
         chrc.WriteValue([dbus.Byte(b) for b in payload], {})
-        print(f"set clock to {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(epoch))} UTC "
-              f"(epoch {epoch})")
+        # gmtime() here is correct and not a bug: the value is a wall clock, so
+        # rendering it as UTC shows exactly what the watch face will display.
+        print(f"set clock to {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(epoch))} "
+              f"local (wire value {epoch})")
 
         # Read back so the result is confirmed rather than assumed — but wait
         # first. time_valid in the status characteristic comes from a cache the
@@ -328,7 +363,8 @@ def main():
     s = sub.add_parser("status"); s.set_defaults(func=cmd_status)
 
     s = sub.add_parser("set-time")
-    s.add_argument("--epoch", type=int, help="UNIX seconds UTC (default: now)")
+    s.add_argument("--epoch", type=int,
+                   help="raw wire value, sent verbatim (default: host local wall clock)")
     s.set_defaults(func=cmd_set_time)
 
     s = sub.add_parser("watch"); s.add_argument("--seconds", type=int, default=20)

@@ -17,7 +17,8 @@ from common.path_helper import get_data_dir
 from common.logger import build_log_name
 from common import device_protocol
 from common.device_protocol import DeviceProtocol, ProtocolError, ConnectionLostError
-from common.dump_decoder import (decode_dump, summarize, plot_dump, format_header, export_datastream,
+from common.dump_decoder import (decode_dump, summarize, plot_dump, plot_time_allocation,
+                                  format_header, export_datastream,
                                   DumpViewConfig, load_imu_processor)
 from gui import gui_helper as guih
 from gui import gui_class as guic
@@ -677,15 +678,23 @@ class TabUSB(guic.ThemedFrame):
         postfix = self.dump_postfix_entry.get().strip() or None
 
         t0 = time.time()
+        rate_state = {"t": t0, "bytes": 0}  # for instantaneous KB/s between progress prints
 
         def progress_cb(received, total):
             if received % (64 * 2176) == 0:  # ~every 64 pages
+                now = time.time()
+                dt = now - rate_state["t"]
+                d_bytes = received - rate_state["bytes"]
+                rate_kbs = (d_bytes / dt / 1024.0) if dt > 0 else 0.0
+                rate_state["t"] = now
+                rate_state["bytes"] = received
                 if total:
                     pct = 100.0 * received / total
-                    self.after(0, lambda r=received, t=total, p=pct: self.prompt.print(
-                        f"  ...{r}/{t} bytes ({p:.0f}%)"))
+                    self.after(0, lambda r=received, t=total, p=pct, rk=rate_kbs: self.prompt.print(
+                        f"  ...{r}/{t} bytes ({p:.0f}%) [{rk:.1f} KB/s]"))
                 else:
-                    self.after(0, lambda r=received: self.prompt.print(f"  ...{r} bytes received"))
+                    self.after(0, lambda r=received, rk=rate_kbs: self.prompt.print(
+                        f"  ...{r} bytes received [{rk:.1f} KB/s]"))
 
         received_so_far = [0]  # mutable box so progress_cb's closure can update it
 
@@ -702,8 +711,9 @@ class TabUSB(guic.ThemedFrame):
                 with open(outpath, "wb") as f:
                     f.write(data)
                 elapsed = time.time() - t0
+                avg_kbs = (len(data) / elapsed / 1024.0) if elapsed > 0 else 0.0
                 self.after(0, lambda: self.prompt.print(
-                    f"DUMP complete: {len(data)} bytes in {elapsed:.1f}s, crc32=0x{device_crc:08x} -> {outpath}"))
+                    f"DUMP complete: {len(data)} bytes in {elapsed:.1f}s ({avg_kbs:.1f} KB/s avg), crc32=0x{device_crc:08x} -> {outpath}"))
             except Exception as e:
                 err = e
                 def report():
@@ -772,7 +782,14 @@ class TabUSB(guic.ThemedFrame):
                 return
 
         try:
-            plot_dump(df, title=os.path.basename(filepath), temp_unit=cfg.temp_unit, imu_processor=imu_processor)
+            # Built first with show=False: plt.show() raises every open figure,
+            # so this puts the allocation bars and the signal panels on screen
+            # together instead of making the user close one to see the other.
+            # Returns None when the dump has no wear/activity markers at all.
+            plot_time_allocation(df, title=f"Time allocation — {os.path.basename(filepath)}",
+                                 show=False)
+            plot_dump(df, title=os.path.basename(filepath), temp_unit=cfg.temp_unit,
+                      imu_processor=imu_processor)
         except Exception as e:
             self.prompt.print(f"ERROR: {e}", "error")
             logger.exception("plot_dump failed")

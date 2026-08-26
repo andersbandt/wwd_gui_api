@@ -167,9 +167,24 @@ All log files are written to the `data/` directory with timestamped filenames.
   `ConnectionLostError` (the serial port itself dropped mid-operation — callers should
   treat this as "tear down the connection," not just "retry").
 - `dump_decoder.py` — decodes a raw flash dump (`.bin`, from the Dump to File button)
-  into a pandas DataFrame (`decode_dump()`) and a basic accel/gyro/temperature plot
-  (`plot_dump()`). Mirrors the on-flash record layout in the firmware's `src/memory/nvs.h`
-  by hand, same sync caveat as `device_protocol.py`.
+  into a pandas DataFrame (`decode_dump()`), plus an analysis layer and two plots.
+  Mirrors the on-flash record layout in the firmware's `src/memory/nvs.h` by hand,
+  same sync caveat as `device_protocol.py`.
+  - Decode gives one row per record. Two scope columns matter: `segment` is an
+    anchor interval (the firmware writes a TIME_ANCHOR every 5 min, so these tick
+    over constantly and are NOT boots), and `boot` is a power cycle, detected from
+    the kernel tick count going backwards because the firmware writes no
+    RESET_MARKER. Activity `session_seq` is RAM-only and restarts at 0 per boot, so
+    anything pairing sessions must scope by `boot`.
+  - `session_table()` / `wear_table()` / `time_allocation()` turn the edge-triggered
+    ACTIVITY and WEAR_STATE markers into spans and a time budget. `capture_duration()`
+    is the shared denominator — sums per segment so a reboot or a post-CMD_ERASE
+    anchor jump is never counted as elapsed time.
+  - `plot_dump()` stacks accel / gyro / temperature (IMU die and SoC die on one axis,
+    which is the point — see `record_soc_temp` in nvs.h) / steps, over a wear+session
+    context strip, with sessions shaded across every panel.
+    `plot_time_allocation()` is the wear-vs-activity budget as stacked bars. Both take
+    `show=False` so a caller can raise several figures with one `plt.show()`.
 
 ### Analysis
 

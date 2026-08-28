@@ -84,10 +84,11 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE,
     of their own.
 
     progress_callback: optional callable(pages_done, total_pages), invoked
-    periodically while walking the dump (not on every page — a 2.2 MB dump is
-    ~8600 pages and a GUI repaint per page costs more than the decode does).
-    A full-size dump takes tens of seconds to decode, so a caller with a
-    progress bar to drive needs a hook inside this loop, not around it.
+    about 100 times over the dump rather than once per page — a 3.2 MB dump is
+    ~1450 pages, and a GUI repaint per page would cost several times what the
+    decode itself does. The hook has to live inside this loop because the
+    decode is a meaningful fraction of View Dump's wall time (~0.6 s of ~2.2 s
+    on a full dump), so a caller driving a progress bar cannot just wrap it.
     """
     rows = []
     seq = 0

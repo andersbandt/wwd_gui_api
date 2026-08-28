@@ -397,6 +397,71 @@ class Tooltip:
 
 
 ##########################################
+### PROGRESS DIALOG              #########
+##########################################
+
+class ProgressDialog:
+    """Modal determinate progress bar for a long main-thread operation.
+
+    Built for work that CANNOT be moved off the GUI thread — matplotlib's Tk
+    backend has to build figures on the main thread — so the loop that drives
+    the work calls step()/set() itself and this pumps Tk's event queue with
+    update() so the bar actually repaints between calls. A background-thread
+    caller should schedule set()/close() through .after() instead.
+
+    Usage:
+        pd = ProgressDialog(parent, theme_config, "Rendering dump", total=100)
+        pd.set(30, "Decoding...")
+        pd.close()
+    """
+    def __init__(self, master, theme_config, title, total=100, width=380):
+        self.total = total
+        self.theme_config = theme_config
+        self.top = tk.Toplevel(master)
+        self.top.title(title)
+        self.top.configure(bg=theme_config["bg_light"])
+        self.top.resizable(False, False)
+        self.top.transient(master.winfo_toplevel())
+        # No close button action: the work is not cancelable, so a window that
+        # looks dismissable would be lying about what it can do.
+        self.top.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        self.label = ttk.Label(self.top, text=title, style="TLabel")
+        self.label.pack(padx=15, pady=(15, 5), anchor="w")
+
+        self.bar = ttk.Progressbar(self.top, orient="horizontal", length=width,
+                                   mode="determinate", maximum=total)
+        self.bar.pack(padx=15, pady=(0, 15))
+
+        self.top.update_idletasks()
+        # Centre on the parent window rather than the screen — with a second
+        # monitor the screen centre can land nowhere near the app.
+        root = master.winfo_toplevel()
+        x = root.winfo_rootx() + (root.winfo_width() - self.top.winfo_width()) // 2
+        y = root.winfo_rooty() + (root.winfo_height() - self.top.winfo_height()) // 3
+        self.top.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        self.top.grab_set()
+        self.top.update()
+
+    def set(self, value, text=None):
+        """Sets absolute progress (0..total) and optionally the status line."""
+        if not self.top.winfo_exists():
+            return
+        self.bar["value"] = min(value, self.total)
+        if text is not None:
+            self.label.config(text=text)
+        self.top.update()
+
+    def step(self, amount=1, text=None):
+        self.set(self.bar["value"] + amount, text)
+
+    def close(self):
+        if self.top.winfo_exists():
+            self.top.grab_release()
+            self.top.destroy()
+
+
+##########################################
 ### CONNECTION FRAMES            #########
 ##########################################
 

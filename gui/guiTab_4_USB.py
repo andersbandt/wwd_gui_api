@@ -750,49 +750,89 @@ class TabUSB(guic.ThemedFrame):
             return
 
         self.prompt.print(f"Decoding {filepath} ({len(data)} bytes)...")
+
+        # Weighted, not per-step, and the weights come from timing a full
+        # 3.2 MB dump: writing the text export is the slowest phase (~58% of
+        # the wall time), decoding second (~28%), the two plots small. All of
+        # it stays on the GUI thread because matplotlib's Tk backend must
+        # build figures there — ProgressDialog pumps the event loop so the bar
+        # still repaints between steps.
+        DECODE_END, EXPORT_END, ALLOC_END = 35, 85, 93
+        progress = guic.ProgressDialog(self, self.theme_config,
+                                       f"Rendering {os.path.basename(filepath)}",
+                                       total=100)
+
+        def decode_progress(pages_done, total_pages):
+            frac = pages_done / total_pages if total_pages else 1.0
+            progress.set(DECODE_END * frac,
+                         f"Decoding records... {pages_done}/{total_pages} pages")
+
         try:
-            df = decode_dump(data)
-        except Exception as e:
-            self.prompt.print(f"ERROR: decode failed: {e}", "error")
-            logger.exception("dump decode failed")
-            return
-
-        for line in summarize(df).splitlines():
-            self.prompt.print(line)
-
-        base, _ = os.path.splitext(filepath)
-        header_path = base + "_header.txt"
-        data_path = base + "_data.txt"
-        try:
-            with open(header_path, "w") as f:
-                f.write(format_header(df, size_bytes=len(data)))
-            export_datastream(df, data_path)
-            self.prompt.print(f"Wrote {os.path.basename(header_path)} and {os.path.basename(data_path)}")
-        except OSError as e:
-            self.prompt.print(f"ERROR: couldn't write text export: {e}", "error")
-
-        imu_processor = None
-        cfg = self.dump_view_config
-        if cfg.imu_processing_enabled and cfg.imu_script_path:
             try:
-                imu_processor = load_imu_processor(cfg.imu_script_path, cfg.imu_func_name)
+                df = decode_dump(data, progress_callback=decode_progress)
             except Exception as e:
-                self.prompt.print(f"ERROR: couldn't load IMU processing script: {e}", "error")
-                logger.exception("IMU processor load failed")
+                self.prompt.print(f"ERROR: decode failed: {e}", "error")
+                logger.exception("dump decode failed")
                 return
 
-        try:
-            # Built first with show=False: plt.show() raises every open figure,
-            # so this puts the allocation bars and the signal panels on screen
-            # together instead of making the user close one to see the other.
-            # Returns None when the dump has no wear/activity markers at all.
-            plot_time_allocation(df, title=f"Time allocation — {os.path.basename(filepath)}",
-                                 show=False)
-            plot_dump(df, title=os.path.basename(filepath), temp_unit=cfg.temp_unit,
-                      imu_processor=imu_processor)
-        except Exception as e:
-            self.prompt.print(f"ERROR: {e}", "error")
-            logger.exception("plot_dump failed")
+            progress.set(DECODE_END, "Summarizing...")
+            for line in summarize(df).splitlines():
+                self.prompt.print(line)
+
+            base, _ = os.path.splitext(filepath)
+            header_path = base + "_header.txt"
+            data_path = base + "_data.txt"
+            progress.set(DECODE_END, "Writing text export...")
+
+            def export_progress(rows_done, total_rows):
+                frac = rows_done / total_rows if total_rows else 1.0
+                progress.set(DECODE_END + (EXPORT_END - DECODE_END) * frac,
+                             f"Writing text export... {rows_done}/{total_rows} rows")
+
+            try:
+                with open(header_path, "w") as f:
+                    f.write(format_header(df, size_bytes=len(data)))
+                export_datastream(df, data_path, progress_callback=export_progress)
+                self.prompt.print(f"Wrote {os.path.basename(header_path)} and {os.path.basename(data_path)}")
+            except OSError as e:
+                self.prompt.print(f"ERROR: couldn't write text export: {e}", "error")
+            progress.set(EXPORT_END)
+
+            imu_processor = None
+            cfg = self.dump_view_config
+            if cfg.imu_processing_enabled and cfg.imu_script_path:
+                try:
+                    imu_processor = load_imu_processor(cfg.imu_script_path, cfg.imu_func_name)
+                except Exception as e:
+                    self.prompt.print(f"ERROR: couldn't load IMU processing script: {e}", "error")
+                    logger.exception("IMU processor load failed")
+                    return
+
+            try:
+                # Built first with show=False: plt.show() raises every open figure,
+                # so this puts the allocation bars and the signal panels on screen
+                # together instead of making the user close one to see the other.
+                # Returns None when the dump has no wear/activity markers at all.
+                progress.set(EXPORT_END, "Building time allocation plot...")
+                plot_time_allocation(df, title=f"Time allocation — {os.path.basename(filepath)}",
+                                     show=False)
+                progress.set(ALLOC_END, "Building signal plots...")
+                plot_dump(df, title=os.path.basename(filepath),
+                          temp_unit=cfg.temp_unit,
+                          imu_processor=imu_processor, show=False)
+                progress.set(100, "Done")
+            except Exception as e:
+                self.prompt.print(f"ERROR: {e}", "error")
+                logger.exception("plot_dump failed")
+                return
+        finally:
+            # Down before show(): plt.show() blocks until the figures are
+            # closed, so a dialog still up here would sit on top of the plots
+            # (and keep its grab) for as long as the user looks at them.
+            progress.close()
+
+        import matplotlib.pyplot as plt
+        plt.show()
 
     def open_dump_view_config_dialog(self):
         """Modal popup to configure View Dump's display/processing options

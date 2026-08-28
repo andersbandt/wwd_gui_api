@@ -66,7 +66,8 @@ PAYLOAD_FMT = {
 }
 
 
-def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
+def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE,
+                progress_callback=None):
     """Decodes a raw flash dump into a single wide DataFrame, one row per record.
 
     Columns present on every row: seq, page, record_type, dt_ticks,
@@ -81,6 +82,12 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
     with at capture time (see startAccel()/startGyro() in imu.c — currently
     hardcoded to 16 g / 2000 dps) since raw ADC counts carry no scale info
     of their own.
+
+    progress_callback: optional callable(pages_done, total_pages), invoked
+    periodically while walking the dump (not on every page — a 2.2 MB dump is
+    ~8600 pages and a GUI repaint per page costs more than the decode does).
+    A full-size dump takes tens of seconds to decode, so a caller with a
+    progress bar to drive needs a hook inside this loop, not around it.
     """
     rows = []
     seq = 0
@@ -120,7 +127,10 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
     prev_anchor_ticks = None
 
     n_pages = len(data) // page_size
+    report_every = max(1, n_pages // 100)  # ~100 updates over the whole dump
     for page_idx in range(n_pages):
+        if progress_callback is not None and page_idx % report_every == 0:
+            progress_callback(page_idx, n_pages)
         page = data[page_idx * page_size:(page_idx + 1) * page_size]
         offset = 0
 
@@ -242,7 +252,174 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE):
             rows.append(row)
             seq += 1
 
-    return pd.DataFrame(rows)
+    if progress_callback is not None:
+        progress_callback(n_pages, n_pages)
+
+    return _rebuild_wall_time(pd.DataFrame(rows))
+
+
+# ---------------------------------------------------------------------------
+# Wall-clock reconstruction
+#
+# Every TIME_ANCHOR carries a real RTC date/time (year..seconds + time_valid),
+# written every ANCHOR_INTERVAL_SEC. That has always been on flash; what was
+# missing was trusting it. Everything downstream used to key off
+# `seconds_since_boot`, which is device uptime — so two captures separated by a
+# power cycle land on top of each other, and "how long was this run" silently
+# became "how long had the watch been on".
+#
+# Two things have to be true before wall time can carry that weight:
+#
+# ORDERING. Records between anchors are placed by accumulating dt_ticks. That
+# accumulation is only as good as the records it walks, and a corrupted length
+# or a garbage dt injects time that never happened. On the dump that prompted
+# this work, the last anchor read 2026-08-27 13:51 while the accumulated
+# stream ran on to Aug 30 — three days of fiction past the last real reading.
+#
+# BOUNDING. The fix is to treat consecutive anchors as what they are: two
+# measured instants with a known number of records between them. The tick
+# accumulation sets each record's POSITION within that interval; the anchors
+# set its LENGTH. When the accumulation claims more time than the anchors
+# allow, it is rescaled to fit and the rows are flagged, rather than being
+# quietly believed or quietly dropped.
+#
+# The last segment has no closing anchor and cannot be bounded this way. It is
+# left on raw accumulation, which is the one place a runaway can still show.
+# ---------------------------------------------------------------------------
+
+# Slack allowed before an interval is judged to have over-run its anchors.
+# Generous on purpose: dt_ticks is integer and the anchor cadence is a software
+# timer, so a second of disagreement over a 300 s interval is normal and
+# rescaling it would be noise-fitting.
+_ANCHOR_SLACK_S = 2.0
+
+
+def _rebuild_wall_time(df):
+    """Re-derives wall_time from the anchors that bracket each segment.
+
+    Adds a `time_rescaled` column marking rows whose interval claimed more
+    elapsed time than its two anchors permit. Those rows keep their ORDER and
+    their share of the interval, but their absolute times are compressed to fit
+    between two measured instants — which is a statement about the log being
+    damaged, not about the clock.
+    """
+    if df.empty or "wall_time" not in df.columns:
+        return df
+
+    df["time_rescaled"] = False
+
+    anchors = df[df.record_type == "TIME_ANCHOR"]
+    if anchors.empty:
+        return df
+
+    # One anchor opens each segment, so the segment IS the anchor interval.
+    seg_info = {}
+    for _, row in anchors.iterrows():
+        seg_info.setdefault(int(row["segment"]),
+                            (row["wall_time"], float(row["seconds_since_boot"]),
+                             int(row["boot"])))
+
+    segments = sorted(seg_info)
+    for i, seg in enumerate(segments):
+        anchor_wall, anchor_s, anchor_boot = seg_info[seg]
+        if pd.isna(anchor_wall):
+            continue
+
+        mask = df["segment"] == seg
+        offsets = df.loc[mask, "seconds_since_boot"] - anchor_s
+        if offsets.empty:
+            continue
+
+        scale = 1.0
+        if i + 1 < len(segments):
+            next_wall, _, next_boot = seg_info[segments[i + 1]]
+            # Only a same-boot successor bounds anything: across a reset the
+            # tick base restarts, so the "interval" is not one.
+            if next_boot == anchor_boot and pd.notna(next_wall):
+                budget = (next_wall - anchor_wall).total_seconds()
+                span = float(offsets.max())
+                if budget >= 0 and span > budget + _ANCHOR_SLACK_S:
+                    scale = budget / span if span > 0 else 1.0
+                    df.loc[mask, "time_rescaled"] = True
+
+        df.loc[mask, "wall_time"] = anchor_wall + pd.to_timedelta(offsets * scale, unit="s")
+
+    return df
+
+
+def dump_has_wall_time(df):
+    """True if this dump carries usable RTC time.
+
+    False for a board whose RTC was never set (every anchor has time_valid=0,
+    e.g. no backup cell fitted), which is the case every caller has to keep
+    working for — hence the boot-relative fallbacks throughout.
+    """
+    return (not df.empty and "wall_time" in df.columns
+            and df["wall_time"].notna().any())
+
+
+def dump_time_axis(df, prefer="auto"):
+    """Picks the time domain to report in: ("wall_time", label) or
+    ("seconds_since_boot", label).
+
+    prefer: "auto" uses wall clock when the dump has it, "wall" demands it
+    (raises if absent), "boot" forces uptime.
+    """
+    if prefer not in ("auto", "wall", "boot"):
+        raise ValueError(f"prefer must be auto/wall/boot, got {prefer!r}")
+    if prefer == "boot":
+        return "seconds_since_boot", "Seconds since boot"
+    if dump_has_wall_time(df):
+        return "wall_time", "Time"
+    if prefer == "wall":
+        raise ValueError("this dump carries no valid RTC time (every anchor has "
+                         "time_valid=0) — nothing to build a wall-clock axis from")
+    return "seconds_since_boot", "Seconds since boot"
+
+
+def _segment_wall_intervals(df):
+    """(start, end) wall-clock timestamps for each segment that has them."""
+    if not dump_has_wall_time(df):
+        return []
+    intervals = []
+    for _, seg in df.groupby("segment"):
+        wall = seg["wall_time"].dropna()
+        if len(wall) >= 1:
+            intervals.append((wall.min(), wall.max()))
+    return intervals
+
+
+def _union_seconds(intervals):
+    """Total length of a union of (start, end) intervals, in seconds.
+
+    A UNION rather than a sum, because segments can overlap in real time and
+    summing them counts the overlap twice. That is not hypothetical: a driver
+    bug that mirrored half the NAND put the same capture on flash twice, and
+    the summed version reported 101 hours for 15 hours of wall clock. A union
+    reports the same answer whether or not the log repeats itself, which is
+    the property worth having in a number labelled "captured".
+    """
+    if not intervals:
+        return 0.0
+    ordered = sorted(intervals)
+    total = 0.0
+    cur_start, cur_end = ordered[0]
+    for start, end in ordered[1:]:
+        if start > cur_end:
+            total += (cur_end - cur_start).total_seconds()
+            cur_start, cur_end = start, end
+        elif end > cur_end:
+            cur_end = end
+    total += (cur_end - cur_start).total_seconds()
+    return total
+
+
+def capture_wall_span(df):
+    """(first, last) wall-clock timestamps in the dump, or (None, None)."""
+    if not dump_has_wall_time(df):
+        return None, None
+    wall = df["wall_time"].dropna()
+    return wall.min(), wall.max()
 
 
 # ---------------------------------------------------------------------------
@@ -302,13 +479,31 @@ def session_table(df):
         ref = start if start is not None else stop
 
         boot_rows = df[df.boot == boot]
-        start_s = start["seconds_since_boot"] if start is not None else boot_rows["seconds_since_boot"].min()
+        have_wall = dump_has_wall_time(df)
+
+        if start is not None:
+            start_s = start["seconds_since_boot"]
+            start_wall = start["wall_time"] if have_wall else pd.NaT
+        else:
+            start_s = boot_rows["seconds_since_boot"].min()
+            start_wall = boot_rows["wall_time"].min() if have_wall else pd.NaT
+
         if stop is not None:
             stop_s = stop["seconds_since_boot"]
+            stop_wall = stop["wall_time"] if have_wall else pd.NaT
             complete = start is not None
         else:
             stop_s = boot_rows["seconds_since_boot"].max()
+            stop_wall = boot_rows["wall_time"].max() if have_wall else pd.NaT
             complete = False
+
+        # Wall clock decides the duration when both ends are real instants.
+        # An unterminated session is clamped to the end of its boot, and in
+        # uptime that bound is wrong the moment a log resumes or repeats.
+        if pd.notna(start_wall) and pd.notna(stop_wall):
+            duration_s = (stop_wall - start_wall).total_seconds()
+        else:
+            duration_s = float(stop_s - start_s)
 
         in_bounds = imu[(imu.boot == boot) &
                         (imu.seconds_since_boot >= start_s) &
@@ -321,9 +516,9 @@ def session_table(df):
             "activity_id": int(ref["activity_id"]),
             "start_s": float(start_s),
             "stop_s": float(stop_s),
-            "duration_s": float(stop_s - start_s),
-            "start_wall": start["wall_time"] if start is not None else pd.NaT,
-            "stop_wall": stop["wall_time"] if stop is not None else pd.NaT,
+            "duration_s": duration_s,
+            "start_wall": start_wall,
+            "stop_wall": stop_wall,
             "imu_samples": int(len(in_bounds)),
             "complete": bool(complete),
         })
@@ -332,7 +527,8 @@ def session_table(df):
         ["boot", "start_s"]).reset_index(drop=True)
 
 
-WEAR_COLUMNS = ["boot", "worn", "start_s", "stop_s", "duration_s"]
+WEAR_COLUMNS = ["boot", "worn", "start_s", "stop_s", "duration_s",
+                "start_wall", "stop_wall"]
 
 
 def wear_table(df):
@@ -343,6 +539,12 @@ def wear_table(df):
     BEFORE the first marker is genuinely unknown — the device only logs the
     edge — so no span is emitted for it; that leading time shows up as the
     difference between the capture duration and the summed span durations.
+
+    duration_s is measured in WALL CLOCK when the dump carries it, and in
+    uptime otherwise. The two disagree in exactly the case that matters: a
+    span closed by "the end of this boot" is bounded by the last record of the
+    boot, and on a log that repeats or resumes, the last record by uptime is
+    not the last record in real time.
     """
     if df.empty or "worn" not in df.columns:
         return pd.DataFrame(columns=WEAR_COLUMNS)
@@ -351,35 +553,62 @@ def wear_table(df):
     if markers.empty:
         return pd.DataFrame(columns=WEAR_COLUMNS)
 
+    have_wall = dump_has_wall_time(df)
     rows = []
     for boot, group in markers.groupby("boot", sort=True):
         group = group.sort_values("seq")
-        boot_end = df[df.boot == boot]["seconds_since_boot"].max()
+        boot_rows = df[df.boot == boot]
+        boot_end = boot_rows["seconds_since_boot"].max()
+        boot_end_wall = boot_rows["wall_time"].max() if have_wall else pd.NaT
+
         times = list(group["seconds_since_boot"])
+        walls = list(group["wall_time"]) if have_wall else [pd.NaT] * len(times)
         worn_flags = list(group["worn"])
+
         for i, (t, worn) in enumerate(zip(times, worn_flags)):
-            end = times[i + 1] if i + 1 < len(times) else boot_end
+            last = (i + 1 == len(times))
+            end = boot_end if last else times[i + 1]
+            end_wall = boot_end_wall if last else walls[i + 1]
+
+            if pd.notna(walls[i]) and pd.notna(end_wall):
+                duration = (end_wall - walls[i]).total_seconds()
+            else:
+                duration = float(end - t)
+
             rows.append({
                 "boot": int(boot),
                 "worn": bool(worn),
                 "start_s": float(t),
                 "stop_s": float(end),
-                "duration_s": float(end - t),
+                "duration_s": duration,
+                "start_wall": walls[i],
+                "stop_wall": end_wall,
             })
 
     return pd.DataFrame(rows, columns=WEAR_COLUMNS)
 
 
 def capture_duration(df):
-    """Total logged seconds, summed per anchor segment.
+    """Total REAL time the dump covers, in seconds.
 
-    Per-segment rather than a naive max-min because seconds_since_boot can
-    jump mid-dump: a reboot restarts the tick count, and CMD_ERASE moves the
-    write pointer without resetting the boot-relative clock. Bridging either
-    jump would report the device's uptime as capture time.
+    Wall clock when the dump has it: the union of the per-segment wall-clock
+    intervals (see _union_seconds for why a union and not a sum). That is the
+    honest answer to "how much time is in this file" — it does not grow when
+    the log repeats itself, and it does not shrink when the device is rebooted
+    mid-capture.
+
+    Falls back to summing per-segment `seconds_since_boot` spans when there is
+    no valid RTC time. Per-segment rather than max-min because uptime jumps at
+    a reboot and at a CMD_ERASE, and bridging either would report the device's
+    uptime as capture time.
     """
     if df.empty:
         return 0.0
+
+    intervals = _segment_wall_intervals(df)
+    if intervals:
+        return _union_seconds(intervals)
+
     return float(sum(
         (seg["seconds_since_boot"].max() - seg["seconds_since_boot"].min())
         for _, seg in df.groupby("segment")))
@@ -489,7 +718,19 @@ def load_imu_processor(path, func_name="process"):
 _ACTIVITY_COLORS = ["#7f7f7f", "#1f77b4", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 
 
-def _shade_sessions(ax, sessions, label_axis=False):
+def _span_xs(row, wall):
+    """(start, stop) for a session/wear row in the axis domain being plotted.
+
+    Falls back to the uptime columns per-row rather than per-table: a session
+    whose START was erased off the front of the dump has no start_wall even in
+    a dump that otherwise has wall clock everywhere.
+    """
+    if wall and pd.notna(row.get("start_wall")) and pd.notna(row.get("stop_wall")):
+        return row["start_wall"], row["stop_wall"]
+    return row["start_s"], row["stop_s"]
+
+
+def _shade_sessions(ax, sessions, label_axis=False, wall=False):
     """Draws each activity session as a shaded span across one axis.
 
     Applied to every panel so a feature in the accel trace can be read against
@@ -498,24 +739,31 @@ def _shade_sessions(ax, sessions, label_axis=False):
     """
     for _, row in sessions.iterrows():
         color = _ACTIVITY_COLORS[int(row["activity_id"]) % len(_ACTIVITY_COLORS)]
-        ax.axvspan(row["start_s"], row["stop_s"], color=color,
-                   alpha=0.13, lw=0, zorder=0)
+        x0, x1 = _span_xs(row, wall)
+        ax.axvspan(x0, x1, color=color, alpha=0.13, lw=0, zorder=0)
         if label_axis:
             # Hatch an unterminated session so a lower-bound duration never
             # reads as a measured one.
             if not row["complete"]:
-                ax.axvspan(row["start_s"], row["stop_s"], facecolor="none",
-                           edgecolor=color, hatch="///", alpha=0.35, lw=0, zorder=0)
-            ax.text(row["start_s"], 1.06, f" {row['activity']}",
+                ax.axvspan(x0, x1, facecolor="none", edgecolor=color,
+                           hatch="///", alpha=0.35, lw=0, zorder=0)
+            ax.text(x0, 1.06, f" {row['activity']}",
                     transform=ax.get_xaxis_transform(), fontsize=7,
                     color=color, ha="left", va="bottom")
 
 
 def plot_dump(df, title=None, temp_unit="C", imu_processor=None,
-              show_context=True, show=True):
+              show_context=True, show=True, time_axis="auto"):
     """Stacked time-series view of a dump, one panel per signal family, sharing
-    an x axis of seconds since boot. Skips panels with no data. Opens a
-    matplotlib window (blocking show()).
+    one time axis. Skips panels with no data. Opens a matplotlib window
+    (blocking show()).
+
+    time_axis: "auto" (default) plots against RTC wall clock when the dump
+    carries it and falls back to seconds-since-boot when it does not; "wall"
+    demands wall clock; "boot" forces uptime. Wall clock is the default
+    because uptime cannot survive a power cycle — two captures either side of
+    a reset both start at zero and draw on top of each other, which is exactly
+    the reading this axis is supposed to prevent.
 
     Panels, in order: accel (g), gyro (dps), temperature, steps, and a context
     strip carrying wear state and activity sessions.
@@ -546,6 +794,9 @@ def plot_dump(df, title=None, temp_unit="C", imu_processor=None,
     if temp_unit not in ("C", "F"):
         raise ValueError(f"temp_unit must be 'C' or 'F', got {temp_unit!r}")
 
+    xcol, xlabel = dump_time_axis(df, prefer=time_axis)
+    wall = (xcol == "wall_time")
+
     def to_unit(series):
         return series * 9.0 / 5.0 + 32.0 if temp_unit == "F" else series
 
@@ -565,15 +816,15 @@ def plot_dump(df, title=None, temp_unit="C", imu_processor=None,
         series = []
         frame = pd.DataFrame()
         if not temp.empty:
-            frame = temp[["seconds_since_boot"]].copy()
+            frame = temp[[xcol]].copy()
             frame["imu_die"] = to_unit(temp["temp_c"])
             series.append(("imu_die", "IMU die"))
         if not soc.empty:
-            soc_frame = soc[["seconds_since_boot"]].copy()
+            soc_frame = soc[[xcol]].copy()
             soc_frame["soc_die"] = to_unit(soc["soc_temp_c"])
             frame = soc_frame if frame.empty else pd.concat([frame, soc_frame])
             series.append(("soc_die", "SoC die"))
-        panels.append(("temp", frame.sort_values("seconds_since_boot"), series,
+        panels.append(("temp", frame.sort_values(xcol), series,
                        f"Temp ({temp_unit})"))
 
     steps = df[df.record_type == "STEP_COUNT"]
@@ -600,16 +851,16 @@ def plot_dump(df, title=None, temp_unit="C", imu_processor=None,
         for col, label in series:
             # dropna per series: the temp frame is two record types stacked, so
             # each column is dense only on its own rows.
-            sub = sub_df[["seconds_since_boot", col]].dropna() if col in sub_df else None
+            sub = sub_df[[xcol, col]].dropna() if col in sub_df else None
             if sub is None or sub.empty:
                 continue
-            ax.plot(sub["seconds_since_boot"], sub[col], label=label, linewidth=0.8)
+            ax.plot(sub[xcol], sub[col], label=label, linewidth=0.8)
         ax.set_ylabel(ylabel)
         ax.grid(True, alpha=0.3)
         if len(series) > 1:
             ax.legend(loc="upper right")
         if context:
-            _shade_sessions(ax, sessions)
+            _shade_sessions(ax, sessions, wall=wall)
 
     if context:
         ax = axes[-1]
@@ -619,7 +870,8 @@ def plot_dump(df, title=None, temp_unit="C", imu_processor=None,
             # would be a lie about what the device recorded.
             xs, ys = [], []
             for _, row in wear.iterrows():
-                xs += [row["start_s"], row["stop_s"]]
+                x0, x1 = _span_xs(row, wall)
+                xs += [x0, x1]
                 ys += [1 if row["worn"] else 0] * 2
             ax.step(xs, ys, where="post", color="#2ca02c", linewidth=1.2, label="worn")
             ax.fill_between(xs, ys, step="post", color="#2ca02c", alpha=0.18)
@@ -628,9 +880,17 @@ def plot_dump(df, title=None, temp_unit="C", imu_processor=None,
         ax.set_yticklabels(["off", "on"])
         ax.set_ylabel("Wrist")
         ax.grid(True, alpha=0.3)
-        _shade_sessions(ax, sessions, label_axis=True)
+        _shade_sessions(ax, sessions, label_axis=True, wall=wall)
 
-    axes[-1].set_xlabel("Seconds since boot")
+    axes[-1].set_xlabel(xlabel)
+    if wall:
+        # Let matplotlib pick the tick density, but keep the date off every
+        # tick — a capture is usually inside one day and repeating it eleven
+        # times across the axis is noise. The date goes in the offset label.
+        import matplotlib.dates as mdates
+        locator = mdates.AutoDateLocator()
+        axes[-1].xaxis.set_major_locator(locator)
+        axes[-1].xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
     fig.suptitle(title or "Flash dump")
     plt.tight_layout()
     if show:
@@ -711,18 +971,45 @@ def format_header(df, size_bytes=None):
     anchors = df[df.record_type == "TIME_ANCHOR"]
     lines.append("")
     lines.append(f"Time anchors ({len(anchors)}):")
+    prev_wall = None
     for _, row in anchors.iterrows():
         wall_time = row["wall_time"]
         wall_str = wall_time.strftime("%Y-%m-%d %H:%M:%S") if pd.notna(wall_time) else "invalid"
+        # The gap to the previous anchor is the cheapest health check there is:
+        # the firmware writes one every ANCHOR_INTERVAL_SEC (300 s), so
+        # anything else is a reboot, a gap in logging, or a damaged interval.
+        gap = ""
+        if pd.notna(wall_time) and prev_wall is not None:
+            delta = (wall_time - prev_wall).total_seconds()
+            gap = f"  (+{delta:.0f}s)" if delta >= 0 else f"  (BACKWARDS {delta:.0f}s)"
+        if pd.notna(wall_time):
+            prev_wall = wall_time
         lines.append(f"  seq={int(row['seq']):>6}  t={row['seconds_since_boot']:.3f}s  "
-                     f"wall={wall_str}  valid={row['time_valid']}")
+                     f"wall={wall_str}  valid={row['time_valid']}{gap}")
 
     lines.append("")
     logged_duration = capture_duration(df)
     n_segments = df["segment"].nunique()
     n_boots = int(df["boot"].nunique())
-    lines.append(f"Logged duration: {logged_duration:.3f} s ({_format_hms(logged_duration)})  "
-                 f"[summed over {n_segments} anchor segment(s)]")
+
+    first, last = capture_wall_span(df)
+    if first is not None:
+        lines.append(f"Wall clock: {first:%Y-%m-%d %H:%M:%S} .. {last:%Y-%m-%d %H:%M:%S}")
+        lines.append(f"Captured duration: {logged_duration:.3f} s ({_format_hms(logged_duration)})  "
+                     f"[union of {n_segments} anchor interval(s), real time]")
+    else:
+        lines.append("Wall clock: unavailable — every anchor has time_valid=0 "
+                     "(RTC never set), so all times below are device uptime")
+        lines.append(f"Logged duration: {logged_duration:.3f} s ({_format_hms(logged_duration)})  "
+                     f"[summed over {n_segments} anchor segment(s)]")
+
+    if "time_rescaled" in df.columns:
+        rescaled = int(df["time_rescaled"].sum())
+        if rescaled:
+            affected = int(df.loc[df["time_rescaled"], "segment"].nunique())
+            lines.append(f"  WARNING: {rescaled} record(s) in {affected} interval(s) "
+                         f"accumulated more time than their anchors allow and were "
+                         f"rescaled to fit — that interval's log is damaged")
     if n_boots > 1:
         # Segments alone are NOT evidence of a discontinuity — the firmware
         # writes an anchor every 5 minutes, so a healthy capture has one per
@@ -801,11 +1088,28 @@ def _session_lines(df):
     return lines
 
 
-def export_datastream(df, path):
+def export_datastream(df, path, progress_callback=None, chunk_rows=20000):
     """Writes the full decoded record stream (one row per record, same
     columns as decode_dump()'s DataFrame) to a CSV-formatted text file.
+
+    progress_callback: optional callable(rows_done, total_rows). Supplying it
+    switches the write to chunk_rows-sized appends so a caller can drive a
+    progress bar — this is the slowest phase of View Dump on a full dump
+    (serializing ~144k rows costs more than decoding them), so it is the one
+    that most needs to report. Without a callback it stays a single to_csv().
     """
-    df.to_csv(path, index=False, float_format="%.6f")
+    if progress_callback is None:
+        df.to_csv(path, index=False, float_format="%.6f")
+        return
+
+    total = len(df)
+    with open(path, "w", newline="") as f:
+        for start in range(0, total, chunk_rows):
+            chunk = df.iloc[start:start + chunk_rows]
+            chunk.to_csv(f, index=False, float_format="%.6f", header=(start == 0))
+            progress_callback(min(start + chunk_rows, total), total)
+    if total == 0:
+        progress_callback(0, 0)
 
 
 def summarize(df):
@@ -818,6 +1122,12 @@ def summarize(df):
         lines.append(f"  {type_name}: {count}")
     logged_duration = capture_duration(df)
     lines.append(f"  logged duration: {logged_duration:.1f} s ({_format_hms(logged_duration)})")
+
+    first, last = capture_wall_span(df)
+    if first is not None:
+        lines.append(f"  wall clock: {first:%Y-%m-%d %H:%M:%S} .. {last:%Y-%m-%d %H:%M:%S}")
+    else:
+        lines.append("  wall clock: unavailable (RTC never set — times are uptime)")
 
     sessions = session_table(df)
     if not sessions.empty:

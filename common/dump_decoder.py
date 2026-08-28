@@ -48,6 +48,12 @@ RECORD_TYPE_NAMES = {
 ACTIVITY_NAMES = {
     0: "none",
     1: "running",
+    2: "eating",
+    3: "working",
+    4: "watching TV",
+    5: "phone",
+    6: "cleaning",
+    7: "driving",
 }
 
 HDR_FMT = "<HHH"  # record_type, length, dt_ticks
@@ -716,7 +722,8 @@ def load_imu_processor(path, func_name="process"):
 
 # Span fill colours, indexed by activity_id. Deliberately pale: these sit
 # UNDER the data on every panel and must never compete with it.
-_ACTIVITY_COLORS = ["#7f7f7f", "#1f77b4", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+_ACTIVITY_COLORS = ["#7f7f7f", "#1f77b4", "#2ca02c", "#d62728", "#9467bd",
+                    "#8c564b", "#e377c2", "#bcbd22"]
 
 
 def _span_xs(row, wall):

@@ -41,6 +41,14 @@ RECORD_TYPE_NAMES = {
     6: "SOC_TEMP",
     7: "WEAR_STATE",
     8: "ACTIVITY",
+    9: "IMU_HEALTH",
+}
+
+# struct record_imu_health.event in nvs.h.
+IMU_HEALTH_EVENTS = {
+    0: "stall",
+    1: "recovered",
+    2: "recovery_failed",
 }
 
 # activity_id_t in src/activity/activity.h — must match exactly. Append only:
@@ -68,6 +76,7 @@ PAYLOAD_FMT = {
     "WEAR_STATE": "<B",       # worn (1 = on-wrist, 0 = off-wrist)
     "ACTIVITY": "<BBHI",      # event, activity_id, session_seq, nand_offset
     "POWER": "<BH",           # mode, voltage_mv
+    "IMU_HEALTH": "<BBhH",    # event, pwr_mgmt0, raw_temp, frozen_ticks
     # RESET_MARKER has no payload
 }
 
@@ -246,6 +255,26 @@ def decode_dump(data, accel_fsr_g=16, gyro_fsr_dps=2000, page_size=PAGE_SIZE,
                     mode, mv = struct.unpack(PAYLOAD_FMT["POWER"], payload)
                     row["power_mode"] = mode
                     row["power_mv"] = mv
+                elif type_name == "IMU_HEALTH" and struct.calcsize(PAYLOAD_FMT["IMU_HEALTH"]) == len(payload):
+                    # The IMU's sensor data path stopped (or was recovered).
+                    # Like WEAR_STATE this is an edge marker, and it explains a
+                    # gap in IMU_FIFO coverage that has no worn=0 before it.
+                    #
+                    # pwr_mgmt0 is the raw register byte: bits 1:0 are
+                    # ACCEL_MODE, bits 3:2 GYRO_MODE (0 = OFF, 2 = LP,
+                    # 3 = LOW_NOISE), bit 4 IDLE. Both modes reading OFF during
+                    # a stall means the part was powered down rather than
+                    # internally wedged — see imu_health.c in the firmware.
+                    # 0xFF means the register read itself failed.
+                    hl_event, pwr, hl_raw, hl_ticks = struct.unpack(
+                        PAYLOAD_FMT["IMU_HEALTH"], payload)
+                    row["imu_health_event"] = IMU_HEALTH_EVENTS.get(
+                        hl_event, f"unknown_{hl_event}")
+                    row["imu_pwr_mgmt0"] = pwr
+                    row["imu_accel_mode"] = pwr & 0x03 if pwr != 0xFF else None
+                    row["imu_gyro_mode"] = (pwr >> 2) & 0x03 if pwr != 0xFF else None
+                    row["imu_health_raw_temp"] = hl_raw
+                    row["imu_health_frozen_ticks"] = hl_ticks
 
             row["segment"] = segment
             row["boot"] = boot
@@ -975,6 +1004,24 @@ def format_header(df, size_bytes=None):
     lines.append("Record counts:")
     for type_name, count in df["record_type"].value_counts().items():
         lines.append(f"  {type_name}: {count}")
+
+    # IMU data-path stalls, called out rather than left to the record counts:
+    # a stall is the one thing in a dump that invalidates the IMU coverage
+    # either side of it, and it is silent otherwise (the part keeps answering
+    # SPI, so nothing else in the log looks wrong).
+    health = df[df.record_type == "IMU_HEALTH"] if "IMU_HEALTH" in set(df.record_type) else df.iloc[0:0]
+    if not health.empty:
+        lines.append("")
+        lines.append(f"IMU data-path health events ({len(health)}):")
+        for _, row in health.iterrows():
+            wall_time = row["wall_time"]
+            wall_str = (wall_time.strftime("%Y-%m-%d %H:%M:%S")
+                        if pd.notna(wall_time) else "time unknown")
+            pwr = row.get("imu_pwr_mgmt0")
+            pwr_str = "read failed" if pwr is None or pwr == 0xFF else (
+                f"PWR_MGMT0=0x{int(pwr):02x} accel_mode={int(row['imu_accel_mode'])} "
+                f"gyro_mode={int(row['imu_gyro_mode'])}")
+            lines.append(f"  {wall_str}  {row['imu_health_event']:<16} {pwr_str}")
 
     anchors = df[df.record_type == "TIME_ANCHOR"]
     lines.append("")

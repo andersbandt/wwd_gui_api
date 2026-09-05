@@ -11,6 +11,7 @@ would overrun the page.
 
 import importlib.util
 import logging
+import os
 import struct
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -713,9 +714,12 @@ class DumpViewConfig:
     via the "Configure View..." dialog. temp_unit is applied directly;
     imu_script_path/imu_func_name are only used if imu_processing_enabled is
     True, and are resolved to a callable via load_imu_processor() right
-    before plotting.
+    before plotting. reuse_cached lets View Dump skip decoding and re-writing
+    the text export when the artifacts beside the dump are still fresh — see
+    artifact_is_fresh().
     """
     temp_unit: str = "C"
+    reuse_cached: bool = True
     imu_processing_enabled: bool = False
     imu_script_path: str = ""
     imu_func_name: str = "process"
@@ -1141,6 +1145,84 @@ def _session_lines(df):
             lines.append("      (no IMU data inside this session — logging was "
                          "gated off, most likely off-wrist)")
     return lines
+
+
+# ---------------------------------------------------------------------------
+# Derived-artifact caching
+# ---------------------------------------------------------------------------
+# View Dump's two expensive phases — decode_dump() (~28% of wall time on a
+# full dump) and the _data.txt export (~58%) — are both pure functions of the
+# .bin plus this module's code. On a 283 MB dump that is ~10 minutes to
+# recompute artifacts that already exist on disk, so a re-view reuses them.
+#
+# Freshness is mtime-based against TWO inputs: the dump itself (never
+# rewritten in practice, so it mostly just anchors the comparison) and this
+# source file. Keying on the decoder's own mtime is the point — editing a
+# PAYLOAD_FMT or a tick constant here silently changes what every record
+# decodes to, and an mtime check invalidates the caches automatically instead
+# of serving rows produced by rules that no longer exist. There is no version
+# constant to remember to bump.
+
+_DECODER_SRC = os.path.abspath(__file__)
+
+CACHE_SUFFIX = "_decoded.pkl"
+
+
+def cache_path_for(dump_path):
+    """Path of the cached DataFrame that goes with a .bin dump."""
+    base, _ = os.path.splitext(dump_path)
+    return base + CACHE_SUFFIX
+
+
+def artifact_is_fresh(artifact_path, dump_path):
+    """True if `artifact_path` exists and is newer than both the dump it was
+    derived from and this decoder module. Any missing file means "not fresh"
+    (recompute) rather than an error.
+    """
+    try:
+        artifact_mtime = os.path.getmtime(artifact_path)
+        newest_input = max(os.path.getmtime(dump_path),
+                           os.path.getmtime(_DECODER_SRC))
+    except OSError:
+        return False
+    return artifact_mtime >= newest_input
+
+
+def load_cached_frame(dump_path):
+    """Returns the cached decode of `dump_path`, or None if there isn't a
+    usable one. A corrupt/half-written pickle (killed mid-save, pandas
+    version change) is treated as a miss and logged, never raised — the
+    caller's fallback is simply to decode again.
+    """
+    path = cache_path_for(dump_path)
+    if not artifact_is_fresh(path, dump_path):
+        return None
+    try:
+        return pd.read_pickle(path)
+    except Exception:
+        logger.warning("dump_decoder: ignoring unreadable decode cache %s", path,
+                       exc_info=True)
+        return None
+
+
+def save_cached_frame(df, dump_path):
+    """Pickles `df` next to its dump. Returns the path written, or None if the
+    write failed — caching is an optimisation, so a full disk degrades View
+    Dump back to recomputing rather than failing it. A partial file is removed
+    so it can't later look fresh.
+    """
+    path = cache_path_for(dump_path)
+    try:
+        df.to_pickle(path)
+        return path
+    except Exception:
+        logger.warning("dump_decoder: could not write decode cache %s", path,
+                       exc_info=True)
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        return None
 
 
 def export_datastream(df, path, progress_callback=None, chunk_rows=20000):

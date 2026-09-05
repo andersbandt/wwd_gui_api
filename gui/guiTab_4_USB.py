@@ -19,7 +19,9 @@ from common import device_protocol
 from common.device_protocol import DeviceProtocol, ProtocolError, ConnectionLostError
 from common.dump_decoder import (decode_dump, summarize, plot_dump, plot_time_allocation,
                                   format_header, export_datastream,
-                                  DumpViewConfig, load_imu_processor)
+                                  DumpViewConfig, load_imu_processor,
+                                  load_cached_frame, save_cached_frame,
+                                  cache_path_for, artifact_is_fresh)
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -205,6 +207,8 @@ class TabUSB(guic.ThemedFrame):
         guic.Tooltip(btn_view_dump, "Decode a .bin dump file, plot accel/gyro/temperature, and write\n"
                                      "companion _header.txt (time anchors, counts, sample rate) and\n"
                                      "_data.txt (full decoded record stream) files next to it.\n"
+                                     "Re-viewing the same dump reuses the decode and the text export\n"
+                                     "instead of recomputing them (see Configure View...).\n"
                                      "Does not need a live connection.")
 
         btn_view_dump_config = Button(self.fr_protocol_actions, text="Configure View...",
@@ -743,13 +747,12 @@ class TabUSB(guic.ThemedFrame):
             return
 
         try:
-            with open(filepath, "rb") as f:
-                data = f.read()
+            size_bytes = os.path.getsize(filepath)
         except OSError as e:
-            self.prompt.print(f"ERROR: couldn't read {filepath}: {e}", "error")
+            self.prompt.print(f"ERROR: couldn't stat {filepath}: {e}", "error")
             return
 
-        self.prompt.print(f"Decoding {filepath} ({len(data)} bytes)...")
+        self.prompt.print(f"Viewing {filepath} ({size_bytes} bytes)...")
 
         # Weighted, not per-step, and the weights come from timing a full
         # 3.2 MB dump: writing the text export is the slowest phase (~58% of
@@ -767,13 +770,38 @@ class TabUSB(guic.ThemedFrame):
             progress.set(DECODE_END * frac,
                          f"Decoding records... {pages_done}/{total_pages} pages")
 
+        cfg = self.dump_view_config
+
         try:
-            try:
-                df = decode_dump(data, progress_callback=decode_progress)
-            except Exception as e:
-                self.prompt.print(f"ERROR: decode failed: {e}", "error")
-                logger.exception("dump decode failed")
-                return
+            df = None
+            if cfg.reuse_cached:
+                progress.set(0, "Checking for a cached decode...")
+                df = load_cached_frame(filepath)
+                if df is not None:
+                    self.prompt.print(
+                        f"Reusing cached decode {os.path.basename(cache_path_for(filepath))} "
+                        f"({len(df)} records) — skipping decode")
+
+            if df is None:
+                # Only now is the raw dump actually needed in memory; a full
+                # cache hit never touches the .bin's 283 MB at all.
+                try:
+                    with open(filepath, "rb") as f:
+                        data = f.read()
+                except OSError as e:
+                    self.prompt.print(f"ERROR: couldn't read {filepath}: {e}", "error")
+                    return
+                try:
+                    df = decode_dump(data, progress_callback=decode_progress)
+                except Exception as e:
+                    self.prompt.print(f"ERROR: decode failed: {e}", "error")
+                    logger.exception("dump decode failed")
+                    return
+                if cfg.reuse_cached:
+                    progress.set(DECODE_END, "Caching decode...")
+                    cached = save_cached_frame(df, filepath)
+                    if cached:
+                        self.prompt.print(f"Cached decode -> {os.path.basename(cached)}")
 
             progress.set(DECODE_END, "Summarizing...")
             for line in summarize(df).splitlines():
@@ -782,24 +810,31 @@ class TabUSB(guic.ThemedFrame):
             base, _ = os.path.splitext(filepath)
             header_path = base + "_header.txt"
             data_path = base + "_data.txt"
-            progress.set(DECODE_END, "Writing text export...")
 
             def export_progress(rows_done, total_rows):
                 frac = rows_done / total_rows if total_rows else 1.0
                 progress.set(DECODE_END + (EXPORT_END - DECODE_END) * frac,
                              f"Writing text export... {rows_done}/{total_rows} rows")
 
-            try:
-                with open(header_path, "w") as f:
-                    f.write(format_header(df, size_bytes=len(data)))
-                export_datastream(df, data_path, progress_callback=export_progress)
-                self.prompt.print(f"Wrote {os.path.basename(header_path)} and {os.path.basename(data_path)}")
-            except OSError as e:
-                self.prompt.print(f"ERROR: couldn't write text export: {e}", "error")
+            export_is_fresh = (cfg.reuse_cached
+                               and artifact_is_fresh(header_path, filepath)
+                               and artifact_is_fresh(data_path, filepath))
+            if export_is_fresh:
+                self.prompt.print(
+                    f"Reusing existing text export {os.path.basename(header_path)} "
+                    f"and {os.path.basename(data_path)}")
+            else:
+                progress.set(DECODE_END, "Writing text export...")
+                try:
+                    with open(header_path, "w") as f:
+                        f.write(format_header(df, size_bytes=size_bytes))
+                    export_datastream(df, data_path, progress_callback=export_progress)
+                    self.prompt.print(f"Wrote {os.path.basename(header_path)} and {os.path.basename(data_path)}")
+                except OSError as e:
+                    self.prompt.print(f"ERROR: couldn't write text export: {e}", "error")
             progress.set(EXPORT_END)
 
             imu_processor = None
-            cfg = self.dump_view_config
             if cfg.imu_processing_enabled and cfg.imu_script_path:
                 try:
                     imu_processor = load_imu_processor(cfg.imu_script_path, cfg.imu_func_name)
@@ -858,20 +893,37 @@ class TabUSB(guic.ThemedFrame):
         ttk.Radiobutton(fr_temp, text="Celsius", variable=temp_unit_var, value="C").pack(side="left", padx=5)
         ttk.Radiobutton(fr_temp, text="Fahrenheit", variable=temp_unit_var, value="F").pack(side="left", padx=5)
 
+        # -- Caching --
+        # Decoding a full dump and writing its _data.txt cost ~10 minutes on a
+        # 283 MB capture, and both outputs are pure functions of the .bin plus
+        # dump_decoder.py — so a re-view reuses them when they're newer than
+        # both. Off means "always recompute", the escape hatch for when a
+        # cache is suspect.
+        reuse_cached_var = tk.IntVar(value=1 if cfg.reuse_cached else 0)
+        chk_reuse = ttk.Checkbutton(
+            dialog, text="Reuse cached decode and text export when up to date",
+            variable=reuse_cached_var, onvalue=1, offvalue=0)
+        chk_reuse.grid(row=2, column=0, columnspan=3, padx=10, pady=(10, 5), sticky="w")
+        guic.Tooltip(chk_reuse,
+                     "Skips decoding and re-writing _header.txt/_data.txt if the\n"
+                     "files next to the dump are newer than both the .bin and\n"
+                     "dump_decoder.py. Editing the decoder invalidates them\n"
+                     "automatically. Uncheck to force a full recompute.")
+
         # -- IMU processing --
         ttk.Label(dialog, text="IMU processing", style="TPinkLabel.TLabel",
                   font=(self.theme_config["font"]["family"], 11, "bold")).grid(
-            row=2, column=0, columnspan=3, pady=(15, 5), padx=10, sticky="w")
+            row=3, column=0, columnspan=3, pady=(15, 5), padx=10, sticky="w")
 
         imu_enabled_var = tk.IntVar(value=1 if cfg.imu_processing_enabled else 0)
         ttk.Checkbutton(dialog, text="Apply a Python function to IMU data before plotting",
                          variable=imu_enabled_var, onvalue=1, offvalue=0).grid(
-            row=3, column=0, columnspan=3, padx=10, pady=5, sticky="w")
+            row=4, column=0, columnspan=3, padx=10, pady=5, sticky="w")
 
-        ttk.Label(dialog, text="Script:", style="TLabel").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(dialog, text="Script:", style="TLabel").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         script_var = tk.StringVar(value=cfg.imu_script_path)
         script_entry = ttk.Entry(dialog, textvariable=script_var, width=40)
-        script_entry.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+        script_entry.grid(row=5, column=1, padx=5, pady=5, sticky="w")
 
         def browse_script():
             path = filedialog.askopenfilename(
@@ -882,13 +934,13 @@ class TabUSB(guic.ThemedFrame):
 
         tk.Button(dialog, text="Browse...", command=browse_script,
                   fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"]).grid(
-            row=4, column=2, padx=5, pady=5)
+            row=5, column=2, padx=5, pady=5)
 
         ttk.Label(dialog, text="Function name:", style="TLabel").grid(
-            row=5, column=0, padx=10, pady=5, sticky="w")
+            row=6, column=0, padx=10, pady=5, sticky="w")
         func_name_var = tk.StringVar(value=cfg.imu_func_name)
         ttk.Entry(dialog, textvariable=func_name_var, width=20).grid(
-            row=5, column=1, padx=5, pady=5, sticky="w")
+            row=6, column=1, padx=5, pady=5, sticky="w")
 
         guic.Tooltip(script_entry, "A .py file defining a top-level function that takes and\n"
                                     "returns a DataFrame of IMU_FIFO rows (accel_x/y/z, gyro_x/y/z,\n"
@@ -897,13 +949,14 @@ class TabUSB(guic.ThemedFrame):
         # -- OK / Cancel --
         def on_ok():
             cfg.temp_unit = temp_unit_var.get()
+            cfg.reuse_cached = bool(reuse_cached_var.get())
             cfg.imu_processing_enabled = bool(imu_enabled_var.get())
             cfg.imu_script_path = script_var.get().strip()
             cfg.imu_func_name = func_name_var.get().strip() or "process"
             dialog.destroy()
 
         btn_frame = tk.Frame(dialog, bg=self.theme_config["bg_light"])
-        btn_frame.grid(row=6, column=0, columnspan=3, pady=10)
+        btn_frame.grid(row=7, column=0, columnspan=3, pady=10)
         tk.Button(btn_frame, text="OK", width=10, command=on_ok,
                   bg=self.theme_config["success"], fg=self.theme_config["fg_light"]).pack(side="left", padx=10)
         tk.Button(btn_frame, text="Cancel", width=10, command=dialog.destroy,

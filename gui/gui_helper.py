@@ -57,6 +57,49 @@ def generate_drop_down(frame, options, callback_func=None, theme_config=None, wi
     return drop, clicked_opt
 
 
+def add_placeholder(entry, text, color="gray"):
+    """
+    Show greyed-out hint text in a tk.Entry while it is empty and unfocused.
+
+    Tkinter has no native placeholder, so this fakes one with focus bindings.
+    The widget's `get()` is wrapped to return "" while the placeholder is
+    showing, so callers never see the hint text as if it were user input.
+
+    Args:
+        entry: The tk.Entry to decorate
+        text: Placeholder text to display
+        color: Foreground color used for the placeholder text
+
+    Returns:
+        The entry (for convenient chaining)
+    """
+    normal_fg = entry.cget("fg")
+    real_get = entry.get
+    state = {"showing": False}
+
+    def show():
+        if not real_get():
+            entry.insert(0, text)
+            entry.config(fg=color)
+            state["showing"] = True
+
+    def hide():
+        if state["showing"]:
+            entry.delete(0, END)
+            entry.config(fg=normal_fg)
+            state["showing"] = False
+
+    def get():
+        return "" if state["showing"] else real_get()
+
+    entry.bind("<FocusIn>", lambda e: hide(), add="+")
+    entry.bind("<FocusOut>", lambda e: show(), add="+")
+    entry.get = get
+    show()
+
+    return entry
+
+
 ##############################################################################
 ####      PROMPT/ALERT FUNCTIONS           ###################################
 ##############################################################################

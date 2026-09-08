@@ -5,6 +5,7 @@ import csv
 import pytest
 
 from common import capture_naming
+from services import osc_service
 from services.osc_service import OscService
 
 
@@ -81,16 +82,27 @@ class FakeScope:
     """Minimal stand-in for a connected oscilloscope."""
     model = "MSO64"
     channel_count = 4
+    MEASUREMENTS = ("vpp", "vavg", "frequency")
 
-    def __init__(self, screenshot_error=None, enabled=(1,)):
+    def __init__(self, screenshot_error=None, enabled=(1,), failing=()):
         self.screenshot_error = screenshot_error
         self.enabled = list(enabled)
+        # Measurement names that raise, as an unsupported command does.
+        self.failing = set(failing)
+        self.recovered = 0
 
     def get_enabled_channels(self):
         return self.enabled
 
-    def measure_all(self, channel):
-        return {"vpp": 1.5 * channel, "vavg": None}
+    def measure(self, name, channel):
+        if name in self.failing:
+            raise TimeoutError(f"{name} timed out")
+        if name == "vavg":
+            return None          # measurable in principle, no value right now
+        return 1.5 * channel
+
+    def recover(self):
+        self.recovered += 1
 
     def screenshot_to_file(self, path):
         if self.screenshot_error:
@@ -128,6 +140,49 @@ def test_capture_writes_row_and_image(tmp_path):
     assert rows[0]["CH1_vpp"] == "1.5"
     # A measurement the scope can't make is blank, not the string "None".
     assert rows[0]["CH1_vavg"] == ""
+
+
+def test_one_failing_measurement_does_not_lose_the_others(tmp_path):
+    """The DSO1014A regression: a single unsupported query emptied the row.
+
+    vrms used X-series syntax the 1000 series ignores, so the query timed out,
+    and because measure_all was all-or-nothing the CSV ended up with no
+    measurement columns at all.
+    """
+    scope = FakeScope(failing=("vpp",))
+    svc = make_service(scope)
+    result = svc.capture(str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "psu"})
+
+    assert result.success
+    with open(result.csv_path) as f:
+        row = next(csv.DictReader(f))
+    assert row["CH1_vpp"] == "", "the failed measurement is blank"
+    assert row["CH1_frequency"] == "1.5", "the ones after it still ran"
+    assert any("vpp" in w for w in result.warnings), "the failure is reported"
+
+
+def test_failed_measurement_resynchronises_the_transport(tmp_path):
+    """A timed-out query leaves its reply queued for the next read."""
+    scope = FakeScope(failing=("vpp",))
+    svc = make_service(scope)
+    svc.capture(str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "psu"})
+    assert scope.recovered == 1
+
+
+def test_measurements_stop_after_repeated_failures(tmp_path):
+    """A scope that has stopped answering must not cost a timeout per name."""
+    calls = []
+
+    class DeadScope(FakeScope):
+        def measure(self, name, channel):
+            calls.append(name)
+            raise TimeoutError("no reply")
+
+    svc = make_service(DeadScope())
+    result = svc.capture(str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "psu"})
+
+    assert result.success, "an unresponsive channel still records the capture"
+    assert len(calls) == osc_service.MAX_CONSECUTIVE_FAILURES
 
 
 def test_capture_counter_advances_across_calls(tmp_path):

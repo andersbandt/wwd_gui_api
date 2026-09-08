@@ -13,6 +13,11 @@ from services.equipment_service import EquipmentService, COMMUNICATION_ERRORS
 
 logger = logging.getLogger(__name__)
 
+# Stop measuring a channel after this many failures in a row: a scope that has
+# stopped answering costs a full timeout per attempt, and eleven of those turns
+# one capture into a minute of dead air.
+MAX_CONSECUTIVE_FAILURES = 3
+
 @dataclass
 class CaptureResult:
     """Outcome of one capture, so the tab can report without poking at files."""
@@ -212,13 +217,13 @@ class OscService(EquipmentService):
 
         if save_measurements:
             for ch in channels:
-                try:
-                    results = osc.measure_all(ch)
-                except COMMUNICATION_ERRORS + (ValueError,) as e:
-                    warnings.append(f"CH{ch} measurements failed: {e}")
-                    continue
-                for key, val in results.items():
+                values, failed = self._measure_channel(osc, ch)
+                for key, val in values.items():
                     row[f"CH{ch}_{key}"] = "" if val is None else val
+                if failed:
+                    warnings.append(
+                        f"CH{ch}: {len(failed)}/{len(values)} measurements failed "
+                        f"({', '.join(failed)})")
 
         image_path = None
         if save_image:
@@ -247,6 +252,46 @@ class OscService(EquipmentService):
 
         return CaptureResult(True, name=name, index=index, csv_path=csv_path,
                              image_path=image_path, warnings=warnings)
+
+    @staticmethod
+    def _measure_channel(osc, channel):
+        """Measure one channel, surviving individual measurement failures.
+
+        Returns (values, failed_names). A single unsupported or timed-out
+        measurement must not cost the other ten -- that is what emptied the
+        run CSV of every measurement column on the DSO1014A, where one query
+        used X-series syntax and simply never answered.
+
+        Gives up on the rest of the channel after MAX_CONSECUTIVE_FAILURES in
+        a row: at that point the scope is not answering at all, and each
+        further attempt costs a full timeout.
+        """
+        values = {}
+        failed = []
+        consecutive = 0
+
+        for name in osc.MEASUREMENTS:
+            if consecutive >= MAX_CONSECUTIVE_FAILURES:
+                values[name] = None
+                failed.append(name)
+                continue
+            try:
+                values[name] = osc.measure(name, channel)
+                consecutive = 0
+            except Exception as e:
+                logger.warning(f"CH{channel} measurement '{name}' failed: "
+                               f"{type(e).__name__}: {e}")
+                values[name] = None
+                failed.append(name)
+                consecutive += 1
+                # Resynchronise, or the failed query's reply is handed to the
+                # next measurement and every value after it is off by one.
+                try:
+                    osc.recover()
+                except Exception as recover_error:
+                    logger.debug(f"recover() failed: {recover_error}")
+
+        return values, failed
 
     @staticmethod
     def _append_row(csv_path, row):

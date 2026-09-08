@@ -118,6 +118,63 @@ def test_enabled_channels_reads_all_channels(cls):
     assert scope.get_enabled_channels() == [1, 2, 3, 4]
 
 
+@pytest.mark.parametrize("cls", SCOPE_CLASSES, ids=[c.__name__ for c in SCOPE_CLASSES])
+def test_every_measurement_name_has_a_method(cls):
+    """MEASUREMENTS names are dispatched by string; a typo would only show up
+    at runtime, on the bench, as a missing CSV column."""
+    for name in cls.MEASUREMENTS:
+        assert hasattr(cls, f"measure_{name}"), f"{cls.__name__} lacks measure_{name}"
+
+
+def test_measure_rejects_an_unknown_name():
+    scope = make_scope(DSOX4104A)
+    with pytest.raises(ValueError, match="Unknown measurement"):
+        scope.measure("vsomething", 1)
+
+
+def test_measure_all_survives_one_failing_measurement_and_resyncs():
+    """One unsupported query must not cost the other ten, and the transport
+    has to be cleared afterwards or its late reply lands on the next read."""
+
+    class FlakyConn(RecordingConn):
+        def __init__(self):
+            super().__init__(responses={r"MEASure:": "1.234"})
+            self.flushes = 0
+
+        def query(self, cmd):
+            if "VRMS" in cmd:
+                raise TimeoutError("VI_ERROR_TMO")
+            return super().query(cmd)
+
+        def flush(self):
+            self.flushes += 1
+
+    conn = FlakyConn()
+    scope = make_scope(DSOX4104A, conn)
+    results = scope.measure_all(1)
+
+    assert results["vrms"] is None
+    assert results["vpp"] == pytest.approx(1.234)
+    assert len(results) == len(DSOX4104A.MEASUREMENTS)
+    assert conn.flushes == 1
+
+
+def test_measure_all_still_rejects_a_bad_channel():
+    """A caller bug must raise, not dissolve into a row of blanks."""
+    scope = make_scope(DSOX4104A)
+    with pytest.raises(ValueError, match="Channel must be"):
+        scope.measure_all(9)
+
+
+def test_dso1014a_vrms_takes_only_a_source():
+    """Regression: the X-series' "DISPlay,AC" prefix makes the 1000 series
+    drop the query, which surfaces as a timeout and an empty CSV column."""
+    scope = make_scope(DSO1014A)
+    cmd = scope._cmd("measure_vrms", channel=1)
+    assert "DISPlay" not in cmd
+    assert cmd == ":MEASure:VRMS? CHANnel1"
+
+
 # ------------------------------------------------------------- MSO64 quirks --
 
 def test_mso64_translates_gui_vocabulary_to_tek():

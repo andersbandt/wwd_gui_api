@@ -360,6 +360,28 @@ connection, and deletes it in `disconnect()`. It also has to treat `NAN` as "no
 result" — `float("NAN")` succeeds, so the base class's 9.9E37 check alone lets a
 silent NaN through into the CSV.
 
+### Measurements are per-measurement tolerant, and a failure must resync the transport
+`Oscilloscope.measure_all()` takes each measurement through `measure(name, channel)`
+and turns an individual failure into `None` rather than aborting the channel. This is
+not defensive padding: on the DSO1014A a single query (`measure_vrms`, which carried
+the X-series' `DISPlay,AC` prefix that the 1000 series silently drops) timed out, and
+because the old `measure_all` was all-or-nothing, **every** measurement column vanished
+from the run CSV. An invalid *channel* still raises — that's a caller bug, and must not
+dissolve into a row of blanks.
+
+After any failed exchange, call `TestEquipment.recover()` (→ `ConnectionHandler.flush()`,
+`inst.clear()` on VISA). A timed-out query's reply stays queued on the instrument, so
+without the flush the *next* read gets the previous answer and every value after it is
+off by one — the same failure mode as the `[Errno 75] Overflow` note above, and the
+likely source of the `unpack_from ... buffer size is 0` seen after a measurement
+timeout. `OscService._measure_channel()` also gives up on a channel after
+`MAX_CONSECUTIVE_FAILURES`, since an unresponsive scope costs a full timeout per name.
+
+When adding a scope model, check each `measure_*` line against *that model's*
+programming guide rather than copying from another config.ini — the X-series and
+1000-series measurement syntax differ in argument lists, not just spelling, and a
+wrong one fails as a timeout rather than an error.
+
 ### Screenshot format is detected, never assumed
 Scopes disagree on what `display_data` returns: the X-series streams a PNG in an
 IEEE block, the DSO1014A (1000 series) a BMP that may arrive with no block header

@@ -127,6 +127,7 @@ Supported equipment:
 - Siglent SPD3303X power supply (PyVISA)
 - OWON XDM1041 multimeter (serial)
 - Keysight DSOX4104A oscilloscope (PyVISA)
+- Tektronix MSO64 oscilloscope, 6 Series / 4 analog channels (PyVISA)
 - TI XDS110 debug probe (subprocess/scripts)
 - USB relay module (pyusb)
 - Fluke 8842A, HP 3478A multimeters
@@ -158,6 +159,12 @@ All log files are written to the `data/` directory with timestamped filenames.
 - `csv_helper.py` — CSV file operations
 - `math_columns.py` — User-defined computed columns using safe expression evaluation (`simpleeval`)
 - `path_helper.py` — Centralized path management (`get_project_root()`, `resolve_path()`, `get_config_path()`, `get_data_dir()`, `get_full_data_path()`). All bundled resources (`config/`, `data/`, `EEequipment/`) resolve against the project root — derived from `__file__`, never `os.getcwd()` — so the app can be launched from any working directory. Never hardcode a relative path like `"config/master.ini"`; use `resolve_path()`.
+- `capture_naming.py` — filename templating for OSC captures. `render()` expands
+  a template like `{prefix}_Vin{Vin}_{n:03d}` from built-in tokens (`date`,
+  `time`, `datetime`, `n`, `model`) plus user-defined fields, sanitizing each
+  value for the filesystem; `next_index()` derives the capture counter from the
+  run CSV's row count so it survives a restart. A bad token raises
+  `TemplateError` rather than producing a surprising filename.
 - `subprocessor.py` — Subprocess execution utilities
 - `usb_api.py` — USB device enumeration
 - `device_protocol.py` — binary client for the WWD-n firmware's host command protocol
@@ -205,7 +212,7 @@ All log files are written to the `data/` directory with timestamped filenames.
 ### Configuration
 
 **config/** directory contains:
-- `master.ini` — Main config with sections: `[THEME]`, `[PATHS]`, `[AUTOCONNECT]`, `[VISA]`, `[DMM]`, `[USB]`, `[LOGGER]`, `[PS]`, `[SHUTDOWN]`, `[Target]`. All reads go through `services/config_service.py` (`ConfigService`) so the file is parsed once; add a getter there rather than reading the file directly. `[PS] output_off_on_connect` (default YES) controls whether `PSService._post_connect` forces both outputs off on connect — set NO to adopt the supply's existing state.
+- `master.ini` — Main config with sections: `[THEME]`, `[PATHS]`, `[AUTOCONNECT]`, `[VISA]`, `[DMM]`, `[USB]`, `[LOGGER]`, `[PS]`, `[OSC]`, `[SHUTDOWN]`, `[Target]`. All reads go through `services/config_service.py` (`ConfigService`) so the file is parsed once; add a getter there rather than reading the file directly. `[PS] output_off_on_connect` (default YES) controls whether `PSService._post_connect` forces both outputs off on connect — set NO to adopt the supply's existing state. `[OSC] capture_template` / `capture_dir` seed the OSC tab's Capture panel (the tech edits the template per run in the tab).
 - `darcula.json` — Dark theme configuration
 - `light.json` — Light theme configuration
 - `ports_used.xml` — Tracks last used port and model for each equipment type (auto-generated)
@@ -230,7 +237,13 @@ Each tab is in `gui/guiTab_N_*.py`:
 7. **ATE** (`guiTab_7_ATE.py`, `TabATE`) — Automated test equipment sequencing
 8. **Logger** (`guiTab_8_LOG.py`, `TabLog`) — Data logging with various modes (timestamp, raw, data, math columns)
 9. **GRAPH** (`guiTab_9_GRAPH.py`, `TabGraph`) — Real-time graphing of measurements with preset support
-10. **OSC Control** (`guiTab_10_OSC.py`, `TabOSC`) — Oscilloscope control
+10. **OSC Control** (`guiTab_10_OSC.py`, `TabOSC`) — Oscilloscope control (channels,
+    timebase, trigger, acquisition, measurements) plus a **Capture** panel that saves
+    to the *host* filesystem: one click appends a measurement row to the run CSV and
+    optionally writes a screenshot PNG beside it. The filename template and the
+    user-defined fields feed both the filename and the CSV columns, so a sweep of
+    Vin/temperature/load stays self-describing. Orchestration lives in
+    `OscService.capture()`; naming in `common/capture_naming.py`.
 
 Each tab has:
 - Constructor that receives `(notebook, controller, basefilepath, theme_config, [autoconnect])`
@@ -286,6 +299,18 @@ git submodule update --init
 - **tests/** — pytest test suite (run with `pytest tests/`):
   - `test_dmm_drivers.py` — AST-based check that each DMM driver's model name matches a `CommandRegistry` entry; no hardware needed
   - `test_equipment_instantiation.py` — instantiates every `TestEquipment` subclass with connection I/O mocked out; catches unimplemented abstract methods
+  - `test_osc_capture.py` — capture filename templating and run-CSV behaviour
+    (counter, header widening when a field is added mid-run, screenshot failure
+    degrading to a warning); uses a fake scope, no hardware
+  - `test_osc_drivers.py` — drives every control the OSC tab exposes against a
+    recording fake connection for each scope model, so a missing `config.ini` key
+    fails in CI instead of under the tech's mouse; also pins the MSO64's
+    Keysight→Tek translations, waveform scaling and screenshot sequence
+  - `manual_osc_capture_check.py` — **not** collected by pytest; run it by hand with a
+    scope plugged in (`python3 tests/manual_osc_capture_check.py [--model MSO64]`) to
+    verify the parts the fakes can't: a real VISA session, a complete screenshot
+    transfer (it checks for the PNG `IEND` chunk, which is what catches a
+    termination-character truncation), live measurements and a two-capture run
   - New drivers are picked up automatically via `equipment_manager.get_instruments`
 - **conftest.py** — Adds project root to `sys.path` so pytest can import `EEequipment` and other packages
 
@@ -314,6 +339,45 @@ orphaned response in the USBTMC endpoint that surfaces later as `[Errno 75] Over
 Use `conn.query(cmd)`, or `with self.conn.transaction():` for genuine multi-step
 exchanges. Reader helpers in `services/` also catch `ValueError` so a malformed reply
 returns `None` (logged as `"ERROR"`) instead of killing the record thread.
+
+### Two oscilloscope SCPI dialects — never copy lines between the config.ini files
+`DSOX4104A/config.ini` is Keysight/InfiniiVision, `MSO64/config.ini` is TekScope.
+They disagree on spelling *and* meaning: Tek's `HORizontal:POSition` is a percentage
+of the record where Keysight's `:TIMebase:POSition` is seconds of delay; Tek's
+`TRIGger:A:TYPe` is the trigger kind while `TRIGger:A:MODe` is auto/normal, the
+opposite of Keysight's `MODE`/`SWEep` naming. The registry keys are mapped by
+*meaning*, and `MSO64.py` overrides the methods where behaviour (not just the
+string) differs. The OSC tab's dropdowns still emit Keysight words
+(`CHANnel1`, `POSitive`, `HRESolution`); `MSO64._TRIG_SOURCES`/`_TRIG_SLOPES`/
+`_ACQ_TYPES` translate them so one GUI drives both scopes.
+
+### MSO64 has no immediate-measurement query
+The 6 Series dropped `MEASUrement:IMMed`; every measurement is an object that must
+be added, pointed at a source, read, and deleted. `MSO64._measure_immediate()`
+allocates one scratch slot past the highest one already on screen (so it never
+clobbers the tech's own measurement badges), reuses it for the life of the
+connection, and deletes it in `disconnect()`. It also has to treat `NAN` as "no
+result" — `float("NAN")` succeeds, so the base class's 9.9E37 check alone lets a
+silent NaN through into the CSV.
+
+### Screenshot format is detected, never assumed
+Scopes disagree on what `display_data` returns: the X-series streams a PNG in an
+IEEE block, the DSO1014A (1000 series) a BMP that may arrive with no block header
+and rejects the X-series' `PNG,COLor` arguments entirely. `Oscilloscope
+.get_screenshot()` unwraps the block only when one is present, and
+`screenshot_to_file()` picks the extension from the returned magic bytes
+(`IMAGE_MAGIC`), so a BMP never lands on disk named `.png`; unrecognisable data
+raises instead of writing a corrupt file. Because the real extension isn't known
+until the scope answers, `OscService.capture()` reserves the name across every
+`capture_naming.IMAGE_EXTENSIONS`.
+
+### Binary reads must drop the VISA termination character
+Waveform blocks and screenshot PNGs contain `0x0A` bytes. With `read_termination`
+set (every scope config.ini sets it), VISA stops the read at the first one and the
+image comes back truncated. `PyVISAHandler.read_raw()` clears the term char for the
+duration of the read and restores it after. Use `conn.query_raw(cmd)` for these —
+a bare `write()` + `read_raw()` pair is not atomic and hands the block to whichever
+thread reads next.
 
 ### USB tab serial output: ANSI escape codes from Zephyr
 The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).

@@ -152,6 +152,28 @@ class ConfigService:
         return self._config["PS"].getboolean("output_off_on_connect", True)
 
     # ------------------------------------------------------------------
+    # Oscilloscope
+    # ------------------------------------------------------------------
+
+    def get_osc_capture_template(self) -> str:
+        """Return the default capture filename template for the OSC tab.
+
+        Tokens are documented in common/capture_naming.py; the tab lets the
+        user edit this per run, so this is only the starting point.
+        """
+        from common.capture_naming import DEFAULT_TEMPLATE
+        if "OSC" not in self._config:
+            return DEFAULT_TEMPLATE
+        return self._config["OSC"].get("capture_template", DEFAULT_TEMPLATE).strip()
+
+    def get_osc_capture_dir(self) -> str:
+        """Return the data subdirectory that capture run folders live under."""
+        default_dir = "osc_data"
+        if "OSC" not in self._config:
+            return default_dir
+        return self._config["OSC"].get("capture_dir", default_dir).strip()
+
+    # ------------------------------------------------------------------
     # Shutdown
     # ------------------------------------------------------------------
 

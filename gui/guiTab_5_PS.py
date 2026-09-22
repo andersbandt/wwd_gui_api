@@ -11,6 +11,7 @@ import threading
 
 # import user defined modules
 from EEequipment import equipment_manager
+from EEequipment.TestEquipment import InstrumentError
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -54,6 +55,13 @@ class TabPS(guic.ThemedFrame):
         self._status_cache = None
         self._status_cache_time = 0.0
         self._poll_after_id = None
+
+        # [PS] check_error_on_poll in master.ini -- read once at startup.
+        # When on, every status poll also queries the instrument's error
+        # queue so a stray beep not tied to a command you issued still shows
+        # up in this console.
+        config_svc = getattr(self.cc, "config_svc", None)
+        self._check_error_on_poll = bool(config_svc and config_svc.get_ps_check_error_on_poll())
 
         # set up prompt
         self.prompt = guic.Prompt(self, self.theme_config, "PS Console Output")
@@ -254,27 +262,38 @@ class TabPS(guic.ThemedFrame):
             self.valueI2.config(text='{:8s}'.format(str(self.ps_i2)))
             self.valueI2_s.config(text='{:8s}'.format(str(self.ps_i2s)))
 
+    def _query_status_and_cache(self):
+        """Query PS status, refresh the cache, and (if enabled) check the error
+        queue. Shared by the on-demand and background-poll paths below.
+
+        Safe to call from a background thread: check_error() is I/O-only, and
+        any console output it triggers is marshalled onto the main thread via
+        self.after() rather than touching self.prompt directly.
+        """
+        status = self.cc.ps.check_status()
+        self._status_cache = status
+        self._status_cache_time = time.monotonic()
+
+        if self._check_error_on_poll:
+            err = self.cc.ps_service.check_error()
+            if err is not None:
+                self.after(0, lambda e=err: self.prompt.print(f"PS error queue (poll): {e}", "error"))
+
+        return status
+
     def _get_status_cached(self):
         """Return cached channel status, querying the instrument only when the cache is stale."""
         now = time.monotonic()
         if self._status_cache is not None and (now - self._status_cache_time) < self._STATUS_CACHE_TTL:
             return self._status_cache
-        status = self.cc.ps.check_status()
-        self._status_cache = status
-        self._status_cache_time = time.monotonic()
-        return status
+        return self._query_status_and_cache()
 
     def _schedule_status_poll(self):
         """Background poll every TTL seconds so the cache stays fresh even when the tab isn't visible."""
         if not self.cc.get_ps_status():
             return
 
-        def _poll():
-            status = self.cc.ps.check_status()
-            self._status_cache = status
-            self._status_cache_time = time.monotonic()
-
-        threading.Thread(target=_poll, daemon=True).start()
+        threading.Thread(target=self._query_status_and_cache, daemon=True).start()
         self._poll_after_id = self.after(int(self._STATUS_CACHE_TTL * 1000), self._schedule_status_poll)
 
     # NOTE: this function is quite similar to the relay one in tab 1
@@ -386,6 +405,8 @@ class TabPS(guic.ThemedFrame):
                 raise ValueError("Wrong channel input")
         except ValueError as e:
             guih.alert_user("Can't toggle channel", f"Error: {e}", "error")
+        except InstrumentError as e:
+            self.prompt.print(f"PS rejected channel {channel} toggle: {e}", "error")
         else:
             state = None
             if channel == 1:
@@ -406,7 +427,11 @@ class TabPS(guic.ThemedFrame):
         if self.cc.get_ps_status():
             # have to format input text_data box into float
             voltage = float(voltage_str)
-            self.cc.ps.set_voltage(voltage)
+            try:
+                self.cc.ps.set_voltage(voltage, channel=channel)
+            except InstrumentError as e:
+                self.prompt.print(f"PS rejected voltage {voltage} V on channel {channel}: {e}", "error")
+                return
             self.prompt.print(f"Set voltage on channel {channel} to {voltage} V")
             if channel == 1:
                 self.ps_v1s = voltage
@@ -422,7 +447,15 @@ class TabPS(guic.ThemedFrame):
     def set_current(self, channel, current_str):
         if self.cc.get_ps_status():
             current = float(current_str)
-            self.cc.ps_service.set_current(channel, current)
+            # ps_service.set_current() swallows InstrumentError to a bool
+            # (other callers, e.g. the Logger's stimulus sweep, need that --
+            # they can't have a rejected setpoint kill a background thread).
+            # Call the driver directly here so this tab can show the detail.
+            try:
+                self.cc.ps.set_current(current, channel=channel)
+            except InstrumentError as e:
+                self.prompt.print(f"PS rejected current limit {current} A on channel {channel}: {e}", "error")
+                return
             self.prompt.print(f"Set current limit on channel {channel} to {current} A")
             if channel == 1:
                 self.ps_i1s = current

@@ -37,6 +37,10 @@ class ClassController:
         self.fg = None
         self.osc = None
 
+        # Set by gui_driver.main() after ConfigService is created; stays None
+        # for headless/test callers that construct ClassController directly.
+        self.config_svc = None
+
         # Recording status flag - set by logging tab to prevent gui_refresh during active recording
         self.recording = False
 

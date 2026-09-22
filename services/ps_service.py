@@ -1,6 +1,7 @@
 """Service layer for Power Supply operations."""
 
 from services.equipment_service import EquipmentService, COMMUNICATION_ERRORS
+from EEequipment.TestEquipment import InstrumentError
 
 
 class PSService(EquipmentService):
@@ -38,7 +39,7 @@ class PSService(EquipmentService):
         try:
             instance.output_off(1)
             instance.output_off(2)
-        except (*COMMUNICATION_ERRORS, AttributeError) as e:
+        except (*COMMUNICATION_ERRORS, InstrumentError, AttributeError) as e:
             return f"Could not turn outputs off: {e}"
         return None
 
@@ -56,7 +57,10 @@ class PSService(EquipmentService):
         """Enable output on the given channel.
 
         Returns:
-            True on success, False on failure.
+            True on success, False on failure. On an instrument-reported
+            error (e.g. a range violation) the PS driver's own last_error
+            attribute holds the InstrumentError for callers that want the
+            detail -- see check_error() above.
         """
         ps = self._get_from_controller()
         if ps is None:
@@ -64,14 +68,15 @@ class PSService(EquipmentService):
         try:
             ps.output_on(channel)
             return True
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, InstrumentError):
             return False
 
     def output_off(self, channel):
         """Disable output on the given channel.
 
         Returns:
-            True on success, False on failure.
+            True on success, False on failure. See output_on() for how to
+            get the detail behind an instrument-reported failure.
         """
         ps = self._get_from_controller()
         if ps is None:
@@ -79,14 +84,15 @@ class PSService(EquipmentService):
         try:
             ps.output_off(channel)
             return True
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, InstrumentError):
             return False
 
     def set_voltage(self, channel, voltage):
         """Set voltage on the given channel.
 
         Returns:
-            True on success, False on failure.
+            True on success, False on failure. See output_on() for how to
+            get the detail behind an instrument-reported failure.
         """
         ps = self._get_from_controller()
         if ps is None:
@@ -94,14 +100,15 @@ class PSService(EquipmentService):
         try:
             ps.set_voltage(voltage, channel=channel)
             return True
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, InstrumentError):
             return False
 
     def set_current(self, channel, current):
         """Set current limit on the given channel.
 
         Returns:
-            True on success, False on failure.
+            True on success, False on failure. See output_on() for how to
+            get the detail behind an instrument-reported failure.
         """
         ps = self._get_from_controller()
         if ps is None:
@@ -109,7 +116,7 @@ class PSService(EquipmentService):
         try:
             ps.set_current(current, channel=channel)
             return True
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, InstrumentError):
             return False
 
     def read_voltage(self, channel):
@@ -180,6 +187,6 @@ class PSService(EquipmentService):
         try:
             ps.output_off(1)
             ps.output_off(2)
-        except COMMUNICATION_ERRORS:
+        except (*COMMUNICATION_ERRORS, InstrumentError):
             pass
         self.disconnect()

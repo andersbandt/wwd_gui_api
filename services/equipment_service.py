@@ -17,6 +17,7 @@ from typing import Optional
 from datetime import datetime
 
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+from EEequipment.TestEquipment import InstrumentError
 
 
 @dataclass
@@ -135,6 +136,30 @@ class EquipmentService:
             error=post_error,  # None unless post_connect had a non-fatal issue
             timestamp=timestamp,
         )
+
+    def check_error(self) -> Optional[InstrumentError]:
+        """Query the connected instrument's error queue, if it has one.
+
+        Works for every equipment type (PS/DMM/FG/OSC) since it just calls
+        the driver's own check_error() -- see TestEquipment.check_error().
+        Some drivers (SPD3303X) raise InstrumentError instead of returning
+        it; this normalizes both styles to a plain return value so callers
+        never need a try/except just to check for an error.
+
+        Returns:
+            InstrumentError if the instrument reports a fault, None if it's
+            clear or doesn't support error reporting, None on a
+            communication failure (logged, not raised).
+        """
+        instance = self._get_from_controller()
+        if instance is None:
+            return None
+        try:
+            return instance.check_error()
+        except InstrumentError as e:
+            return e
+        except COMMUNICATION_ERRORS:
+            return None
 
     def disconnect(self):
         """Disconnect the equipment and clean up controller state.

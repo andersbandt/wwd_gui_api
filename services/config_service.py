@@ -162,6 +162,18 @@ class ConfigService:
         return default_data_dir
 
     # ------------------------------------------------------------------
+    # PS
+    # ------------------------------------------------------------------
+
+    def get_ps_check_error_on_poll(self) -> bool:
+        """Return whether the PS tab should query SYST:ERR? after each status
+        poll and report it to the console (default False -- see [PS] in
+        master.ini)."""
+        if "PS" not in self._config:
+            return False
+        return self._config["PS"].getboolean("check_error_on_poll", False)
+
+    # ------------------------------------------------------------------
     # Target
     # ------------------------------------------------------------------
 

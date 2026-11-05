@@ -1,23 +1,31 @@
+# --- Core ---
 pyserial
-matplotlib
-drawnow
-pandas
 numpy
+pandas
 scipy
-fpdf
-usb
-future
-setuptools
+scikit-learn
+matplotlib
+dash
+plotly
+simpleeval
+colorlog
+
+# --- Instrument I/O ---
 PyVISA
 pyvisa-py
-sv_ttk
-dash
-simpleeval
+# pyvisa-py extras: TCPIP/LAN instrument discovery
 zeroconf
 psutil
+# USB relay + pyvisa-py USB support (provides the `usb` module)
+pyusb
+# libusb DLL for pyusb on Windows (Linux uses the system libusb)
+libusb; sys_platform == "win32"
+
+# --- Dev / tooling ---
 pytest
-scikit-learn
+setuptools
 
-
-
-
+# --- Optional (install only if you use the feature) ---
+# mcp                       # mcp_server.py
+# uldaq                     # MCC USB-201 DAQ driver (also needs MCC's UL for Linux)
+# dbus-python PyGObject     # common/ble_client.py (Linux only, BlueZ)

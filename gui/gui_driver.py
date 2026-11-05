@@ -41,7 +41,7 @@ class MainApplication(ThemedApp):
         self.config_svc = config_svc
         self.nb = ttk.Notebook(window, height=height, width=width)
         self.nb.bind("<<NotebookTabChanged>>", self.on_tab_changed)
-        self.basefilepath = os.getcwd()
+        self.basefilepath = path_helper.get_project_root()
         self.controller = ClassController()
         self.controller.config_svc = config_svc
 

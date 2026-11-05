@@ -6,7 +6,7 @@ import configparser
 from dataclasses import dataclass
 from typing import List
 
-from common.path_helper import get_config_path
+from common.path_helper import get_config_path, resolve_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ class ConfigService:
     # ------------------------------------------------------------------
 
     def get_theme_file(self) -> str:
-        """Return the path to the theme JSON file (e.g. 'config/darcula.json')."""
-        default_theme = "config/darcula.json"
+        """Return the absolute path to the theme JSON file (e.g. '<root>/config/darcula.json')."""
+        default_theme = resolve_path("config", "darcula.json")
 
         if "THEME" not in self._config:
             logger.warning("Missing [THEME] section in config. Using default theme.")
@@ -53,6 +53,7 @@ class ConfigService:
 
         if not theme_file.startswith("config/"):
             theme_file = f"config/{theme_file}"
+        theme_file = resolve_path(theme_file)
 
         if not os.path.exists(theme_file):
             logger.warning(f"Theme file {theme_file} does not exist. Using default theme.")
@@ -139,6 +140,38 @@ class ConfigService:
         if "VISA" not in self._config:
             return ""
         return self._config["VISA"].get("backend", "").strip()
+
+    # ------------------------------------------------------------------
+    # Power supply
+    # ------------------------------------------------------------------
+
+    def get_ps_output_off_on_connect(self) -> bool:
+        """Return whether PS outputs should be forced off right after connecting (default True)."""
+        if "PS" not in self._config:
+            return True
+        return self._config["PS"].getboolean("output_off_on_connect", True)
+
+    # ------------------------------------------------------------------
+    # Oscilloscope
+    # ------------------------------------------------------------------
+
+    def get_osc_capture_template(self) -> str:
+        """Return the default capture filename template for the OSC tab.
+
+        Tokens are documented in common/capture_naming.py; the tab lets the
+        user edit this per run, so this is only the starting point.
+        """
+        from common.capture_naming import DEFAULT_TEMPLATE
+        if "OSC" not in self._config:
+            return DEFAULT_TEMPLATE
+        return self._config["OSC"].get("capture_template", DEFAULT_TEMPLATE).strip()
+
+    def get_osc_capture_dir(self) -> str:
+        """Return the data subdirectory that capture run folders live under."""
+        default_dir = "osc_data"
+        if "OSC" not in self._config:
+            return default_dir
+        return self._config["OSC"].get("capture_dir", default_dir).strip()
 
     # ------------------------------------------------------------------
     # Shutdown

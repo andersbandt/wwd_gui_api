@@ -12,6 +12,7 @@ import subprocess
 # import user defined modules
 from EEequipment.usbrelay import usbrelay_controller
 from common.serial_api import SerialProcessor
+from common.path_helper import get_config_path, resolve_path
 
 # import GUI modules
 from gui import gui_class as guic
@@ -228,12 +229,12 @@ class TabMainDashboard(guic.ThemedFrame):
             self.prompt.print("ERROR: probably self.ser_obj is None", "error")
 
     def open_config_ini(self):
-        file_path = os.path.join(os.getcwd(), "EEequipment", "usbrelay", "config.ini")
+        file_path = resolve_path("EEequipment", "usbrelay", "config.ini")
         if not open_file_cross_platform(file_path):
             guih.alert_user("Can't edit config file", f"{file_path} doesn't exist or couldn't be opened", "error")
 
     def open_master_ini(self):
-        file_path = os.path.join(os.getcwd(), "config", "master.ini")
+        file_path = get_config_path()
         if not open_file_cross_platform(file_path):
             guih.alert_user("Can't edit config file", f"{file_path} doesn't exist or couldn't be opened", "error")
 

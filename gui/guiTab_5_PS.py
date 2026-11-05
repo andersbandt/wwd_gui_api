@@ -196,13 +196,13 @@ class TabPS(guic.ThemedFrame):
 
         # CHANNEL 1 CONTROLS
         self.ch1_label = ttk.Label(fr_m, text="Channel 1", style="TLabel")
-        self.ch1_voltage = tk.Entry(fr_m)
+        self.ch1_voltage = guih.add_placeholder(tk.Entry(fr_m), "voltage")
         self.ch1_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(1, self.ch1_voltage.get()))
         self.ch1_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(1))
 
         self.ch1_ilabel = ttk.Label(fr_m, text="  I limit", style="TLabel")
-        self.ch1_current = tk.Entry(fr_m)
+        self.ch1_current = guih.add_placeholder(tk.Entry(fr_m), "current")
         self.ch1_setI_btn = tk.Button(fr_m, text="Set Current",
                                        command=lambda: self.set_current(1, self.ch1_current.get()))
 
@@ -216,13 +216,13 @@ class TabPS(guic.ThemedFrame):
 
         # CHANNEL 2 CONTROLS
         self.ch2_label = ttk.Label(fr_m, text="Channel 2", style="TLabel")
-        self.ch2_voltage = tk.Entry(fr_m)
+        self.ch2_voltage = guih.add_placeholder(tk.Entry(fr_m), "voltage")
         self.ch2_set_btn = tk.Button(fr_m, text="Set Voltage",
                                       command=lambda: self.set_voltage(2, self.ch2_voltage.get()))
         self.ch2_toggle_btn = tk.Button(fr_m, text="Toggle", command=lambda: self.toggle_channel(2))
 
         self.ch2_ilabel = ttk.Label(fr_m, text="  I limit", style="TLabel")
-        self.ch2_current = tk.Entry(fr_m)
+        self.ch2_current = guih.add_placeholder(tk.Entry(fr_m), "current")
         self.ch2_setI_btn = tk.Button(fr_m, text="Set Current",
                                        command=lambda: self.set_current(2, self.ch2_current.get()))
 
@@ -287,6 +287,17 @@ class TabPS(guic.ThemedFrame):
         if self._status_cache is not None and (now - self._status_cache_time) < self._STATUS_CACHE_TTL:
             return self._status_cache
         return self._query_status_and_cache()
+
+    def _sync_channel_flags(self):
+        """Refresh ch1_on/ch2_on from the instrument's reported output state."""
+        status = self._get_status_cached()
+        if status.get("error"):
+            # Fall back to "off" so a failed read can't leave a stale ON flag.
+            self.ch1_on = False
+            self.ch2_on = False
+            return
+        self.ch1_on = status.get("ch1_state") == "ON"
+        self.ch2_on = status.get("ch2_state") == "ON"
 
     def _schedule_status_poll(self):
         """Background poll every TTL seconds so the cache stays fresh even when the tab isn't visible."""
@@ -426,7 +437,11 @@ class TabPS(guic.ThemedFrame):
     def set_voltage(self, channel, voltage_str):
         if self.cc.get_ps_status():
             # have to format input text_data box into float
-            voltage = float(voltage_str)
+            try:
+                voltage = float(voltage_str)
+            except ValueError:
+                guih.alert_user("Can't set voltage", f"Invalid voltage: '{voltage_str}'", "error")
+                return
             try:
                 self.cc.ps.set_voltage(voltage, channel=channel)
             except InstrumentError as e:
@@ -445,26 +460,33 @@ class TabPS(guic.ThemedFrame):
             guih.alert_user("Can't set voltage", "No PS connection!", "error")
 
     def set_current(self, channel, current_str):
-        if self.cc.get_ps_status():
-            current = float(current_str)
-            # ps_service.set_current() swallows InstrumentError to a bool
-            # (other callers, e.g. the Logger's stimulus sweep, need that --
-            # they can't have a rejected setpoint kill a background thread).
-            # Call the driver directly here so this tab can show the detail.
-            try:
-                self.cc.ps.set_current(current, channel=channel)
-            except InstrumentError as e:
-                self.prompt.print(f"PS rejected current limit {current} A on channel {channel}: {e}", "error")
-                return
-            self.prompt.print(f"Set current limit on channel {channel} to {current} A")
-            if channel == 1:
-                self.ps_i1s = current
-            elif channel == 2:
-                self.ps_i2s = current
-            self.update_PS()
-            self.gui_refresh_info()
-        else:
+        if not self.cc.get_ps_status():
             guih.alert_user("Can't set current", "No PS connection!", "error")
+            return
+
+        # interpret the entry in the channel's selected unit (A / mA / uA),
+        # converting to amps before sending to the driver
+        scale = self.ch1_scale if channel == 1 else self.ch2_scale
+        try:
+            current = float(current_str) / scale
+        except ValueError:
+            guih.alert_user("Can't set current", f"Invalid current: '{current_str}'", "error")
+            return
+
+        # ps_service.set_current() swallows InstrumentError to a bool
+        # (other callers, e.g. the Logger's stimulus sweep, need that --
+        # they can't have a rejected setpoint kill a background thread).
+        # Call the driver directly here so this tab can show the detail.
+        # The driver applies the per-channel calibration offset automatically.
+        try:
+            self.cc.ps.set_current(current, channel=channel)
+        except InstrumentError as e:
+            self.prompt.print(f"PS rejected current limit {current} A on channel {channel}: {e}", "error")
+            return
+        self.prompt.print(f"Set current limit on channel {channel} to {current_str} "
+                          f"({current} A, before cal offset)")
+        self.update_PS()
+        self.gui_refresh_info()
 
     #################################
     #### SERIAL (COM)  ##############
@@ -496,11 +518,13 @@ class TabPS(guic.ThemedFrame):
         self.labelTimeConnectedValue.config(text=result.timestamp)
         self.fr_port.set_status(True)
 
-        self.ch1_on = 0
-        self.ch2_on = 0
         # Invalidate cache so the first refresh actually queries the instrument
         self._status_cache = None
         self._status_cache_time = 0.0
+        # Seed the toggle-button state from the supply rather than assuming off:
+        # with [PS] output_off_on_connect = NO the outputs may already be on, and
+        # a wrong assumption here makes the first toggle press a no-op.
+        self._sync_channel_flags()
         # Start background poll to keep cache warm
         if self._poll_after_id is not None:
             self.after_cancel(self._poll_after_id)

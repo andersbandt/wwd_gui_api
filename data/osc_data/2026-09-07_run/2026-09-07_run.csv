@@ -1,0 +1,4 @@
+timestamp,capture,n,model,channels,prefix,Vin
+2026-09-07 22:19:37,capture_001,1,DSO1014A,2,capture,4.5V
+2026-09-07 22:20:26,capture_002,2,DSO1014A,2,capture,4.5V
+2026-09-07 22:48:19,capture_003,3,DSO1014A,2,capture,

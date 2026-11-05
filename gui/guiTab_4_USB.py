@@ -3,15 +3,25 @@
 # import needed packages
 import logging
 import os
+import threading
+import time
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
+from tkinter import filedialog
 import serial
 
 # import user defined modules
 from common.serial_api import SerialProcessor
 from common.path_helper import get_data_dir
 from common.logger import build_log_name
+from common import device_protocol
+from common.device_protocol import DeviceProtocol, ProtocolError, ConnectionLostError
+from common.dump_decoder import (decode_dump, summarize, plot_dump, plot_time_allocation,
+                                  format_header, export_datastream,
+                                  DumpViewConfig, load_imu_processor,
+                                  load_cached_frame, save_cached_frame,
+                                  cache_path_for, artifact_is_fresh)
 from gui import gui_helper as guih
 from gui import gui_class as guic
 
@@ -42,11 +52,24 @@ class TabUSB(guic.ThemedFrame):
         self._recording = False
         self._conn_watch_id = None
 
+        # DeviceProtocol object (binary command channel, cdc_acm_uart1 on the
+        # firmware side — a second, independent ttyACM interface from the
+        # console/log port above)
+        self.dp_obj = None
+        self._protocol_busy = False
+        self._protocol_conn_watch_id = None
+
+        # View Dump display/processing options, set via "Configure View..."
+        self.dump_view_config = DumpViewConfig()
+
         # init frames within tab
         self.fr_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_serial", self.port_init, lambda: self.port_close(),
                                                   status_cmd=lambda: self.ser_obj.serStatus if self.ser_obj else False)
         self.fr_state = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_test = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_protocol_port = guic.SerialConnFrame(self, self.theme_config, self.cc, "USB_cmd_protocol", self.protocol_port_init, lambda: self.protocol_port_close(),
+                                                  status_cmd=lambda: self.dp_obj.serStatus if self.dp_obj else False)
+        self.fr_protocol_actions = tk.Frame(self, bg=self.theme_config["light_4"])
         self.prompt = guic.Prompt(self, self.theme_config, "Debug serial")
 
         # initialize threads (actual init is in thread_print) or something
@@ -61,7 +84,9 @@ class TabUSB(guic.ThemedFrame):
         self.fr_port.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"])
         self.fr_state.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="n")
         self.fr_test.grid(row=3, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="n")
-        self.prompt.grid(row=1, column=1, rowspan=3, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nswe")
+        self.fr_protocol_port.grid(row=4, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="n")
+        self.fr_protocol_actions.grid(row=5, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="n")
+        self.prompt.grid(row=1, column=1, rowspan=5, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="nswe")
 
         # configure grid weights so prompt expands to fill available space
         self.columnconfigure(1, weight=1)
@@ -77,6 +102,7 @@ class TabUSB(guic.ThemedFrame):
 
         self.init_fr_state()
         self.init_fr_test()
+        self.init_fr_protocol_actions()
 
     def init_fr_state(self):
         # add output mode selector
@@ -150,10 +176,71 @@ class TabUSB(guic.ThemedFrame):
         )
         self.test_drop[0].grid(row=2, column=3, padx=15, pady=15)
 
+    def init_fr_protocol_actions(self):
+        lbl = ttk.Label(self.fr_protocol_actions, text="Device Protocol", style="TSpunkLabel.TLabel")
+        lbl.grid(row=0, column=1, columnspan=2, pady=2)
+
+        btn_ping = Button(self.fr_protocol_actions, text="Ping",
+                          command=self.on_ping,
+                          fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+                          height=1, width=15)
+        btn_ping.grid(row=1, column=1, padx=5, pady=5)
+
+        self.btn_dump = Button(self.fr_protocol_actions, text="Dump to File",
+                               command=self.on_dump,
+                               fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+                               height=1, width=15)
+        self.btn_dump.grid(row=2, column=1, padx=5, pady=5)
+
+        lbl_postfix = Label(self.fr_protocol_actions, text="Dump filename postfix")
+        lbl_postfix.grid(row=2, column=2, padx=(15, 5), pady=5, sticky="w")
+        self.dump_postfix_entry = Entry(self.fr_protocol_actions, width=18)
+        self.dump_postfix_entry.grid(row=2, column=3, padx=5, pady=5, sticky="w")
+        guic.Tooltip(lbl_postfix, "Optional text appended to the dump filename, e.g.\n"
+                                   "\"shaky_end\" -> DUMP_20260726120000_shaky_end.bin")
+
+        btn_view_dump = Button(self.fr_protocol_actions, text="View Dump...",
+                               command=self.on_view_dump,
+                               fg=self.theme_config["fg_dark"], bg=self.theme_config["light_6"],
+                               height=1, width=15)
+        btn_view_dump.grid(row=2, column=4, padx=5, pady=5)
+        guic.Tooltip(btn_view_dump, "Decode a .bin dump file, plot accel/gyro/temperature, and write\n"
+                                     "companion _header.txt (time anchors, counts, sample rate) and\n"
+                                     "_data.txt (full decoded record stream) files next to it.\n"
+                                     "Re-viewing the same dump reuses the decode and the text export\n"
+                                     "instead of recomputing them (see Configure View...).\n"
+                                     "Does not need a live connection.")
+
+        btn_view_dump_config = Button(self.fr_protocol_actions, text="Configure View...",
+                                      command=self.open_dump_view_config_dialog,
+                                      fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"],
+                                      height=1, width=15)
+        btn_view_dump_config.grid(row=2, column=5, padx=5, pady=5)
+        guic.Tooltip(btn_view_dump_config, "Configure temperature units and optional IMU data\n"
+                                            "processing (e.g. a filtering script) for View Dump.")
+
+        self.btn_erase = Button(self.fr_protocol_actions, text="Erase Flash",
+                           command=self.on_erase,
+                           fg=self.theme_config["error"], bg=self.theme_config["light_3"],
+                           height=1, width=15)
+        self.btn_erase.grid(row=3, column=1, padx=5, pady=5)
+
+        btn_set_rate = Button(self.fr_protocol_actions, text="Set Data Rates...",
+                              command=self.on_set_rate,
+                              fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"],
+                              height=1, width=15)
+        btn_set_rate.grid(row=4, column=1, padx=5, pady=5)
+
+        guic.Tooltip(self.btn_erase, "Erases the entire on-device flash log. Irreversible.")
+        guic.Tooltip(btn_set_rate, "View/change the IMU sample rate and temperature logging interval.")
+
     def gui_refresh(self, event):
         if not self.fr_port.status:
             self.fr_port.refresh_ports()
         self.fr_port.gui_refresh()
+        if not self.fr_protocol_port.status:
+            self.fr_protocol_port.refresh_ports()
+        self.fr_protocol_port.gui_refresh()
 
 
     ##############################################################################
@@ -311,6 +398,35 @@ class TabUSB(guic.ThemedFrame):
             return
         self._conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_connection)
 
+    def _start_protocol_connection_watch(self):
+        self._protocol_conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_protocol_connection)
+
+    def _stop_protocol_connection_watch(self):
+        if self._protocol_conn_watch_id is not None:
+            self.after_cancel(self._protocol_conn_watch_id)
+            self._protocol_conn_watch_id = None
+
+    def _watch_protocol_connection(self):
+        """Same idea as _watch_connection() but for the command channel.
+        Skips the check while a dump/erase/etc. is in flight — that worker
+        thread will notice the failure itself via ConnectionLostError and
+        call protocol_port_close(), and polling serStatus/os.path.exists()
+        concurrently with an active read/write isn't harmful but is just
+        redundant noise."""
+        if self.dp_obj is None:
+            return
+        if self._protocol_busy:
+            self._protocol_conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_protocol_connection)
+            return
+        port = self.dp_obj.port
+        port_gone = not self.dp_obj.serStatus or not os.path.exists(port)
+        if port_gone:
+            self.prompt.print(f"ERROR: command channel connection lost on {port}", "error")
+            self.protocol_port_close()
+            guih.alert_user("Command channel lost", f"Connection on {port} dropped unexpectedly.\nThe device may have re-enumerated at a different tty path.", "error")
+            return
+        self._protocol_conn_watch_id = self.after(self._CONN_WATCH_MS, self._watch_protocol_connection)
+
     def thread_print_display(self):
         """Start serial reader (t1) on connect. Recording is started separately via the record button."""
         self.t1 = guic.StoppableThread(
@@ -345,6 +461,7 @@ class TabUSB(guic.ThemedFrame):
     def port_close(self):
         self._stop_connection_watch()
         if self.ser_obj is not None:
+            port = self.ser_obj.port
             if self.t1 is not None:
                 self.t1.stop()
             if self.t2 is not None:
@@ -358,6 +475,12 @@ class TabUSB(guic.ThemedFrame):
             self.prompt.print(f"Port closed: {num_lines} lines wrote")
             self.ser_obj = None
             self.cc.set_ser(None)
+            # Also needed on the unexpected-disconnect path (_watch_connection
+            # calls port_close() directly, bypassing SerialConnFrame.disconnect()
+            # which is the only other place this gets cleared) — otherwise the
+            # port stays marked active and the next connect() attempt refuses
+            # with "already in use".
+            self.cc.remove_active_connection(port)
         self._recording = False
         self.btn_record.config(text="Start Recording", bg=self.theme_config["light_3"])
         self.fr_port.set_status(False)
@@ -381,4 +504,461 @@ class TabUSB(guic.ThemedFrame):
                                                      progress_callback=progress_callback)
         )
         self.t3.start()
+
+    #################################
+    #### DEVICE PROTOCOL (cdc_acm_uart1) ###
+    #################################
+
+    # NOTE: this is called by fr_protocol_port (a SerialConnFrame). Must return True/False.
+    def protocol_port_init(self):
+        port = self.fr_protocol_port.get_port()
+
+        self.prompt.print(f"Protocol: connecting to {port} @ 115200 baud")
+        try:
+            self.dp_obj = DeviceProtocol(port, baud_rate=115200)
+        except (serial.serialutil.SerialException, OSError, ConnectionLostError) as e:
+            self.dp_obj = None
+            self.prompt.print(f"ERROR: {e}", "error")
+            guih.alert_user("Can't start command channel", str(e), "error")
+            return False
+
+        self.prompt.print("Protocol: connected")
+        self._start_protocol_connection_watch()
+        return True
+
+    def protocol_port_close(self):
+        self._stop_protocol_connection_watch()
+        if self.dp_obj is not None:
+            port = self.dp_obj.port
+            self.dp_obj.close()
+            self.dp_obj = None
+            # Same "already in use" fix as port_close(): both the unexpected-
+            # disconnect watcher and _handle_protocol_exception() call this
+            # directly rather than through SerialConnFrame.disconnect().
+            self.cc.remove_active_connection(port)
+        self.fr_protocol_port.set_status(False)
+        self._protocol_busy = False
+
+    def _protocol_connected(self):
+        if self.dp_obj is None or not self.dp_obj.serStatus:
+            self.prompt.print("ERROR: command channel not connected", "error")
+            return False
+        return True
+
+    def _handle_protocol_exception(self, e, action):
+        """Shared error handling for every Device Protocol command. Must only
+        be called from the GUI (main) thread — worker threads should route
+        through self.after(0, lambda: self._handle_protocol_exception(...)).
+
+        Reports the failure to the prompt and, for a lost connection
+        specifically, tears down the (now-stale) DeviceProtocol and updates
+        the connection indicator so the UI doesn't keep claiming to be
+        connected. Also catches anything NOT already a ProtocolError/
+        TimeoutError — a background-thread exception that nobody catches is
+        silently swallowed by Tkinter (no crash, no GUI feedback, just a
+        traceback in the terminal), which is worse than an ugly message here.
+        """
+        if isinstance(e, ConnectionLostError):
+            self.prompt.print(f"{action} failed: {e}", "error")
+            self.prompt.print("Command channel connection lost — disconnecting.", "error")
+            self.protocol_port_close()
+        elif isinstance(e, (ProtocolError, TimeoutError)):
+            self.prompt.print(f"{action} failed: {e}", "error")
+        else:
+            self.prompt.print(f"{action} failed: unexpected {type(e).__name__}: {e}", "error")
+            logger.exception(f"{action} raised an unexpected exception")
+
+    def on_ping(self):
+        if not self._protocol_connected():
+            return
+        try:
+            ok = self.dp_obj.ping()
+            self.prompt.print("PING -> OK" if ok else "PING -> unexpected response", "error" if not ok else None)
+        except Exception as e:
+            self._handle_protocol_exception(e, "PING")
+
+    def on_erase(self):
+        if not self._protocol_connected():
+            return
+        if self._protocol_busy:
+            self.prompt.print("ERROR: another protocol operation is in progress, wait for it to finish", "error")
+            return
+        if not guih.promptYesNo("Erase flash", "Erase the entire on-device flash log? This cannot be undone."):
+            return
+
+        self._protocol_busy = True
+        self.btn_erase.config(text="Erasing...", state="disabled")
+        self.prompt.print("ERASE: requesting chip erase (several seconds)...")
+
+        def worker():
+            try:
+                self.dp_obj.erase()
+                self.after(0, lambda: self.prompt.print("ERASE -> OK, flash log cleared"))
+            except Exception as e:
+                err = e
+                self.after(0, lambda: self._handle_protocol_exception(err, "ERASE"))
+            finally:
+                def reset_btn():
+                    self._protocol_busy = False
+                    self.btn_erase.config(text="Erase Flash", state="normal")
+                self.after(0, reset_btn)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_set_rate(self):
+        if not self._protocol_connected():
+            return
+        if self._protocol_busy:
+            self.prompt.print("ERROR: another protocol operation is in progress", "error")
+            return
+
+        try:
+            cur_odr, cur_temp = self.dp_obj.get_rate()
+        except Exception as e:
+            self._handle_protocol_exception(e, "GET_RATE")
+            return
+
+        dlg = Toplevel(self)
+        dlg.title("Set Data Rates")
+        dlg.configure(bg=self.theme_config["light_4"])
+        dlg.transient(self.winfo_toplevel())
+        dlg.grab_set()
+
+        Label(dlg, text="IMU sample rate (Hz)").grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
+        odr_var = tk.StringVar(value=str(cur_odr))
+        odr_drop = ttk.Combobox(dlg, textvariable=odr_var, state="readonly", width=10,
+                                values=[str(h) for h in device_protocol.VALID_IMU_ODR_HZ])
+        odr_drop.grid(row=0, column=1, padx=10, pady=(10, 5))
+
+        Label(dlg, text="Temperature interval (s)").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        temp_entry = Entry(dlg, width=12)
+        temp_entry.insert(0, str(cur_temp))
+        temp_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        status_lbl = Label(dlg, text="", fg=self.theme_config["error"], bg=self.theme_config["light_4"])
+        status_lbl.grid(row=2, column=0, columnspan=2, padx=10)
+
+        def apply():
+            try:
+                new_odr = int(odr_var.get())
+                new_temp = int(temp_entry.get())
+            except ValueError:
+                status_lbl.config(text="Both fields must be integers")
+                return
+
+            try:
+                applied_odr, applied_temp = self.dp_obj.set_rate(new_odr, new_temp)
+            except Exception as e:
+                if isinstance(e, ConnectionLostError):
+                    self._handle_protocol_exception(e, "SET_RATE")
+                    dlg.destroy()
+                else:
+                    status_lbl.config(text=str(e))
+                return
+
+            self.prompt.print(f"SET_RATE -> IMU {applied_odr} Hz, temperature every {applied_temp} s")
+            dlg.destroy()
+
+        btn_frame = Frame(dlg, bg=self.theme_config["light_4"])
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=10)
+        Button(btn_frame, text="Apply", command=apply,
+              fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"], width=10).grid(row=0, column=0, padx=5)
+        Button(btn_frame, text="Cancel", command=dlg.destroy,
+              fg=self.theme_config["fg_dark"], bg=self.theme_config["light_3"], width=10).grid(row=0, column=1, padx=5)
+
+    def on_dump(self):
+        if not self._protocol_connected():
+            return
+        if self._protocol_busy:
+            self.prompt.print("ERROR: another protocol operation is in progress", "error")
+            return
+
+        self._protocol_busy = True
+        self.btn_dump.config(text="Dumping...", state="disabled")
+        self.prompt.print("DUMP: requesting flash dump (this can take over a minute)...")
+
+        # Read the postfix entry here (main/GUI thread) — the worker thread
+        # below must not touch Tkinter widgets directly.
+        postfix = self.dump_postfix_entry.get().strip() or None
+
+        t0 = time.time()
+        rate_state = {"t": t0, "bytes": 0}  # for instantaneous KB/s between progress prints
+
+        def progress_cb(received, total):
+            if received % (64 * 2176) == 0:  # ~every 64 pages
+                now = time.time()
+                dt = now - rate_state["t"]
+                d_bytes = received - rate_state["bytes"]
+                rate_kbs = (d_bytes / dt / 1024.0) if dt > 0 else 0.0
+                rate_state["t"] = now
+                rate_state["bytes"] = received
+                if total:
+                    pct = 100.0 * received / total
+                    self.after(0, lambda r=received, t=total, p=pct, rk=rate_kbs: self.prompt.print(
+                        f"  ...{r}/{t} bytes ({p:.0f}%) [{rk:.1f} KB/s]"))
+                else:
+                    self.after(0, lambda r=received, rk=rate_kbs: self.prompt.print(
+                        f"  ...{r} bytes received [{rk:.1f} KB/s]"))
+
+        received_so_far = [0]  # mutable box so progress_cb's closure can update it
+
+        def progress_cb_wrapped(received, total):
+            received_so_far[0] = received
+            progress_cb(received, total)
+
+        def worker():
+            try:
+                data, device_crc = self.dp_obj.dump(progress_callback=progress_cb_wrapped)
+                logname = build_log_name("DUMP", postfix, "bin")
+                outdir = get_data_dir("flash_dumps")
+                outpath = os.path.join(outdir, logname)
+                with open(outpath, "wb") as f:
+                    f.write(data)
+                elapsed = time.time() - t0
+                avg_kbs = (len(data) / elapsed / 1024.0) if elapsed > 0 else 0.0
+                self.after(0, lambda: self.prompt.print(
+                    f"DUMP complete: {len(data)} bytes in {elapsed:.1f}s ({avg_kbs:.1f} KB/s avg), crc32=0x{device_crc:08x} -> {outpath}"))
+            except Exception as e:
+                err = e
+                def report():
+                    self._handle_protocol_exception(err, "DUMP")
+                    if received_so_far[0]:
+                        self.prompt.print(
+                            f"  ({received_so_far[0]} bytes were received before the failure — not saved)",
+                            "error")
+                self.after(0, report)
+            finally:
+                def reset_btn():
+                    self._protocol_busy = False
+                    self.btn_dump.config(text="Dump to File", state="normal")
+                self.after(0, reset_btn)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_view_dump(self):
+        """Decode and plot a .bin dump file. Works on any previously-saved
+        dump — doesn't need a live device connection."""
+        outdir = get_data_dir("flash_dumps")
+        filepath = filedialog.askopenfilename(
+            title="Select a flash dump",
+            initialdir=outdir,
+            filetypes=[("Flash dump", "*.bin"), ("All files", "*.*")])
+        if not filepath:
+            return
+
+        try:
+            size_bytes = os.path.getsize(filepath)
+        except OSError as e:
+            self.prompt.print(f"ERROR: couldn't stat {filepath}: {e}", "error")
+            return
+
+        self.prompt.print(f"Viewing {filepath} ({size_bytes} bytes)...")
+
+        # Weighted, not per-step, and the weights come from timing a full
+        # 3.2 MB dump: writing the text export is the slowest phase (~58% of
+        # the wall time), decoding second (~28%), the two plots small. All of
+        # it stays on the GUI thread because matplotlib's Tk backend must
+        # build figures there — ProgressDialog pumps the event loop so the bar
+        # still repaints between steps.
+        DECODE_END, EXPORT_END, ALLOC_END = 35, 85, 93
+        progress = guic.ProgressDialog(self, self.theme_config,
+                                       f"Rendering {os.path.basename(filepath)}",
+                                       total=100)
+
+        def decode_progress(pages_done, total_pages):
+            frac = pages_done / total_pages if total_pages else 1.0
+            progress.set(DECODE_END * frac,
+                         f"Decoding records... {pages_done}/{total_pages} pages")
+
+        cfg = self.dump_view_config
+
+        try:
+            df = None
+            if cfg.reuse_cached:
+                progress.set(0, "Checking for a cached decode...")
+                df = load_cached_frame(filepath)
+                if df is not None:
+                    self.prompt.print(
+                        f"Reusing cached decode {os.path.basename(cache_path_for(filepath))} "
+                        f"({len(df)} records) — skipping decode")
+
+            if df is None:
+                # Only now is the raw dump actually needed in memory; a full
+                # cache hit never touches the .bin's 283 MB at all.
+                try:
+                    with open(filepath, "rb") as f:
+                        data = f.read()
+                except OSError as e:
+                    self.prompt.print(f"ERROR: couldn't read {filepath}: {e}", "error")
+                    return
+                try:
+                    df = decode_dump(data, progress_callback=decode_progress)
+                except Exception as e:
+                    self.prompt.print(f"ERROR: decode failed: {e}", "error")
+                    logger.exception("dump decode failed")
+                    return
+                if cfg.reuse_cached:
+                    progress.set(DECODE_END, "Caching decode...")
+                    cached = save_cached_frame(df, filepath)
+                    if cached:
+                        self.prompt.print(f"Cached decode -> {os.path.basename(cached)}")
+
+            progress.set(DECODE_END, "Summarizing...")
+            for line in summarize(df).splitlines():
+                self.prompt.print(line)
+
+            base, _ = os.path.splitext(filepath)
+            header_path = base + "_header.txt"
+            data_path = base + "_data.txt"
+
+            def export_progress(rows_done, total_rows):
+                frac = rows_done / total_rows if total_rows else 1.0
+                progress.set(DECODE_END + (EXPORT_END - DECODE_END) * frac,
+                             f"Writing text export... {rows_done}/{total_rows} rows")
+
+            export_is_fresh = (cfg.reuse_cached
+                               and artifact_is_fresh(header_path, filepath)
+                               and artifact_is_fresh(data_path, filepath))
+            if export_is_fresh:
+                self.prompt.print(
+                    f"Reusing existing text export {os.path.basename(header_path)} "
+                    f"and {os.path.basename(data_path)}")
+            else:
+                progress.set(DECODE_END, "Writing text export...")
+                try:
+                    with open(header_path, "w") as f:
+                        f.write(format_header(df, size_bytes=size_bytes))
+                    export_datastream(df, data_path, progress_callback=export_progress)
+                    self.prompt.print(f"Wrote {os.path.basename(header_path)} and {os.path.basename(data_path)}")
+                except OSError as e:
+                    self.prompt.print(f"ERROR: couldn't write text export: {e}", "error")
+            progress.set(EXPORT_END)
+
+            imu_processor = None
+            if cfg.imu_processing_enabled and cfg.imu_script_path:
+                try:
+                    imu_processor = load_imu_processor(cfg.imu_script_path, cfg.imu_func_name)
+                except Exception as e:
+                    self.prompt.print(f"ERROR: couldn't load IMU processing script: {e}", "error")
+                    logger.exception("IMU processor load failed")
+                    return
+
+            try:
+                # Built first with show=False: plt.show() raises every open figure,
+                # so this puts the allocation bars and the signal panels on screen
+                # together instead of making the user close one to see the other.
+                # Returns None when the dump has no wear/activity markers at all.
+                progress.set(EXPORT_END, "Building time allocation plot...")
+                plot_time_allocation(df, title=f"Time allocation — {os.path.basename(filepath)}",
+                                     show=False)
+                progress.set(ALLOC_END, "Building signal plots...")
+                plot_dump(df, title=os.path.basename(filepath),
+                          temp_unit=cfg.temp_unit,
+                          imu_processor=imu_processor, show=False)
+                progress.set(100, "Done")
+            except Exception as e:
+                self.prompt.print(f"ERROR: {e}", "error")
+                logger.exception("plot_dump failed")
+                return
+        finally:
+            # Down before show(): plt.show() blocks until the figures are
+            # closed, so a dialog still up here would sit on top of the plots
+            # (and keep its grab) for as long as the user looks at them.
+            progress.close()
+
+        import matplotlib.pyplot as plt
+        plt.show()
+
+    def open_dump_view_config_dialog(self):
+        """Modal popup to configure View Dump's display/processing options
+        (temperature unit, optional IMU processing script). Mirrors the
+        Logger tab's "Configure OSC..." dialog pattern."""
+        cfg = self.dump_view_config
+
+        dialog = tk.Toplevel(self)
+        dialog.title("View Dump Configuration")
+        dialog.configure(bg=self.theme_config["bg_light"])
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="View Dump Options", style="TPinkLabel.TLabel",
+                  font=(self.theme_config["font"]["family"], 12, "bold")).grid(
+            row=0, column=0, columnspan=3, pady=10, padx=10)
+
+        # -- Temperature unit --
+        ttk.Label(dialog, text="Temperature unit:", style="TLabel").grid(
+            row=1, column=0, padx=10, pady=5, sticky="w")
+        temp_unit_var = tk.StringVar(value=cfg.temp_unit)
+        fr_temp = tk.Frame(dialog, bg=self.theme_config["bg_light"])
+        fr_temp.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky="w")
+        ttk.Radiobutton(fr_temp, text="Celsius", variable=temp_unit_var, value="C").pack(side="left", padx=5)
+        ttk.Radiobutton(fr_temp, text="Fahrenheit", variable=temp_unit_var, value="F").pack(side="left", padx=5)
+
+        # -- Caching --
+        # Decoding a full dump and writing its _data.txt cost ~10 minutes on a
+        # 283 MB capture, and both outputs are pure functions of the .bin plus
+        # dump_decoder.py — so a re-view reuses them when they're newer than
+        # both. Off means "always recompute", the escape hatch for when a
+        # cache is suspect.
+        reuse_cached_var = tk.IntVar(value=1 if cfg.reuse_cached else 0)
+        chk_reuse = ttk.Checkbutton(
+            dialog, text="Reuse cached decode and text export when up to date",
+            variable=reuse_cached_var, onvalue=1, offvalue=0)
+        chk_reuse.grid(row=2, column=0, columnspan=3, padx=10, pady=(10, 5), sticky="w")
+        guic.Tooltip(chk_reuse,
+                     "Skips decoding and re-writing _header.txt/_data.txt if the\n"
+                     "files next to the dump are newer than both the .bin and\n"
+                     "dump_decoder.py. Editing the decoder invalidates them\n"
+                     "automatically. Uncheck to force a full recompute.")
+
+        # -- IMU processing --
+        ttk.Label(dialog, text="IMU processing", style="TPinkLabel.TLabel",
+                  font=(self.theme_config["font"]["family"], 11, "bold")).grid(
+            row=3, column=0, columnspan=3, pady=(15, 5), padx=10, sticky="w")
+
+        imu_enabled_var = tk.IntVar(value=1 if cfg.imu_processing_enabled else 0)
+        ttk.Checkbutton(dialog, text="Apply a Python function to IMU data before plotting",
+                         variable=imu_enabled_var, onvalue=1, offvalue=0).grid(
+            row=4, column=0, columnspan=3, padx=10, pady=5, sticky="w")
+
+        ttk.Label(dialog, text="Script:", style="TLabel").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        script_var = tk.StringVar(value=cfg.imu_script_path)
+        script_entry = ttk.Entry(dialog, textvariable=script_var, width=40)
+        script_entry.grid(row=5, column=1, padx=5, pady=5, sticky="w")
+
+        def browse_script():
+            path = filedialog.askopenfilename(
+                title="Select IMU processing script",
+                filetypes=[("Python files", "*.py"), ("All files", "*.*")])
+            if path:
+                script_var.set(path)
+
+        tk.Button(dialog, text="Browse...", command=browse_script,
+                  fg=self.theme_config["fg_dark"], bg=self.theme_config["light_1"]).grid(
+            row=5, column=2, padx=5, pady=5)
+
+        ttk.Label(dialog, text="Function name:", style="TLabel").grid(
+            row=6, column=0, padx=10, pady=5, sticky="w")
+        func_name_var = tk.StringVar(value=cfg.imu_func_name)
+        ttk.Entry(dialog, textvariable=func_name_var, width=20).grid(
+            row=6, column=1, padx=5, pady=5, sticky="w")
+
+        guic.Tooltip(script_entry, "A .py file defining a top-level function that takes and\n"
+                                    "returns a DataFrame of IMU_FIFO rows (accel_x/y/z, gyro_x/y/z,\n"
+                                    "imu_timestamp, seconds_since_boot, ...), e.g. a filter.")
+
+        # -- OK / Cancel --
+        def on_ok():
+            cfg.temp_unit = temp_unit_var.get()
+            cfg.reuse_cached = bool(reuse_cached_var.get())
+            cfg.imu_processing_enabled = bool(imu_enabled_var.get())
+            cfg.imu_script_path = script_var.get().strip()
+            cfg.imu_func_name = func_name_var.get().strip() or "process"
+            dialog.destroy()
+
+        btn_frame = tk.Frame(dialog, bg=self.theme_config["bg_light"])
+        btn_frame.grid(row=7, column=0, columnspan=3, pady=10)
+        tk.Button(btn_frame, text="OK", width=10, command=on_ok,
+                  bg=self.theme_config["success"], fg=self.theme_config["fg_light"]).pack(side="left", padx=10)
+        tk.Button(btn_frame, text="Cancel", width=10, command=dialog.destroy,
+                  bg=self.theme_config["error"], fg=self.theme_config["fg_light"]).pack(side="left", padx=10)
 

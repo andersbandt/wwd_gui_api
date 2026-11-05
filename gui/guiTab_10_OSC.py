@@ -3,14 +3,20 @@
 # import needed GUI packages
 import logging
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 # import needed packages
+import os
+import subprocess
+import sys
+import threading
 from datetime import datetime
 
 # import user defined modules
 from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
+from common import capture_naming
+from common import path_helper
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -33,6 +39,7 @@ class TabOSC(guic.ThemedFrame):
         self.fr_channel = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_tb_trig = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_capture = tk.Frame(self, bg=self.theme_config["light_4"])
 
         # oscilloscope state
         self.id = None
@@ -70,7 +77,8 @@ class TabOSC(guic.ThemedFrame):
         # place everything in grid
         self.fr_info.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="N")
-        self.fr_control.grid(row=1, column=2, rowspan=3, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_control.grid(row=1, column=2, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_capture.grid(row=3, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.fr_channel.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.fr_tb_trig.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.prompt.grid(row=3, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
@@ -88,6 +96,7 @@ class TabOSC(guic.ThemedFrame):
         self.init_fr_channel()
         self.init_fr_tb_trig()
         self.init_fr_control()
+        self.init_fr_capture()
 
     # =========================================================================
     # fr_info — Device Info
@@ -619,16 +628,28 @@ class TabOSC(guic.ThemedFrame):
     # Save / Recall Actions
     # =========================================================================
     def save_screenshot(self):
+        """One-off screenshot onto *this* machine, outside the capture flow.
+
+        Save/Recall Setup below still work on the scope's own filesystem --
+        setups are only useful there -- but an image is wanted on the host,
+        so this writes into the capture run folder.
+        """
         if not self.cc.get_osc_status():
             guih.alert_user("Can't save screenshot", "No OSC connection!", "error")
             return
         filename = self.save_filename_entry.get().strip()
         if not filename:
             filename = "screen_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+        if not filename.lower().endswith(".png"):
+            filename += ".png"
+
+        run_dir = self.capture_dir_var.get().strip() or self._default_run_dir()
         try:
-            self.cc.osc.save_image(filename)
-            self.prompt.print(f"Screenshot saved: {filename}")
-        except COMMUNICATION_ERRORS as e:
+            os.makedirs(run_dir, exist_ok=True)
+            path = self.cc.osc.screenshot_to_file(
+                capture_naming.unique_path(os.path.join(run_dir, filename)))
+            self.prompt.print(f"Screenshot saved: {path}")
+        except COMMUNICATION_ERRORS + (NotImplementedError, ValueError, OSError) as e:
             guih.alert_user("Can't save screenshot", str(e), "error")
 
     def save_setup(self):
@@ -692,6 +713,273 @@ class TabOSC(guic.ThemedFrame):
             guih.alert_user("Can't measure", str(e), "error")
 
     # =========================================================================
+    # fr_capture — Save captures to the host filesystem
+    # =========================================================================
+    def init_fr_capture(self):
+        """Build the capture panel.
+
+        Deliberately not rebuilt on connect (unlike the other frames): the run
+        folder, template and field values are the tech's working state for a
+        whole sweep and must survive a reconnect.
+        """
+        fr = self.fr_capture
+        px = self.theme_config["pad"]["xpad_l"]
+        py = self.theme_config["pad"]["xpad_s"]
+
+        for w in fr.winfo_children():
+            w.destroy()
+
+        cur_row = 0
+        ttk.Label(fr, text="Capture", style="TPinkLabel.TLabel").grid(
+            row=cur_row, column=0, columnspan=3, pady=(5, 5))
+        cur_row += 1
+
+        # --- run folder ---
+        ttk.Label(fr, text="Run folder", style="TLabel").grid(
+            row=cur_row, column=0, padx=px, pady=py, sticky="w")
+        self.capture_dir_var = tk.StringVar(value=self._default_run_dir())
+        tk.Entry(fr, textvariable=self.capture_dir_var, width=26).grid(
+            row=cur_row, column=1, padx=px, pady=py, sticky="w")
+        tk.Button(fr, text="...", width=3, command=self.browse_run_dir).grid(
+            row=cur_row, column=2, padx=px, pady=py, sticky="w")
+        cur_row += 1
+
+        # --- filename template ---
+        lbl_template = ttk.Label(fr, text="Template", style="TLabel")
+        lbl_template.grid(row=cur_row, column=0, padx=px, pady=py, sticky="w")
+        guic.Tooltip(lbl_template,
+                     "Filename template for each capture.\n\n" + capture_naming.TOKEN_HELP)
+        self.capture_template_var = tk.StringVar(value=self._configured_template())
+        tk.Entry(fr, textvariable=self.capture_template_var, width=26).grid(
+            row=cur_row, column=1, columnspan=2, padx=px, pady=py, sticky="w")
+        cur_row += 1
+
+        # --- user fields (become both filename tokens and CSV columns) ---
+        lbl_fields = ttk.Label(fr, text="Fields", style="TLabel")
+        lbl_fields.grid(row=cur_row, column=0, padx=px, pady=py, sticky="nw")
+        guic.Tooltip(lbl_fields,
+                     "Name/value pairs describing this capture's conditions.\n"
+                     "Each name is usable as a {token} in the template and is\n"
+                     "written as a column in the run CSV, so the filename and\n"
+                     "the data row always agree.\n\n"
+                     "Retype just the value that changed between captures.")
+        self.fr_fields = tk.Frame(fr, bg=self.theme_config["light_4"])
+        self.fr_fields.grid(row=cur_row, column=1, columnspan=2, padx=px, pady=py, sticky="w")
+        self.capture_fields = []
+        cur_row += 1
+
+        tk.Button(fr, text="+ Field", width=8, command=self.add_capture_field).grid(
+            row=cur_row, column=1, padx=px, pady=py, sticky="w")
+        cur_row += 1
+
+        # --- what gets written ---
+        self.var_save_image = tk.IntVar(value=1)
+        ttk.Checkbutton(fr, text="Screenshot (PNG)", variable=self.var_save_image,
+                        onvalue=1, offvalue=0, command=self._refresh_capture_preview
+                        ).grid(row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
+        cur_row += 1
+
+        self.var_save_meas = tk.IntVar(value=1)
+        ttk.Checkbutton(fr, text="Measurements (CSV row)", variable=self.var_save_meas,
+                        onvalue=1, offvalue=0).grid(
+            row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
+        cur_row += 1
+
+        # --- preview + action ---
+        self.capture_preview = tk.Label(fr, text="", anchor="w", justify="left",
+                                        wraplength=240, relief="sunken", width=34)
+        self.capture_preview.grid(row=cur_row, column=0, columnspan=3,
+                                  padx=px, pady=(py, 3), sticky="w")
+        cur_row += 1
+
+        self.btn_capture = tk.Button(fr, text="CAPTURE", width=12, command=self.do_capture)
+        self.btn_capture.grid(row=cur_row, column=0, columnspan=2, padx=px, pady=py)
+        tk.Button(fr, text="Open Folder", width=11, command=self.open_run_folder).grid(
+            row=cur_row, column=2, padx=px, pady=py)
+
+        # Seed the two fields nearly every sweep needs; prefix feeds the
+        # default template, the second is the variable being swept.
+        self.add_capture_field("prefix", "capture")
+        self.add_capture_field("Vin", "")
+
+        self.capture_dir_var.trace_add("write", self._refresh_capture_preview)
+        self.capture_template_var.trace_add("write", self._refresh_capture_preview)
+        self._refresh_capture_preview()
+
+    def _configured_template(self):
+        """Starting template from master.ini [OSC], with a safe fallback."""
+        config_svc = getattr(self.cc, "config_svc", None)
+        if config_svc is None:
+            return capture_naming.DEFAULT_TEMPLATE
+        return config_svc.get_osc_capture_template()
+
+    def _default_run_dir(self):
+        """A dated run folder under the configured capture directory."""
+        config_svc = getattr(self.cc, "config_svc", None)
+        subdir = config_svc.get_osc_capture_dir() if config_svc else "osc_data"
+        root = path_helper.get_data_dir(subdir, create=False)
+        return os.path.join(root, datetime.now().strftime("%Y-%m-%d") + "_run")
+
+    def add_capture_field(self, name="", value=""):
+        """Append one name/value row to the fields table."""
+        row = len(self.capture_fields)
+        name_var = tk.StringVar(value=name)
+        value_var = tk.StringVar(value=value)
+
+        name_entry = tk.Entry(self.fr_fields, textvariable=name_var, width=10)
+        value_entry = tk.Entry(self.fr_fields, textvariable=value_var, width=12)
+        name_entry.grid(row=row, column=0, padx=2, pady=1)
+        value_entry.grid(row=row, column=1, padx=2, pady=1)
+
+        entry = {"name": name_var, "value": value_var,
+                 "widgets": [name_entry, value_entry]}
+        remove_btn = tk.Button(self.fr_fields, text="x", width=2,
+                               command=lambda e=entry: self.remove_capture_field(e))
+        remove_btn.grid(row=row, column=2, padx=2, pady=1)
+        entry["widgets"].append(remove_btn)
+
+        self.capture_fields.append(entry)
+        name_var.trace_add("write", self._refresh_capture_preview)
+        value_var.trace_add("write", self._refresh_capture_preview)
+        self._refresh_capture_preview()
+
+    def remove_capture_field(self, entry):
+        """Drop a field row and re-pack the ones below it."""
+        for widget in entry["widgets"]:
+            widget.destroy()
+        self.capture_fields.remove(entry)
+        for row, remaining in enumerate(self.capture_fields):
+            for column, widget in enumerate(remaining["widgets"]):
+                widget.grid(row=row, column=column, padx=2, pady=1)
+        self._refresh_capture_preview()
+
+    def _collect_fields(self):
+        """Fields as a {name: value} dict, skipping unnamed rows."""
+        fields = {}
+        for entry in self.capture_fields:
+            name = entry["name"].get().strip()
+            if name:
+                fields[name] = entry["value"].get().strip()
+        return fields
+
+    def _capture_model(self):
+        """Model name for the {model} token — the live one if connected."""
+        if self.cc.get_osc_status() and self.cc.osc is not None:
+            return self.cc.osc.model
+        return self.ate_drop[1].get()
+
+    def _refresh_capture_preview(self, *_):
+        """Show the name the next capture would get, or why it can't be built."""
+        try:
+            name = self.cc.osc_service.preview_capture_name(
+                self.capture_template_var.get(),
+                self._collect_fields(),
+                self.capture_dir_var.get().strip(),
+                model=self._capture_model())
+        except capture_naming.TemplateError as e:
+            self.capture_preview.config(text=f"Template error: {e}",
+                                        fg=self.theme_config["error"])
+            return
+
+        suffix = ".png" if self.var_save_image.get() else ""
+        self.capture_preview.config(text=f"Next: {name}{suffix}",
+                                    fg=self.theme_config["fg_light"])
+
+    def browse_run_dir(self):
+        chosen = filedialog.askdirectory(title="Capture run folder",
+                                         initialdir=os.path.dirname(self.capture_dir_var.get()))
+        if chosen:
+            self.capture_dir_var.set(chosen)
+
+    def open_run_folder(self):
+        run_dir = self.capture_dir_var.get().strip()
+        if not os.path.isdir(run_dir):
+            guih.alert_user("No such folder", f"{run_dir} does not exist yet", "warning")
+            return
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(run_dir)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", run_dir])
+            else:
+                subprocess.Popen(["xdg-open", run_dir])
+        except OSError as e:
+            guih.alert_user("Can't open folder", str(e), "error")
+
+    def do_capture(self):
+        """Validate on the GUI thread, then do the instrument I/O off it."""
+        if not self.cc.get_osc_status():
+            guih.alert_user("Can't capture", "No OSC connection!", "error")
+            return
+
+        fields = self._collect_fields()
+        for name in fields:
+            if not capture_naming.is_valid_field_name(name):
+                guih.alert_user("Invalid field name",
+                                f"'{name}' can't be a template token. Use letters, "
+                                f"digits and underscores, starting with a letter.",
+                                "error")
+                return
+
+        if not self.var_save_image.get() and not self.var_save_meas.get():
+            guih.alert_user("Nothing to capture",
+                            "Enable the screenshot, the measurements, or both.",
+                            "warning")
+            return
+
+        run_dir = self.capture_dir_var.get().strip()
+        if not run_dir:
+            guih.alert_user("Missing run folder", "Choose a run folder first", "error")
+            return
+
+        self.btn_capture.config(state="disabled")
+        self.prompt.print("Capturing...")
+        threading.Thread(
+            target=self._capture_worker,
+            args=(run_dir, self.capture_template_var.get(), fields,
+                  bool(self.var_save_image.get()), bool(self.var_save_meas.get())),
+            daemon=True).start()
+
+    def _capture_worker(self, run_dir, template, fields, save_image, save_meas):
+        """Runs off the GUI thread; a capture is dozens of round trips.
+
+        Tkinter drops exceptions raised in background threads, so anything
+        unexpected is caught here and reported through the prompt rather than
+        disappearing with a traceback on stderr.
+        """
+        try:
+            result = self.cc.osc_service.capture(
+                run_dir, template, fields,
+                save_image=save_image, save_measurements=save_meas)
+        except Exception as e:
+            logger.exception("Unhandled error during OSC capture")
+            self.after(0, lambda err=e: self._capture_failed(str(err)))
+            return
+        self.after(0, lambda: self._capture_done(result))
+
+    def _capture_failed(self, message):
+        self.btn_capture.config(state="normal")
+        self.prompt.print(f"Capture failed: {message}", "error")
+        guih.alert_user("Capture failed", message, "error")
+
+    def _capture_done(self, result):
+        self.btn_capture.config(state="normal")
+
+        for warning in result.warnings:
+            self.prompt.print(f"Warning: {warning}", "warning")
+
+        if not result.success:
+            self._capture_failed(result.error)
+            return
+
+        self.prompt.print(f"Capture {result.index}: {result.name}")
+        if result.image_path:
+            self.prompt.print(f"  image: {result.image_path}")
+        if result.csv_path:
+            self.prompt.print(f"  row appended to {result.csv_path}")
+        self._refresh_capture_preview()
+
+    # =========================================================================
     # Connection (port_init / port_close)
     # =========================================================================
     def port_init(self):
@@ -719,6 +1007,7 @@ class TabOSC(guic.ThemedFrame):
         self.fr_port.status = True
         self.fr_port.set_status(True)
         self.gui_refresh("connect")
+        self._refresh_capture_preview()
 
         if result.error:
             self.prompt.print(f"Warning: {result.error}", "warning")

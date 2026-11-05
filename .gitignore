@@ -1,8 +1,12 @@
 
+# runtime application logs
+logs/
+
 # data folder (user-generated logs and measurements)
 data/*.csv
 data/*.html
 data/*.log
+data/flash_dumps/
 
 
 # data subfolders

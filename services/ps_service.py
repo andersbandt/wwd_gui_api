@@ -35,7 +35,16 @@ class PSService(EquipmentService):
         return self.cc.ps
 
     def _post_connect(self, instance):
-        """Turn all outputs off after connecting (safety)."""
+        """Turn all outputs off after connecting (safety).
+
+        Controlled by [PS] output_off_on_connect in master.ini; set it to NO to
+        adopt the supply's existing output state instead (e.g. reconnecting to a
+        board that is already powered and must stay powered).
+        """
+        config_svc = getattr(self.cc, "config_svc", None)
+        if config_svc is not None and not config_svc.get_ps_output_off_on_connect():
+            return None
+
         try:
             instance.output_off(1)
             instance.output_off(2)
@@ -130,7 +139,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_voltage(channel)
-        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def read_current(self, channel):
@@ -144,7 +153,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_current(channel)
-        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def read_set_voltage(self, channel):
@@ -158,7 +167,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_set_voltage(channel)
-        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def read_set_current(self, channel):
@@ -172,7 +181,7 @@ class PSService(EquipmentService):
             return None
         try:
             return ps.get_set_current(channel)
-        except (*COMMUNICATION_ERRORS, ValueError, TypeError, Exception):
+        except COMMUNICATION_ERRORS + (ValueError, TypeError):  # malformed/desynced reply
             return None
 
     def get_status(self):

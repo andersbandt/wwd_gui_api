@@ -8,6 +8,17 @@ This project provides a GUI-based control system for interfacing with embedded t
 
 The application is called "WWD GUI API" and provides a tabbed interface for different control functions.
 
+### Companion firmware repo
+
+`/home/anders/Documents/NCS/WWD-n` is the Zephyr firmware for the WWD-n board this GUI
+talks to. The USB COMM tab's "Device Protocol" panel (`common/device_protocol.py`) is a
+hand-written client for a binary protocol whose canonical spec lives there:
+`src/comm/protocol.h`. **There is no shared source of truth or codegen between the two
+repos** — if `protocol.h`'s `enum protocol_cmd`/`enum protocol_err` changes, update
+`device_protocol.py`'s `CMD_*`/`ERR_NAMES` to match by hand, or the host will silently
+misparse. That repo has its own `CLAUDE.md`; read `src/comm/protocol_notes.md` there
+before doing protocol work from either side.
+
 ## Running the Application
 
 ### Installation
@@ -116,6 +127,7 @@ Supported equipment:
 - Siglent SPD3303X power supply (PyVISA)
 - OWON XDM1041 multimeter (serial)
 - Keysight DSOX4104A oscilloscope (PyVISA)
+- Tektronix MSO64 oscilloscope, 6 Series / 4 analog channels (PyVISA)
 - TI XDS110 debug probe (subprocess/scripts)
 - USB relay module (pyusb)
 - Fluke 8842A, HP 3478A multimeters
@@ -146,9 +158,40 @@ All log files are written to the `data/` directory with timestamped filenames.
 - `plotter.py` — Real-time plotting utilities
 - `csv_helper.py` — CSV file operations
 - `math_columns.py` — User-defined computed columns using safe expression evaluation (`simpleeval`)
-- `path_helper.py` — Centralized path management (`get_data_dir()`, `get_full_data_path()`)
+- `path_helper.py` — Centralized path management (`get_project_root()`, `resolve_path()`, `get_config_path()`, `get_data_dir()`, `get_full_data_path()`). All bundled resources (`config/`, `data/`, `EEequipment/`) resolve against the project root — derived from `__file__`, never `os.getcwd()` — so the app can be launched from any working directory. Never hardcode a relative path like `"config/master.ini"`; use `resolve_path()`.
+- `capture_naming.py` — filename templating for OSC captures. `render()` expands
+  a template like `{prefix}_Vin{Vin}_{n:03d}` from built-in tokens (`date`,
+  `time`, `datetime`, `n`, `model`) plus user-defined fields, sanitizing each
+  value for the filesystem; `next_index()` derives the capture counter from the
+  run CSV's row count so it survives a restart. A bad token raises
+  `TemplateError` rather than producing a surprising filename.
 - `subprocessor.py` — Subprocess execution utilities
 - `usb_api.py` — USB device enumeration
+- `device_protocol.py` — binary client for the WWD-n firmware's host command protocol
+  (`DeviceProtocol` class: ping/dump/erase/get_rate/set_rate). Hand-mirrors
+  `src/comm/protocol.h` in the companion firmware repo — see "Companion firmware repo"
+  above. Raises `ProtocolError` (framing/CRC/device-side errors) or its subclass
+  `ConnectionLostError` (the serial port itself dropped mid-operation — callers should
+  treat this as "tear down the connection," not just "retry").
+- `dump_decoder.py` — decodes a raw flash dump (`.bin`, from the Dump to File button)
+  into a pandas DataFrame (`decode_dump()`), plus an analysis layer and two plots.
+  Mirrors the on-flash record layout in the firmware's `src/memory/nvs.h` by hand,
+  same sync caveat as `device_protocol.py`.
+  - Decode gives one row per record. Two scope columns matter: `segment` is an
+    anchor interval (the firmware writes a TIME_ANCHOR every 5 min, so these tick
+    over constantly and are NOT boots), and `boot` is a power cycle, detected from
+    the kernel tick count going backwards because the firmware writes no
+    RESET_MARKER. Activity `session_seq` is RAM-only and restarts at 0 per boot, so
+    anything pairing sessions must scope by `boot`.
+  - `session_table()` / `wear_table()` / `time_allocation()` turn the edge-triggered
+    ACTIVITY and WEAR_STATE markers into spans and a time budget. `capture_duration()`
+    is the shared denominator — sums per segment so a reboot or a post-CMD_ERASE
+    anchor jump is never counted as elapsed time.
+  - `plot_dump()` stacks accel / gyro / temperature (IMU die and SoC die on one axis,
+    which is the point — see `record_soc_temp` in nvs.h) / steps, over a wear+session
+    context strip, with sessions shaded across every panel.
+    `plot_time_allocation()` is the wear-vs-activity budget as stacked bars. Both take
+    `show=False` so a caller can raise several figures with one `plt.show()`.
 
 ### Analysis
 
@@ -169,7 +212,7 @@ All log files are written to the `data/` directory with timestamped filenames.
 ### Configuration
 
 **config/** directory contains:
-- `master.ini` — Main config with sections: `[THEME]`, `[PATHS]`, `[AUTOCONNECT]`, `[DMM]`, `[USB]`, `[Target]`
+- `master.ini` — Main config with sections: `[THEME]`, `[PATHS]`, `[AUTOCONNECT]`, `[VISA]`, `[DMM]`, `[USB]`, `[LOGGER]`, `[PS]`, `[OSC]`, `[SHUTDOWN]`, `[Target]`. All reads go through `services/config_service.py` (`ConfigService`) so the file is parsed once; add a getter there rather than reading the file directly. `[PS] output_off_on_connect` (default YES) controls whether `PSService._post_connect` forces both outputs off on connect — set NO to adopt the supply's existing state. `[OSC] capture_template` / `capture_dir` seed the OSC tab's Capture panel (the tech edits the template per run in the tab).
 - `darcula.json` — Dark theme configuration
 - `light.json` — Light theme configuration
 - `ports_used.xml` — Tracks last used port and model for each equipment type (auto-generated)
@@ -184,13 +227,23 @@ Each tab is in `gui/guiTab_N_*.py`:
 1. **MAIN** (`guiTab_1_mainDashboard.py`, `TabMainDashboard`) — Main dashboard with overview status
 2. **DMM Control** (`guiTab_2_DMM.py`, `TabDMM`) — Digital multimeter control and data acquisition
 3. **XDS110 JTAG** (`guiTab_3_XDS110.py`, `tabXDS110`) — JTAG debug probe interface
-4. **USB COMM** (`guiTab_4_USB.py`, `TabUSB`) — USB serial communication
-5. **PS Control** (`guiTab_5_PS.py`, `TabPS`) — Power supply control (voltage/current settings)
+4. **USB COMM** (`guiTab_4_USB.py`, `TabUSB`) — USB serial console (ttyACM0) plus a
+   "Device Protocol" panel driving a second, independent serial connection (ttyACM1,
+   `cdc_acm_uart1` on the firmware side) for the binary command protocol: Ping, Dump to
+   File (+ View Dump decoder/plotter, + filename postfix field), Erase Flash, Set Data
+   Rates. See "Companion firmware repo" above and `common/device_protocol.py`.
+5. **PS Control** (`guiTab_5_PS.py`, `TabPS`) — Power supply control: per-channel voltage and current-limit setpoints (current entry honors the A/mA/uA unit dropdown; SPD3303X applies its calibration offset automatically)
 6. **FG Control** (`guiTab_6_FG.py`, `TabFG`) — Function generator control (waveform, frequency, duty cycle)
 7. **ATE** (`guiTab_7_ATE.py`, `TabATE`) — Automated test equipment sequencing
 8. **Logger** (`guiTab_8_LOG.py`, `TabLog`) — Data logging with various modes (timestamp, raw, data, math columns)
 9. **GRAPH** (`guiTab_9_GRAPH.py`, `TabGraph`) — Real-time graphing of measurements with preset support
-10. **OSC Control** (`guiTab_10_OSC.py`, `TabOSC`) — Oscilloscope control
+10. **OSC Control** (`guiTab_10_OSC.py`, `TabOSC`) — Oscilloscope control (channels,
+    timebase, trigger, acquisition, measurements) plus a **Capture** panel that saves
+    to the *host* filesystem: one click appends a measurement row to the run CSV and
+    optionally writes a screenshot PNG beside it. The filename template and the
+    user-defined fields feed both the filename and the CSV columns, so a sweep of
+    Vin/temperature/load stays self-describing. Orchestration lives in
+    `OscService.capture()`; naming in `common/capture_naming.py`.
 
 Each tab has:
 - Constructor that receives `(notebook, controller, basefilepath, theme_config, [autoconnect])`
@@ -246,6 +299,18 @@ git submodule update --init
 - **tests/** — pytest test suite (run with `pytest tests/`):
   - `test_dmm_drivers.py` — AST-based check that each DMM driver's model name matches a `CommandRegistry` entry; no hardware needed
   - `test_equipment_instantiation.py` — instantiates every `TestEquipment` subclass with connection I/O mocked out; catches unimplemented abstract methods
+  - `test_osc_capture.py` — capture filename templating and run-CSV behaviour
+    (counter, header widening when a field is added mid-run, screenshot failure
+    degrading to a warning); uses a fake scope, no hardware
+  - `test_osc_drivers.py` — drives every control the OSC tab exposes against a
+    recording fake connection for each scope model, so a missing `config.ini` key
+    fails in CI instead of under the tech's mouse; also pins the MSO64's
+    Keysight→Tek translations, waveform scaling and screenshot sequence
+  - `manual_osc_capture_check.py` — **not** collected by pytest; run it by hand with a
+    scope plugged in (`python3 tests/manual_osc_capture_check.py [--model MSO64]`) to
+    verify the parts the fakes can't: a real VISA session, a complete screenshot
+    transfer (it checks for the PNG `IEND` chunk, which is what catches a
+    termination-character truncation), live measurements and a two-capture run
   - New drivers are picked up automatically via `equipment_manager.get_instruments`
 - **conftest.py** — Adds project root to `sys.path` so pytest can import `EEequipment` and other packages
 
@@ -260,8 +325,108 @@ In `_collect_data_row` (Logger tab), always use `val if val is not None else "ER
 ### SPD3303X: first VISA connect fails with EOVERFLOW (Errno 75)
 The SPD3303X leaves stale data in the USBTMC bulk-in endpoint on disconnect. `PyVISAHandler.connect()` calls `inst.clear()` after `open_resource()` to drain it. This is wrapped in try/except so it silently skips on backends that don't support it. Don't remove this.
 
+### SPD3303X: calibration offset direction is inverted between set and read
+The SPD3303X applies per-channel calibration constants from its `config.ini` (`v_slope`/`v_offset`, `i_offset`). Voltage and current setpoints **add** the offset (`set_voltage`, `set_current` override in `SPD3303X.py`) while readbacks **subtract** it (`get_current` does `max(0.0, raw - i_offset)`). This is intentional and must stay symmetric: a requested 30 mA limit sends `0.030 + i_offset` so the effective regulated limit matches what the user asked for. Only the SPD3303X overrides `set_current`; the base `PowerSupply.set_current` sends the raw value with no offset. The PS tab's "Set Current" entry is interpreted in the channel's selected A/mA/uA unit before conversion to amps.
+
+### Equipment I/O is shared between threads — never write-then-read unguarded
+The Logger record thread and the PS tab's 10 s status poll (`_schedule_status_poll`)
+talk to the *same* instrument session concurrently. `ConnectionHandler` now owns a
+per-instance reentrant `io_lock`; `write()`/`read()`/`query()` take it, so a `query()`
+is atomic. A bare `conn.write(cmd)` followed by `conn.read()` is **not** atomic — the
+two halves can be split by another thread, which hands the wrong reply to the wrong
+caller (e.g. `SYST:STAT`'s `'0x4'` reaching `get_set_voltage`'s `float()`) and leaves an
+orphaned response in the USBTMC endpoint that surfaces later as `[Errno 75] Overflow`.
+Use `conn.query(cmd)`, or `with self.conn.transaction():` for genuine multi-step
+exchanges. Reader helpers in `services/` also catch `ValueError` so a malformed reply
+returns `None` (logged as `"ERROR"`) instead of killing the record thread.
+
+### Two oscilloscope SCPI dialects — never copy lines between the config.ini files
+`DSOX4104A/config.ini` is Keysight/InfiniiVision, `MSO64/config.ini` is TekScope.
+They disagree on spelling *and* meaning: Tek's `HORizontal:POSition` is a percentage
+of the record where Keysight's `:TIMebase:POSition` is seconds of delay; Tek's
+`TRIGger:A:TYPe` is the trigger kind while `TRIGger:A:MODe` is auto/normal, the
+opposite of Keysight's `MODE`/`SWEep` naming. The registry keys are mapped by
+*meaning*, and `MSO64.py` overrides the methods where behaviour (not just the
+string) differs. The OSC tab's dropdowns still emit Keysight words
+(`CHANnel1`, `POSitive`, `HRESolution`); `MSO64._TRIG_SOURCES`/`_TRIG_SLOPES`/
+`_ACQ_TYPES` translate them so one GUI drives both scopes.
+
+### MSO64 has no immediate-measurement query
+The 6 Series dropped `MEASUrement:IMMed`; every measurement is an object that must
+be added, pointed at a source, read, and deleted. `MSO64._measure_immediate()`
+allocates one scratch slot past the highest one already on screen (so it never
+clobbers the tech's own measurement badges), reuses it for the life of the
+connection, and deletes it in `disconnect()`. It also has to treat `NAN` as "no
+result" — `float("NAN")` succeeds, so the base class's 9.9E37 check alone lets a
+silent NaN through into the CSV.
+
+### Measurements are per-measurement tolerant, and a failure must resync the transport
+`Oscilloscope.measure_all()` takes each measurement through `measure(name, channel)`
+and turns an individual failure into `None` rather than aborting the channel. This is
+not defensive padding: on the DSO1014A a single query (`measure_vrms`, which carried
+the X-series' `DISPlay,AC` prefix that the 1000 series silently drops) timed out, and
+because the old `measure_all` was all-or-nothing, **every** measurement column vanished
+from the run CSV. An invalid *channel* still raises — that's a caller bug, and must not
+dissolve into a row of blanks.
+
+After any failed exchange, call `TestEquipment.recover()` (→ `ConnectionHandler.flush()`,
+`inst.clear()` on VISA). A timed-out query's reply stays queued on the instrument, so
+without the flush the *next* read gets the previous answer and every value after it is
+off by one — the same failure mode as the `[Errno 75] Overflow` note above, and the
+likely source of the `unpack_from ... buffer size is 0` seen after a measurement
+timeout. `OscService._measure_channel()` also gives up on a channel after
+`MAX_CONSECUTIVE_FAILURES`, since an unresponsive scope costs a full timeout per name.
+
+When adding a scope model, check each `measure_*` line against *that model's*
+programming guide rather than copying from another config.ini — the X-series and
+1000-series measurement syntax differ in argument lists, not just spelling, and a
+wrong one fails as a timeout rather than an error.
+
+### Screenshot format is detected, never assumed
+Scopes disagree on what `display_data` returns: the X-series streams a PNG in an
+IEEE block, the DSO1014A (1000 series) a BMP that may arrive with no block header
+and rejects the X-series' `PNG,COLor` arguments entirely. `Oscilloscope
+.get_screenshot()` unwraps the block only when one is present, and
+`screenshot_to_file()` picks the extension from the returned magic bytes
+(`IMAGE_MAGIC`), so a BMP never lands on disk named `.png`; unrecognisable data
+raises instead of writing a corrupt file. Because the real extension isn't known
+until the scope answers, `OscService.capture()` reserves the name across every
+`capture_naming.IMAGE_EXTENSIONS`.
+
+### Binary reads must drop the VISA termination character
+Waveform blocks and screenshot PNGs contain `0x0A` bytes. With `read_termination`
+set (every scope config.ini sets it), VISA stops the read at the first one and the
+image comes back truncated. `PyVISAHandler.read_raw()` clears the term char for the
+duration of the read and restores it after. Use `conn.query_raw(cmd)` for these —
+a bare `write()` + `read_raw()` pair is not atomic and hands the block to whichever
+thread reads next.
+
 ### USB tab serial output: ANSI escape codes from Zephyr
 The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).
+
+### Device Protocol dump/erase are not cancelable — don't hammer reconnect
+`DeviceProtocol.dump()`/`.erase()` are synchronous, blocking calls to the firmware with
+no cancel frame in the protocol. If a caller (or a quick test script) gives up early —
+short timeout, closing the port, retrying immediately — the firmware keeps
+streaming/erasing regardless, and the *next* connection's first read can pick up the
+tail of the previous operation's frames interleaved with new ones. This looks exactly
+like data corruption but isn't. Let an operation finish (or power-cycle the board)
+before starting a new one, especially when debugging the protocol directly rather than
+through the GUI buttons (which already serialize this via `_protocol_busy`). A full
+~2.2 MB dump takes on the order of a minute — see `src/comm/protocol_notes.md` in the
+companion firmware repo for why (`uart_poll_out` throughput, not a bug) and the
+`uart_fifo_fill` corruption bug that was tried and reverted there.
+
+### Background-thread errors need explicit handling, not just `except ProtocolError`
+Every Device Protocol command that runs on a background thread (Dump, Erase, Ping,
+Get/Set Rate) routes failures through `TabUSB._handle_protocol_exception()`, which
+catches `ConnectionLostError` specially (tears down the stale `DeviceProtocol`, resets
+the connection indicator) and falls back to a generic `except Exception` so an
+unanticipated failure surfaces in the prompt instead of dying silently in the thread
+(Tkinter does not propagate background-thread exceptions to the GUI — they just print a
+traceback to the terminal and vanish otherwise). If you add a new Device Protocol
+command handler, route it through this helper rather than a bare
+`except (ProtocolError, TimeoutError)`.
 
 ## Development Notes
 

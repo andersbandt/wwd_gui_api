@@ -17,9 +17,11 @@ import threading
 import traceback
 import xml.etree.ElementTree as ET
 
+from common.path_helper import resolve_path
+
 _logger = logging.getLogger(__name__)
 
-_PORTS_XML = os.path.join("config", "ports_used.xml")
+_PORTS_XML = resolve_path("config", "ports_used.xml")
 
 
 class ScriptStoppedError(Exception):

@@ -14,6 +14,7 @@ from gui import gui_class as guic
 # import user created modules
 from common import plotter
 from common.script_runner import ScriptRunner
+from common.path_helper import get_data_dir
 from analysis import stats_analysis
 
 # import needed packages
@@ -46,7 +47,7 @@ class TabATE(guic.ThemedFrame):
         self.ate = None
 
         # Script runner
-        self.scripts_dir = os.path.join("data", "scripts")
+        self.scripts_dir = get_data_dir("scripts", create=False)
         self.script_runner = ScriptRunner(self.cc, self._script_log)
 
         # set up prompt

@@ -247,3 +247,126 @@ def test_measurements_can_be_skipped_for_image_only_captures(tmp_path):
     assert result.csv_path is None
     assert os.path.exists(result.image_path)
     assert not os.path.exists(svc.run_csv_path(run_dir))
+
+
+# ------------------------------------------------------------- waveform ----
+
+class WaveScope(FakeScope):
+    """FakeScope that can also stop and hand back waveform data."""
+
+    def __init__(self, wave_error_channels=(), lengths=None, **kwargs):
+        super().__init__(**kwargs)
+        self.wave_error_channels = set(wave_error_channels)
+        self.lengths = lengths or {}
+        self.calls = []
+
+    def stop(self):
+        self.calls.append("stop")
+
+    def measure(self, name, channel):
+        self.calls.append("measure")
+        return super().measure(name, channel)
+
+    def get_waveform_data(self, channel, points=0, fmt="BYTE"):
+        self.calls.append(("wave", channel, fmt))
+        if channel in self.wave_error_channels:
+            raise TimeoutError("block read timed out")
+        n = self.lengths.get(channel, 5)
+        x_inc = 1e-9
+        return {"x": [i * x_inc for i in range(n)],
+                "y": [channel + 0.1 * i for i in range(n)],
+                "preamble": {"x_increment": x_inc, "x_origin": 0.0,
+                             "y_increment": 0.01}}
+
+
+def test_waveform_csv_shares_one_time_column(tmp_path):
+    scope = WaveScope(enabled=(1, 2))
+    svc = make_service(scope)
+    result = svc.capture(str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf"},
+                         save_image=False, save_waveform=True, waveform_format="csv")
+
+    assert result.success, result.error
+    assert result.waveform_path.endswith("wf_1.csv")
+    with open(result.waveform_path) as f:
+        rows = list(csv.DictReader(f))
+    assert list(rows[0]) == ["time_s", "CH1", "CH2"]
+    assert len(rows) == 5
+    assert float(rows[4]["CH2"]) == pytest.approx(2.4)
+    # 16-bit transfer, so a 12-bit scope's resolution isn't truncated.
+    assert ("wave", 1, "WORD") in scope.calls
+
+    with open(result.csv_path) as f:
+        assert list(csv.DictReader(f))[0]["waveform_file"] == "wf_1.csv"
+
+
+def test_waveform_stops_scope_before_measuring(tmp_path):
+    """Measurements and data must come from the same frozen acquisition."""
+    scope = WaveScope()
+    make_service(scope).capture(str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf"},
+                                save_image=False, save_waveform=True)
+    assert scope.calls[0] == "stop"
+    assert scope.calls.index("measure") < scope.calls.index(("wave", 1, "WORD"))
+
+
+def test_waveform_csv_unequal_lengths_get_own_time_columns(tmp_path):
+    scope = WaveScope(enabled=(1, 2), lengths={1: 5, 2: 3})
+    result = make_service(scope).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf"},
+        save_image=False, save_waveform=True)
+
+    with open(result.waveform_path) as f:
+        rows = list(csv.DictReader(f))
+    assert list(rows[0]) == ["time_CH1_s", "CH1", "time_CH2_s", "CH2"]
+    assert len(rows) == 5
+    assert rows[4]["CH2"] == ""          # padded, not invented
+
+
+def test_waveform_mat_contents(tmp_path):
+    scipy_io = pytest.importorskip("scipy.io")
+    scope = WaveScope(enabled=(1, 3))
+    result = make_service(scope).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf", "Vin": "12"},
+        save_image=False, save_waveform=True, waveform_format="mat")
+
+    assert result.waveform_path.endswith("wf_1.mat")
+    mat = scipy_io.loadmat(result.waveform_path, squeeze_me=True)
+    assert mat["t"].shape == (5,)
+    assert mat["CH3"][0] == pytest.approx(3.0)
+    assert mat["fs"] == pytest.approx(1e9)
+    assert list(mat["channels"]) == [1, 3]
+    assert mat["meta"]["Vin"] == "12"
+    assert mat["meta"]["model"] == "MSO64"
+
+
+def test_one_failed_channel_download_keeps_the_others(tmp_path):
+    scope = WaveScope(enabled=(1, 2), wave_error_channels=(2,))
+    result = make_service(scope).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf"},
+        save_image=False, save_waveform=True)
+
+    assert result.success
+    assert any("CH2 waveform download failed" in w for w in result.warnings)
+    with open(result.waveform_path) as f:
+        assert list(csv.DictReader(f))[0].keys() == {"time_s", "CH1"}
+
+
+def test_all_downloads_failing_degrades_to_warning(tmp_path):
+    scope = WaveScope(wave_error_channels=(1,))
+    result = make_service(scope).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf"},
+        save_image=False, save_waveform=True)
+
+    assert result.success, "measurements must survive a failed waveform download"
+    assert result.waveform_path is None
+    assert any("Waveform not saved" in w for w in result.warnings)
+    with open(result.csv_path) as f:
+        assert "waveform_file" not in list(csv.DictReader(f))[0]
+
+
+def test_unknown_waveform_format_fails_before_touching_scope(tmp_path):
+    scope = WaveScope()
+    result = make_service(scope).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "wf"},
+        save_waveform=True, waveform_format="dat")
+    assert not result.success
+    assert scope.calls == []

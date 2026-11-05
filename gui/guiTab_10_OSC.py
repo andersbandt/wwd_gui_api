@@ -17,6 +17,7 @@ from EEequipment import equipment_manager
 from EEequipment.equipment_manager import COMMUNICATION_ERRORS
 from common import capture_naming
 from common import path_helper
+from common import waveform_export
 
 # import user defined GUI modules
 from gui import gui_helper as guih
@@ -260,26 +261,38 @@ class TabOSC(guic.ThemedFrame):
                   ).grid(row=cur_row, column=2, padx=5, pady=3)
         cur_row += 1
 
-        # --- Save / Recall ---
-        ttk.Label(fr, text="Save / Recall", style="TPinkLabel.TLabel").grid(
+        # --- Quick actions ---
+        tk.Button(fr, text="Autoscale", width=10, command=self.autoscale).grid(
+            row=cur_row, column=0, padx=5, pady=(10, 3))
+        btn_shot = tk.Button(fr, text="Screenshot", width=10, command=self.save_screenshot)
+        btn_shot.grid(row=cur_row, column=1, padx=5, pady=(10, 3))
+        guic.Tooltip(btn_shot,
+                     "Save the scope screen as a PNG on this PC, in the Capture\n"
+                     "run folder, named screen_<date>_<time>.png.\n\n"
+                     "For named screenshots alongside data, use CAPTURE instead.")
+        cur_row += 1
+
+        # --- Scope setup files (stored on the scope, not this PC) ---
+        ttk.Label(fr, text="Scope Setup", style="TPinkLabel.TLabel").grid(
             row=cur_row, column=0, columnspan=3, pady=(10, 5))
         cur_row += 1
 
+        lbl_setup = ttk.Label(fr, text="File on scope", style="TLabel")
+        lbl_setup.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        guic.Tooltip(lbl_setup,
+                     "Path of a setup file on the SCOPE's own drive, not this PC.\n\n"
+                     "Save Setup stores the scope's current settings (channels,\n"
+                     "timebase, trigger, measurements) to this file.\n"
+                     "Recall Setup loads them back.\n\n"
+                     "MSO64 example: C:/bench_setup.set")
         self.save_filename_entry = tk.Entry(fr, width=18)
-        self.save_filename_entry.grid(row=cur_row, column=0, columnspan=2, padx=5, pady=3, sticky="W")
+        self.save_filename_entry.grid(row=cur_row, column=1, columnspan=2, padx=5, pady=3, sticky="W")
         cur_row += 1
 
-        tk.Button(fr, text="Screenshot", width=10, command=self.save_screenshot).grid(
-            row=cur_row, column=0, padx=5, pady=3)
         tk.Button(fr, text="Save Setup", width=10, command=self.save_setup).grid(
             row=cur_row, column=1, padx=5, pady=3)
         tk.Button(fr, text="Recall Setup", width=10, command=self.recall_setup).grid(
             row=cur_row, column=2, padx=5, pady=3)
-        cur_row += 1
-
-        # --- Autoscale ---
-        tk.Button(fr, text="Autoscale", width=10, command=self.autoscale).grid(
-            row=cur_row, column=0, padx=5, pady=(10, 3))
         cur_row += 1
 
         # --- Quick Measurements ---
@@ -630,18 +643,14 @@ class TabOSC(guic.ThemedFrame):
     def save_screenshot(self):
         """One-off screenshot onto *this* machine, outside the capture flow.
 
-        Save/Recall Setup below still work on the scope's own filesystem --
-        setups are only useful there -- but an image is wanted on the host,
-        so this writes into the capture run folder.
+        Always auto-named into the capture run folder. (The "File on scope"
+        entry belongs to Save/Recall Setup only -- setups live on the scope's
+        own drive, while images are wanted on the host.)
         """
         if not self.cc.get_osc_status():
             guih.alert_user("Can't save screenshot", "No OSC connection!", "error")
             return
-        filename = self.save_filename_entry.get().strip()
-        if not filename:
-            filename = "screen_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-        if not filename.lower().endswith(".png"):
-            filename += ".png"
+        filename = "screen_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".png"
 
         run_dir = self.capture_dir_var.get().strip() or self._default_run_dir()
         try:
@@ -658,7 +667,9 @@ class TabOSC(guic.ThemedFrame):
             return
         filename = self.save_filename_entry.get().strip()
         if not filename:
-            guih.alert_user("Missing filename", "Enter a filename first", "error")
+            guih.alert_user("Missing filename",
+                            "Enter a setup file path on the scope first "
+                            "(e.g. C:/bench_setup.set)", "error")
             return
         try:
             self.cc.osc.save_setup(filename)
@@ -672,7 +683,9 @@ class TabOSC(guic.ThemedFrame):
             return
         filename = self.save_filename_entry.get().strip()
         if not filename:
-            guih.alert_user("Missing filename", "Enter a filename first", "error")
+            guih.alert_user("Missing filename",
+                            "Enter the setup file path on the scope first "
+                            "(e.g. C:/bench_setup.set)", "error")
             return
         try:
             self.cc.osc.recall_setup(filename)
@@ -785,6 +798,24 @@ class TabOSC(guic.ThemedFrame):
             row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
         cur_row += 1
 
+        self.var_save_wave = tk.IntVar(value=0)
+        chk_wave = ttk.Checkbutton(fr, text="Waveform data", variable=self.var_save_wave,
+                                   onvalue=1, offvalue=0, command=self._refresh_capture_preview)
+        chk_wave.grid(row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
+        guic.Tooltip(chk_wave,
+                     "Download every enabled channel's full record and save it as\n"
+                     "<capture name>.csv or .mat next to the screenshot.\n\n"
+                     "This STOPS the scope first so the measurements, screenshot\n"
+                     "and data all come from the same acquisition. Press Run\n"
+                     "afterwards to resume.\n\n"
+                     "Long records are slow: ~10M points per channel can take\n"
+                     "several seconds each over USB.")
+        drop_fmt, self.var_wave_fmt = guih.generate_drop_down(
+            fr, list(waveform_export.FORMATS), self._refresh_capture_preview,
+            self.theme_config, width=4)
+        drop_fmt.grid(row=cur_row, column=2, padx=px, sticky="w")
+        cur_row += 1
+
         # --- preview + action ---
         self.capture_preview = tk.Label(fr, text="", anchor="w", justify="left",
                                         wraplength=240, relief="sunken", width=34)
@@ -881,7 +912,12 @@ class TabOSC(guic.ThemedFrame):
                                         fg=self.theme_config["error"])
             return
 
-        suffix = ".png" if self.var_save_image.get() else ""
+        exts = []
+        if self.var_save_image.get():
+            exts.append(".png")
+        if self.var_save_wave.get():
+            exts.append("." + self.var_wave_fmt.get())
+        suffix = " + ".join(exts)
         self.capture_preview.config(text=f"Next: {name}{suffix}",
                                     fg=self.theme_config["fg_light"])
 
@@ -921,9 +957,10 @@ class TabOSC(guic.ThemedFrame):
                                 "error")
                 return
 
-        if not self.var_save_image.get() and not self.var_save_meas.get():
+        if not (self.var_save_image.get() or self.var_save_meas.get()
+                or self.var_save_wave.get()):
             guih.alert_user("Nothing to capture",
-                            "Enable the screenshot, the measurements, or both.",
+                            "Enable the screenshot, measurements, or waveform data.",
                             "warning")
             return
 
@@ -937,10 +974,12 @@ class TabOSC(guic.ThemedFrame):
         threading.Thread(
             target=self._capture_worker,
             args=(run_dir, self.capture_template_var.get(), fields,
-                  bool(self.var_save_image.get()), bool(self.var_save_meas.get())),
+                  bool(self.var_save_image.get()), bool(self.var_save_meas.get()),
+                  bool(self.var_save_wave.get()), self.var_wave_fmt.get()),
             daemon=True).start()
 
-    def _capture_worker(self, run_dir, template, fields, save_image, save_meas):
+    def _capture_worker(self, run_dir, template, fields, save_image, save_meas,
+                        save_wave, wave_fmt):
         """Runs off the GUI thread; a capture is dozens of round trips.
 
         Tkinter drops exceptions raised in background threads, so anything
@@ -950,7 +989,8 @@ class TabOSC(guic.ThemedFrame):
         try:
             result = self.cc.osc_service.capture(
                 run_dir, template, fields,
-                save_image=save_image, save_measurements=save_meas)
+                save_image=save_image, save_measurements=save_meas,
+                save_waveform=save_wave, waveform_format=wave_fmt)
         except Exception as e:
             logger.exception("Unhandled error during OSC capture")
             self.after(0, lambda err=e: self._capture_failed(str(err)))
@@ -975,6 +1015,9 @@ class TabOSC(guic.ThemedFrame):
         self.prompt.print(f"Capture {result.index}: {result.name}")
         if result.image_path:
             self.prompt.print(f"  image: {result.image_path}")
+        if result.waveform_path:
+            self.prompt.print(f"  waveform: {result.waveform_path}")
+            self.prompt.print("  scope left stopped -- press Run to resume")
         if result.csv_path:
             self.prompt.print(f"  row appended to {result.csv_path}")
         self._refresh_capture_preview()

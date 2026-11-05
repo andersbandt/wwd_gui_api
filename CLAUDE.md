@@ -165,6 +165,10 @@ All log files are written to the `data/` directory with timestamped filenames.
   value for the filesystem; `next_index()` derives the capture counter from the
   run CSV's row count so it survives a restart. A bad token raises
   `TemplateError` rather than producing a surprising filename.
+- `waveform_export.py` — writes scope waveforms (driver `get_waveform_data()` dicts) to
+  CSV (`time_s, CH1, ...`) or MATLAB `.mat` (`t`, `CHn`, `fs`, `meta` struct). Used by
+  the OSC Capture panel's "Waveform data" option, which stops the scope first so the
+  measurements, screenshot and data share one acquisition, and downloads WORD (16-bit).
 - `subprocessor.py` — Subprocess execution utilities
 - `usb_api.py` — USB device enumeration
 - `device_protocol.py` — binary client for the WWD-n firmware's host command protocol

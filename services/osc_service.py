@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from common import capture_naming
 from common import path_helper
+from common import waveform_export
 from services.equipment_service import EquipmentService, COMMUNICATION_ERRORS
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class CaptureResult:
     index: Optional[int] = None
     csv_path: Optional[str] = None
     image_path: Optional[str] = None
+    waveform_path: Optional[str] = None
     error: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
 
@@ -133,7 +135,7 @@ class OscService(EquipmentService):
         if osc is None:
             return None
         try:
-            return osc.get_waveform(channel)
+            return osc.get_waveform_data(channel)
         except COMMUNICATION_ERRORS:
             return None
 
@@ -165,7 +167,8 @@ class OscService(EquipmentService):
         return os.path.join(run_dir, f"{os.path.basename(os.path.normpath(run_dir))}.csv")
 
     def capture(self, run_dir, template, fields, channels=None,
-                save_image=True, save_measurements=True):
+                save_image=True, save_measurements=True,
+                save_waveform=False, waveform_format="csv"):
         """Record one capture: a row of measurements and, optionally, a PNG.
 
         Args:
@@ -178,8 +181,12 @@ class OscService(EquipmentService):
                 scope currently has displayed.
             save_image: also pull a screenshot back from the scope.
             save_measurements: append the measurement row to the run CSV.
+            save_waveform: also download each channel's waveform and write it
+                to `<name>.<waveform_format>` ("csv" or "mat"). This stops the
+                scope first, so the measurements, screenshot and data all come
+                from the same acquisition; the scope is left stopped.
 
-        Returns a CaptureResult. A screenshot failure degrades to a warning
+        Returns a CaptureResult. A screenshot or waveform failure degrades to a warning
         rather than losing the measurements that were already read.
         """
         osc = self._get_from_controller()
@@ -205,6 +212,18 @@ class OscService(EquipmentService):
         if not channels:
             return CaptureResult(
                 False, error="No channels enabled — nothing to measure")
+
+        if save_waveform:
+            if waveform_format not in waveform_export.FORMATS:
+                return CaptureResult(
+                    False, error=f"Unknown waveform format '{waveform_format}'")
+            # Freeze the display before anything is read. The download would
+            # stop the scope anyway, but only after the measurements and
+            # screenshot had seen a different, still-running acquisition.
+            try:
+                osc.stop()
+            except COMMUNICATION_ERRORS as e:
+                return CaptureResult(False, error=f"Can't stop the scope: {e}")
 
         row = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -239,19 +258,62 @@ class OscService(EquipmentService):
                 warnings.append(f"Screenshot failed: {e}")
                 image_path = None
 
+        waveform_path = None
+        if save_waveform:
+            waveform_path = self._save_waveform(
+                osc, channels, os.path.join(run_dir, f"{name}.{waveform_format}"),
+                waveform_format, meta={**row}, warnings=warnings)
+            if waveform_path:
+                row["waveform_file"] = os.path.basename(waveform_path)
+
         if save_measurements:
             try:
                 self._append_row(csv_path, row)
             except OSError as e:
                 return CaptureResult(False, name=name, index=index,
                                      image_path=image_path,
+                                     waveform_path=waveform_path,
                                      error=f"Can't write {csv_path}: {e}",
                                      warnings=warnings)
         else:
             csv_path = None
 
         return CaptureResult(True, name=name, index=index, csv_path=csv_path,
-                             image_path=image_path, warnings=warnings)
+                             image_path=image_path, waveform_path=waveform_path,
+                             warnings=warnings)
+
+    @staticmethod
+    def _save_waveform(osc, channels, path, fmt, meta, warnings):
+        """Download every channel and write one file. Returns its path or None.
+
+        A channel that fails to download is reported in `warnings` and left
+        out; the others are still written.
+        """
+        waves = {}
+        for ch in channels:
+            try:
+                # WORD (16-bit) keeps the full ADC / high-res resolution;
+                # BYTE would truncate a 12-bit scope to 8 bits.
+                waves[ch] = osc.get_waveform_data(ch, fmt="WORD")
+            except Exception as e:
+                logger.warning(f"CH{ch} waveform download failed: "
+                               f"{type(e).__name__}: {e}")
+                warnings.append(f"CH{ch} waveform download failed: {e}")
+                try:
+                    osc.recover()
+                except Exception as recover_error:
+                    logger.debug(f"recover() failed: {recover_error}")
+
+        if not waves:
+            warnings.append("Waveform not saved: no channel downloaded")
+            return None
+
+        try:
+            path = capture_naming.unique_path(path)
+            return waveform_export.write(path, waves, fmt, meta=meta)
+        except (OSError, ValueError) as e:
+            warnings.append(f"Waveform not saved: {e}")
+            return None
 
     @staticmethod
     def _measure_channel(osc, channel):

@@ -300,6 +300,7 @@ git submodule update --init
 - **todo.md** — Development task tracker with open issues, refactoring priorities, and architecture improvement plans. This is the primary task/TODO list.
 - **scripting.md** — Design notes for a planned scripting/automation system.
 - **docs/** — Screenshots and documentation assets.
+- **scope_debug.py** — step-by-step VISA/oscilloscope connection debugger (backends → resources → network ports → raw `*IDN?` → app connect path → optional capture flow). Stops at the first failing layer with a hint. Run `python scope_debug.py --help`.
 - **tests/** — pytest test suite (run with `pytest tests/`):
   - `test_dmm_drivers.py` — AST-based check that each DMM driver's model name matches a `CommandRegistry` entry; no hardware needed
   - `test_equipment_instantiation.py` — instantiates every `TestEquipment` subclass with connection I/O mocked out; catches unimplemented abstract methods

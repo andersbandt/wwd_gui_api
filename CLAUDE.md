@@ -406,6 +406,9 @@ duration of the read and restores it after. Use `conn.query_raw(cmd)` for these 
 a bare `write()` + `read_raw()` pair is not atomic and hands the block to whichever
 thread reads next.
 
+### MSO64: `*OPC?` hangs behind a pending Single acquisition
+On Tek 4/5/6 Series, `*OPC?` doesn't answer until every OPC-generating operation finishes, including a Single acquisition still waiting for its trigger. `MSO64._wait_opc()` checks `BUSY?` first and skips the wait when busy (the screenshot path falls back to a fixed sleep). Don't send a bare `*OPC?` from the MSO64 driver. The driver also sends `HEADer OFF` / `VERBose ON` on connect so replies are bare values. Screenshot failures include the scope's own `ALLEv?` message. To pinpoint a hang on hardware: `python scope_debug.py --address <addr> --trace`.
+
 ### USB tab serial output: ANSI escape codes from Zephyr
 The USB tab's `display_serial_data` uses `prompt.print_ansi()` instead of `prompt.print()`. Zephyr's logging emits ANSI SGR color codes (`\x1b[1;31m` etc.). `print_ansi()` strips the escape sequences and maps them to Tkinter text tags so log levels render in color (red=error, yellow=warning, green=info).
 

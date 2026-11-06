@@ -168,7 +168,7 @@ class OscService(EquipmentService):
 
     def capture(self, run_dir, template, fields, channels=None,
                 save_image=True, save_measurements=True,
-                save_waveform=False, waveform_format="csv"):
+                save_waveform=False, waveform_format="csv", progress=None):
         """Record one capture: a row of measurements and, optionally, a PNG.
 
         Args:
@@ -181,6 +181,9 @@ class OscService(EquipmentService):
                 scope currently has displayed.
             save_image: also pull a screenshot back from the scope.
             save_measurements: append the measurement row to the run CSV.
+            progress: optional callable(str), called before each slow step so
+                a GUI can show what the capture is doing. Called from the
+                capturing thread.
             save_waveform: also download each channel's waveform and write it
                 to `<name>.<waveform_format>` ("csv" or "mat"). This stops the
                 scope first, so the measurements, screenshot and data all come
@@ -192,6 +195,13 @@ class OscService(EquipmentService):
         osc = self._get_from_controller()
         if osc is None or not self.get_status():
             return CaptureResult(False, error="No OSC connection")
+
+        def report(msg):
+            if progress is not None:
+                try:
+                    progress(msg)
+                except Exception as e:
+                    logger.debug(f"capture progress callback failed: {e}")
 
         warnings = []
         model = getattr(osc, "model", "")
@@ -235,17 +245,30 @@ class OscService(EquipmentService):
         row.update(fields or {})
 
         if save_measurements:
+            unresponsive = False
             for ch in channels:
-                values, failed = self._measure_channel(osc, ch)
+                if unresponsive:
+                    # Every query on the previous channel failed: the scope
+                    # isn't answering measurement queries at all, and each
+                    # further attempt is another full timeout.
+                    values = {name: None for name in osc.MEASUREMENTS}
+                    failed = list(values)
+                    warnings.append(f"CH{ch}: measurements skipped -- the scope "
+                                    f"did not answer any on the previous channel")
+                else:
+                    report(f"Measuring CH{ch}...")
+                    values, failed = self._measure_channel(osc, ch)
+                    if failed:
+                        warnings.append(
+                            f"CH{ch}: {len(failed)}/{len(values)} measurements failed "
+                            f"({', '.join(failed)})")
+                    unresponsive = len(failed) == len(values)
                 for key, val in values.items():
                     row[f"CH{ch}_{key}"] = "" if val is None else val
-                if failed:
-                    warnings.append(
-                        f"CH{ch}: {len(failed)}/{len(values)} measurements failed "
-                        f"({', '.join(failed)})")
 
         image_path = None
         if save_image:
+            report("Saving screenshot...")
             try:
                 # The extension is provisional: screenshot_to_file corrects it
                 # to whatever the scope actually sent, so the name has to be
@@ -262,7 +285,7 @@ class OscService(EquipmentService):
         if save_waveform:
             waveform_path = self._save_waveform(
                 osc, channels, os.path.join(run_dir, f"{name}.{waveform_format}"),
-                waveform_format, meta={**row}, warnings=warnings)
+                waveform_format, meta={**row}, warnings=warnings, report=report)
             if waveform_path:
                 row["waveform_file"] = os.path.basename(waveform_path)
 
@@ -283,7 +306,7 @@ class OscService(EquipmentService):
                              warnings=warnings)
 
     @staticmethod
-    def _save_waveform(osc, channels, path, fmt, meta, warnings):
+    def _save_waveform(osc, channels, path, fmt, meta, warnings, report=lambda msg: None):
         """Download every channel and write one file. Returns its path or None.
 
         A channel that fails to download is reported in `warnings` and left
@@ -291,6 +314,7 @@ class OscService(EquipmentService):
         """
         waves = {}
         for ch in channels:
+            report(f"Downloading CH{ch} waveform...")
             try:
                 # WORD (16-bit) keeps the full ADC / high-res resolution;
                 # BYTE would truncate a 12-bit scope to 8 bits.

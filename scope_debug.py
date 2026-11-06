@@ -13,12 +13,17 @@ one that fails with a hint about what to fix:
     6. Capture flow    -- (--capture) channels, a measurement, a screenshot, a
                           short waveform, then a real Capture into a run folder
 
+    --trace (Tek scopes) runs between 4 and 5: the measurement and screenshot
+    command sequences sent one raw command at a time with timings, BUSY? and
+    the scope's event queue -- shows exactly which command hangs and why.
+
 Examples:
     python scope_debug.py                                   # steps 1-2 only
     python scope_debug.py --address TCPIP0::10.44.176.100::inst0::INSTR
     python scope_debug.py --address USB0::0x0699::...::INSTR --capture
     python scope_debug.py --auto --capture --waveform       # first non-serial resource
     python scope_debug.py --address ... --backend @py       # try another backend
+    python scope_debug.py --address ... --trace             # pinpoint a hang
 
 Step 6 leaves the scope stopped (waveform reads stop it) and saves into
 data/osc_data/debug_<timestamp> unless --run-dir is given.
@@ -334,6 +339,131 @@ def _try_recover(scope):
         pass
 
 
+# ------------------------------------------------------------- trace ----
+
+class _Tracer:
+    """Send Tek commands one at a time, timing each, and log what happens.
+
+    Plain pyvisa, no app code, so a hang here is the scope or VISA -- not the
+    driver's locking or retry logic.
+    """
+
+    def __init__(self, inst):
+        self.inst = inst
+        self.first_failure = None
+
+    def _run(self, label, fn):
+        t0 = time.monotonic()
+        try:
+            result = fn()
+        except Exception as e:
+            ms = (time.monotonic() - t0) * 1000
+            print(f"  [FAIL] {label:52s} {ms:6.0f} ms  {type(e).__name__}: {e}")
+            if self.first_failure is None:
+                self.first_failure = label
+            try:
+                self.inst.clear()        # drop any half-sent reply
+            except Exception:
+                pass
+            return None
+        ms = (time.monotonic() - t0) * 1000
+        shown = result if isinstance(result, str) else ""
+        print(f"  [ OK ] {label:52s} {ms:6.0f} ms  {shown}")
+        return result
+
+    def write(self, cmd):
+        return self._run(cmd, lambda: (self.inst.write(cmd), "")[1])
+
+    def query(self, cmd):
+        r = self._run(cmd, lambda: self.inst.query(cmd).strip())
+        return r
+
+    def query_raw(self, cmd):
+        def go():
+            saved = self.inst.read_termination
+            self.inst.read_termination = None
+            try:
+                self.inst.write(cmd)
+                return self.inst.read_raw()
+            finally:
+                self.inst.read_termination = saved
+        data = self._run(cmd + "  (binary read)", go)
+        if data is not None:
+            kind = "PNG" if data.startswith(b"\x89PNG") else f"unknown, starts {data[:8]!r}"
+            info(f"         got {len(data)} bytes, {kind}")
+        return data
+
+    def events(self):
+        """Tek's event queue: where rejected commands and bad paths end up."""
+        self.query("*ESR?")
+        return self.query("ALLEv?")
+
+
+def step_trace(rm, address, timeout_ms, screenshot_path):
+    header("Trace: Tek command sequences, one command at a time")
+    info(f"per-command timeout {timeout_ms} ms. The first [FAIL] is the culprit;")
+    info("BUSY? = 1 means a Single acquisition is pending and *OPC? will hang.")
+    try:
+        inst = rm.open_resource(address)
+    except Exception as e:
+        fail(f"open_resource failed: {e}")
+        return False
+    inst.timeout = timeout_ms
+    inst.read_termination = "\n"
+    inst.write_termination = "\n"
+    t = _Tracer(inst)
+
+    try:
+        print("\n  -- session state --")
+        t.query("HEADer?")
+        t.query("VERBose?")
+        t.write("HEADer OFF")
+        t.write("VERBose ON")
+        t.query("ACQuire:STATE?")
+        t.query("ACQuire:STOPAfter?")
+        t.query("BUSY?")
+        t.events()
+        displayed = []
+        for ch in range(1, 5):
+            if t.query(f"DISplay:GLObal:CH{ch}:STATE?") == "1":
+                displayed.append(ch)
+        ch = displayed[0] if displayed else 1
+
+        print(f"\n  -- measurement (CH{ch}, Vpp) --")
+        listing = t.query("MEASUrement:LIST?") or ""
+        used = [int("".join(c for c in n if c.isdigit()))
+                for n in listing.split(",") if any(c.isdigit() for c in n)]
+        slot = max(used) + 1 if used else 1
+        t.write(f'MEASUrement:ADDNew "MEAS{slot}"')
+        t.write(f"MEASUrement:MEAS{slot}:TYPe PK2PK")
+        t.write(f"MEASUrement:MEAS{slot}:SOUrce CH{ch}")
+        t.query("BUSY?")
+        t.query("*OPC?")
+        t.query(f"MEASUrement:MEAS{slot}:RESUlts:CURRentacq:MEAN?")
+        t.events()
+        t.write(f'MEASUrement:DELete "MEAS{slot}"')
+
+        print("\n  -- screenshot --")
+        t.write(f'SAVe:IMAGe "{screenshot_path}"')
+        t.query("BUSY?")
+        t.query("*OPC?")
+        t.query_raw(f'FILESystem:READFile "{screenshot_path}"')
+        t.write(f'FILESystem:DELEte "{screenshot_path}"')
+        t.events()
+    finally:
+        try:
+            inst.close()
+        except Exception:
+            pass
+
+    if t.first_failure:
+        fail(f"first failing command: {t.first_failure}",
+             "Send me this whole trace output.")
+        return False
+    ok("every command in both sequences answered")
+    return True
+
+
 # ----------------------------------------------------------------- main ----
 
 def main():
@@ -351,6 +481,10 @@ def main():
     parser.add_argument("--waveform", action="store_true",
                         help="include full waveform data in the step-6 capture")
     parser.add_argument("--run-dir", help="where step 6 saves files")
+    parser.add_argument("--trace", action="store_true",
+                        help="send the Tek measurement/screenshot commands one by one")
+    parser.add_argument("--trace-timeout", type=int, default=5000,
+                        help="per-command timeout for --trace, ms (default 5000)")
     args = parser.parse_args()
 
     from services.config_service import ConfigService
@@ -384,6 +518,13 @@ def main():
         return 1
     if not step_raw_idn(rm, address, args.timeout):
         return 1
+    if args.trace:
+        from EEequipment.TestEquipment import get_registry
+        try:
+            shot = get_registry().get_command(args.model, "command", "screenshot_path")
+        except Exception:
+            shot = "C:/Temp.png"
+        step_trace(rm, address, args.trace_timeout, shot)
 
     service = step_driver_connect(address, args.model)
     if service is None:

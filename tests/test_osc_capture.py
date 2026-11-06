@@ -370,3 +370,24 @@ def test_unknown_waveform_format_fails_before_touching_scope(tmp_path):
         save_waveform=True, waveform_format="dat")
     assert not result.success
     assert scope.calls == []
+
+
+def test_unresponsive_scope_skips_remaining_channels(tmp_path):
+    """One channel where nothing answers means the rest would only time out too."""
+    scope = FakeScope(enabled=(1, 2, 3), failing=FakeScope.MEASUREMENTS)
+    result = make_service(scope).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "x"}, save_image=False)
+
+    assert result.success
+    assert any("CH2: measurements skipped" in w for w in result.warnings)
+    assert any("CH3: measurements skipped" in w for w in result.warnings)
+    with open(result.csv_path) as f:
+        row = list(csv.DictReader(f))[0]
+    assert row["CH3_vpp"] == ""
+
+
+def test_capture_reports_progress(tmp_path):
+    seen = []
+    make_service(FakeScope(enabled=(1, 2))).capture(
+        str(tmp_path / "run"), "{prefix}_{n}", {"prefix": "x"}, progress=seen.append)
+    assert seen == ["Measuring CH1...", "Measuring CH2...", "Saving screenshot..."]

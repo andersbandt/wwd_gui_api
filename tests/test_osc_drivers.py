@@ -308,3 +308,61 @@ def test_screenshot_rejects_data_that_is_not_an_image(tmp_path):
     with pytest.raises(ValueError, match="recognisable image"):
         scope.screenshot_to_file(str(tmp_path / "shot.png"))
     assert os.listdir(tmp_path) == []
+
+
+# --------------------------------------------- MSO64 hang / error handling --
+
+def test_mso64_sets_bare_replies_on_connect():
+    """HEADer ON would prefix every reply and break every float()."""
+    conn = RecordingConn()
+    scope = make_scope(MSO64, conn)
+    scope._configure_session()
+    assert conn.sent("HEADer OFF")
+    assert conn.sent("VERBose ON")
+
+
+def test_mso64_measurement_skips_opc_while_a_single_is_pending():
+    """*OPC? waits for the pending trigger, so sending it would just time out."""
+    conn = RecordingConn(responses={r"BUSY\?": "1", r"MEASUrement:LIST\?": "NONE",
+                                    r"RESUlts": "2.5"})
+    scope = make_scope(MSO64, conn)
+    assert scope.measure_vpp(1) == pytest.approx(2.5)
+    assert "*OPC?" not in conn.queries
+
+
+def test_mso64_measurement_waits_for_opc_when_idle():
+    conn = RecordingConn(responses={r"BUSY\?": "0", r"MEASUrement:LIST\?": "NONE",
+                                    r"RESUlts": "2.5"})
+    scope = make_scope(MSO64, conn)
+    scope.measure_vpp(1)
+    assert "*OPC?" in conn.queries
+
+
+def test_mso64_screenshot_while_busy_waits_instead_of_opc(monkeypatch):
+    png = b"\x89PNG\r\n\x1a\n" + b"payload"
+    conn = RecordingConn(responses={r"BUSY\?": "1"}, raw=png)
+    scope = make_scope(MSO64, conn)
+    monkeypatch.setattr(MSO64, "SCREENSHOT_SAVE_WAIT_S", 0)
+    assert scope.get_screenshot() == png
+    assert "*OPC?" not in conn.queries
+
+
+def test_mso64_screenshot_failure_names_the_step_and_scope_message():
+    from EEequipment.MSO64.MSO64 import ScreenshotError
+
+    class NoFileConn(RecordingConn):
+        def query_raw(self, cmd):
+            raise TimeoutError("VI_ERROR_TMO")
+
+    conn = NoFileConn(responses={
+        r"BUSY\?": "0",
+        r"ALLEv\?": '-200,"Execution error; File not found"'})
+    scope = make_scope(MSO64, conn)
+
+    with pytest.raises(ScreenshotError) as e:
+        scope.get_screenshot()
+    msg = str(e.value)
+    assert "READFile" in msg
+    assert "File not found" in msg
+    # An OSError, so the tab's Screenshot button and capture() both catch it.
+    assert isinstance(e.value, OSError)

@@ -35,12 +35,25 @@ class TabOSC(guic.ThemedFrame):
         self.basefilepath = basefilepath
         self.grid(row=0, column=0)
 
+        # Vertical spacing. Compact mode trims it hard: on a ~14" laptop at
+        # 150% scaling the window is ~675 px tall and this tab has to fit.
+        compact = self.theme_config.get("compact", False)
+        self._row_py = 1 if compact else 3
+        self._first_title_py = (2, 1) if compact else 5
+        self._title_py = (4, 1) if compact else (10, 5)
+        self._gap_py = (4, 1) if compact else (10, 3)
+
+        # Right-hand column: control panel with the capture panel under it.
+        # Kept out of the main grid rows so the capture panel's height doesn't
+        # force the console row taller.
+        self.fr_right = tk.Frame(self, bg=self.theme_config["bg_dark"])
+
         self.fr_port = None
         self.fr_info = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_channel = tk.Frame(self, bg=self.theme_config["light_4"])
         self.fr_tb_trig = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_control = tk.Frame(self, bg=self.theme_config["light_4"])
-        self.fr_capture = tk.Frame(self, bg=self.theme_config["light_4"])
+        self.fr_control = tk.Frame(self.fr_right, bg=self.theme_config["light_4"])
+        self.fr_capture = tk.Frame(self.fr_right, bg=self.theme_config["light_4"])
 
         # oscilloscope state
         self.id = None
@@ -57,8 +70,9 @@ class TabOSC(guic.ThemedFrame):
         self.tb_index = 14  # default ~200us
         self.tb_label = None
 
-        # set up prompt
-        self.prompt = guic.Prompt(self, self.theme_config, "OSC Console Output")
+        # set up prompt (shorter in compact mode; it still grows with the window)
+        self.prompt = guic.Prompt(self, self.theme_config, "OSC Console Output",
+                                  height=6 if compact else 10)
 
         # initialize tab content
         self.initTabContent()
@@ -78,8 +92,9 @@ class TabOSC(guic.ThemedFrame):
         # place everything in grid
         self.fr_info.grid(row=1, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.fr_port.grid(row=1, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="N")
-        self.fr_control.grid(row=1, column=2, rowspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
-        self.fr_capture.grid(row=3, column=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_right.grid(row=1, column=2, rowspan=3, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
+        self.fr_control.grid(row=0, column=0, sticky="NW")
+        self.fr_capture.grid(row=1, column=0, pady=(self.theme_config["pad"]["frame_y"], 0), sticky="NW")
         self.fr_channel.grid(row=2, column=0, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.fr_tb_trig.grid(row=2, column=1, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NW")
         self.prompt.grid(row=3, column=0, columnspan=2, padx=self.theme_config["pad"]["frame_x"], pady=self.theme_config["pad"]["frame_y"], sticky="NSEW")
@@ -216,20 +231,20 @@ class TabOSC(guic.ThemedFrame):
 
         # --- Acquisition Controls ---
         ttk.Label(fr, text="Acquisition", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=5)
+            row=cur_row, column=0, columnspan=3, pady=self._first_title_py)
         cur_row += 1
 
         tk.Button(fr, text="Run", width=8, command=self.acq_run).grid(
-            row=cur_row, column=0, padx=5, pady=3)
+            row=cur_row, column=0, padx=5, pady=self._row_py)
         tk.Button(fr, text="Stop", width=8, command=self.acq_stop).grid(
-            row=cur_row, column=1, padx=5, pady=3)
+            row=cur_row, column=1, padx=5, pady=self._row_py)
         tk.Button(fr, text="Single", width=8, command=self.acq_single).grid(
-            row=cur_row, column=2, padx=5, pady=3)
+            row=cur_row, column=2, padx=5, pady=self._row_py)
         cur_row += 1
 
         # --- Acquisition Type ---
         lbl_acq_type = ttk.Label(fr, text="Type", style="TLabel")
-        lbl_acq_type.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        lbl_acq_type.grid(row=cur_row, column=0, padx=5, pady=self._row_py, sticky="w")
         guic.Tooltip(lbl_acq_type,
                      "Acquisition type (:ACQuire:TYPE)\n\n"
                      "NORMal      — standard sample mode\n"
@@ -243,29 +258,29 @@ class TabOSC(guic.ThemedFrame):
                      "use WORD or ASCii waveform format when reading data.")
         self.acq_type_drop = guih.generate_drop_down(fr, ["NORMal", "AVERage", "HRESolution", "PEAK"])
         self.acq_type_drop[1].set("NORMal")
-        self.acq_type_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        self.acq_type_drop[0].grid(row=cur_row, column=1, padx=5, pady=self._row_py)
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_acq_type(self.acq_type_drop[1].get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+                  ).grid(row=cur_row, column=2, padx=5, pady=self._row_py)
         cur_row += 1
 
         # Avg Count (only meaningful for AVERage mode)
         lbl_acq_count = ttk.Label(fr, text="Avg Count", style="TLabel")
-        lbl_acq_count.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        lbl_acq_count.grid(row=cur_row, column=0, padx=5, pady=self._row_py, sticky="w")
         guic.Tooltip(lbl_acq_count, "Number of waveforms to average (1–65536).\nOnly applies in AVERage mode.")
         self.acq_count_entry = tk.Entry(fr, width=10)
         self.acq_count_entry.insert(0, "4")
-        self.acq_count_entry.grid(row=cur_row, column=1, padx=5, pady=3)
+        self.acq_count_entry.grid(row=cur_row, column=1, padx=5, pady=self._row_py)
         tk.Button(fr, text="Set", width=6,
                   command=lambda: self.set_acq_count(self.acq_count_entry.get())
-                  ).grid(row=cur_row, column=2, padx=5, pady=3)
+                  ).grid(row=cur_row, column=2, padx=5, pady=self._row_py)
         cur_row += 1
 
         # --- Quick actions ---
         tk.Button(fr, text="Autoscale", width=10, command=self.autoscale).grid(
-            row=cur_row, column=0, padx=5, pady=(10, 3))
+            row=cur_row, column=0, padx=5, pady=self._gap_py)
         btn_shot = tk.Button(fr, text="Screenshot", width=10, command=self.save_screenshot)
-        btn_shot.grid(row=cur_row, column=1, padx=5, pady=(10, 3))
+        btn_shot.grid(row=cur_row, column=1, padx=5, pady=self._gap_py)
         guic.Tooltip(btn_shot,
                      "Save the scope screen as a PNG on this PC, in the Capture\n"
                      "run folder, named screen_<date>_<time>.png.\n\n"
@@ -274,11 +289,11 @@ class TabOSC(guic.ThemedFrame):
 
         # --- Scope setup files (stored on the scope, not this PC) ---
         ttk.Label(fr, text="Scope Setup", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
+            row=cur_row, column=0, columnspan=3, pady=self._title_py)
         cur_row += 1
 
         lbl_setup = ttk.Label(fr, text="File on scope", style="TLabel")
-        lbl_setup.grid(row=cur_row, column=0, padx=5, pady=3, sticky="w")
+        lbl_setup.grid(row=cur_row, column=0, padx=5, pady=self._row_py, sticky="w")
         guic.Tooltip(lbl_setup,
                      "Path of a setup file on the SCOPE's own drive, not this PC.\n\n"
                      "Save Setup stores the scope's current settings (channels,\n"
@@ -286,26 +301,26 @@ class TabOSC(guic.ThemedFrame):
                      "Recall Setup loads them back.\n\n"
                      "MSO64 example: C:/bench_setup.set")
         self.save_filename_entry = tk.Entry(fr, width=18)
-        self.save_filename_entry.grid(row=cur_row, column=1, columnspan=2, padx=5, pady=3, sticky="W")
+        self.save_filename_entry.grid(row=cur_row, column=1, columnspan=2, padx=5, pady=self._row_py, sticky="W")
         cur_row += 1
 
         tk.Button(fr, text="Save Setup", width=10, command=self.save_setup).grid(
-            row=cur_row, column=1, padx=5, pady=3)
+            row=cur_row, column=1, padx=5, pady=self._row_py)
         tk.Button(fr, text="Recall Setup", width=10, command=self.recall_setup).grid(
-            row=cur_row, column=2, padx=5, pady=3)
+            row=cur_row, column=2, padx=5, pady=self._row_py)
         cur_row += 1
 
         # --- Quick Measurements ---
         ttk.Label(fr, text="Measurements", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(10, 5))
+            row=cur_row, column=0, columnspan=3, pady=self._title_py)
         cur_row += 1
 
-        ttk.Label(fr, text="Channel", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=3)
+        ttk.Label(fr, text="Channel", style="TLabel").grid(row=cur_row, column=0, padx=5, pady=self._row_py)
         self.meas_ch_drop = guih.generate_drop_down(fr, ["1", "2", "3", "4"])
         self.meas_ch_drop[1].set("1")
-        self.meas_ch_drop[0].grid(row=cur_row, column=1, padx=5, pady=3)
+        self.meas_ch_drop[0].grid(row=cur_row, column=1, padx=5, pady=self._row_py)
         tk.Button(fr, text="Measure All", width=10, command=self.measure_all).grid(
-            row=cur_row, column=2, padx=5, pady=3)
+            row=cur_row, column=2, padx=5, pady=self._row_py)
 
     # =========================================================================
     # fr_tb_trig — Timebase + Trigger
@@ -744,7 +759,7 @@ class TabOSC(guic.ThemedFrame):
 
         cur_row = 0
         ttk.Label(fr, text="Capture", style="TPinkLabel.TLabel").grid(
-            row=cur_row, column=0, columnspan=3, pady=(5, 5))
+            row=cur_row, column=0, columnspan=3, pady=self._first_title_py)
         cur_row += 1
 
         # --- run folder ---
@@ -768,8 +783,13 @@ class TabOSC(guic.ThemedFrame):
         cur_row += 1
 
         # --- user fields (become both filename tokens and CSV columns) ---
-        lbl_fields = ttk.Label(fr, text="Fields", style="TLabel")
-        lbl_fields.grid(row=cur_row, column=0, padx=px, pady=py, sticky="nw")
+        # Label and "+ Field" share column 0 so adding a field costs no row.
+        fr_fields_lbl = tk.Frame(fr, bg=self.theme_config["light_4"])
+        fr_fields_lbl.grid(row=cur_row, column=0, padx=px, pady=py, sticky="nw")
+        lbl_fields = ttk.Label(fr_fields_lbl, text="Fields", style="TLabel")
+        lbl_fields.grid(row=0, column=0, sticky="w")
+        tk.Button(fr_fields_lbl, text="+ Field", width=7, command=self.add_capture_field).grid(
+            row=1, column=0, pady=(py, 0), sticky="w")
         guic.Tooltip(lbl_fields,
                      "Name/value pairs describing this capture's conditions.\n"
                      "Each name is usable as a {token} in the template and is\n"
@@ -781,27 +801,27 @@ class TabOSC(guic.ThemedFrame):
         self.capture_fields = []
         cur_row += 1
 
-        tk.Button(fr, text="+ Field", width=8, command=self.add_capture_field).grid(
-            row=cur_row, column=1, padx=px, pady=py, sticky="w")
-        cur_row += 1
+        # --- what gets written (two rows: picture + numbers, then raw data) ---
+        fr_out = tk.Frame(fr, bg=self.theme_config["light_4"])
+        fr_out.grid(row=cur_row, column=0, columnspan=3, padx=px, sticky="w")
 
-        # --- what gets written ---
         self.var_save_image = tk.IntVar(value=1)
-        ttk.Checkbutton(fr, text="Screenshot (PNG)", variable=self.var_save_image,
-                        onvalue=1, offvalue=0, command=self._refresh_capture_preview
-                        ).grid(row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
-        cur_row += 1
+        chk_img = ttk.Checkbutton(fr_out, text="Screenshot", variable=self.var_save_image,
+                                  onvalue=1, offvalue=0, command=self._refresh_capture_preview)
+        chk_img.grid(row=0, column=0, sticky="w")
+        guic.Tooltip(chk_img, "Save the scope screen as a PNG.")
 
         self.var_save_meas = tk.IntVar(value=1)
-        ttk.Checkbutton(fr, text="Measurements (CSV row)", variable=self.var_save_meas,
-                        onvalue=1, offvalue=0).grid(
-            row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
-        cur_row += 1
+        chk_meas = ttk.Checkbutton(fr_out, text="Measurements", variable=self.var_save_meas,
+                                   onvalue=1, offvalue=0)
+        chk_meas.grid(row=0, column=1, padx=(px, 0), sticky="w")
+        guic.Tooltip(chk_meas, "Append a row of measurements for every enabled\n"
+                               "channel to the run CSV.")
 
         self.var_save_wave = tk.IntVar(value=0)
-        chk_wave = ttk.Checkbutton(fr, text="Waveform data", variable=self.var_save_wave,
+        chk_wave = ttk.Checkbutton(fr_out, text="Waveform data", variable=self.var_save_wave,
                                    onvalue=1, offvalue=0, command=self._refresh_capture_preview)
-        chk_wave.grid(row=cur_row, column=0, columnspan=2, padx=px, sticky="w")
+        chk_wave.grid(row=1, column=0, sticky="w")
         guic.Tooltip(chk_wave,
                      "Download every enabled channel's full record and save it as\n"
                      "<capture name>.csv or .mat next to the screenshot.\n\n"
@@ -811,16 +831,19 @@ class TabOSC(guic.ThemedFrame):
                      "Long records are slow: ~10M points per channel can take\n"
                      "several seconds each over USB.")
         drop_fmt, self.var_wave_fmt = guih.generate_drop_down(
-            fr, list(waveform_export.FORMATS), self._refresh_capture_preview,
+            fr_out, list(waveform_export.FORMATS), self._refresh_capture_preview,
             self.theme_config, width=4)
-        drop_fmt.grid(row=cur_row, column=2, padx=px, sticky="w")
+        drop_fmt.grid(row=1, column=1, padx=(px, 0), sticky="w")
         cur_row += 1
 
         # --- preview + action ---
+        # Fixed light background: theme fg colors are white in darcula and
+        # near-black in light, so no single theme bg is readable in both.
         self.capture_preview = tk.Label(fr, text="", anchor="w", justify="left",
-                                        wraplength=240, relief="sunken", width=34)
+                                        wraplength=240, relief="sunken", width=34,
+                                        bg="#FFFFFF")
         self.capture_preview.grid(row=cur_row, column=0, columnspan=3,
-                                  padx=px, pady=(py, 3), sticky="w")
+                                  padx=px, pady=py, sticky="w")
         cur_row += 1
 
         self.btn_capture = tk.Button(fr, text="CAPTURE", width=12, command=self.do_capture)
@@ -918,8 +941,7 @@ class TabOSC(guic.ThemedFrame):
         if self.var_save_wave.get():
             exts.append("." + self.var_wave_fmt.get())
         suffix = " + ".join(exts)
-        self.capture_preview.config(text=f"Next: {name}{suffix}",
-                                    fg=self.theme_config["fg_light"])
+        self.capture_preview.config(text=f"Next: {name}{suffix}", fg="#212121")
 
     def browse_run_dir(self):
         chosen = filedialog.askdirectory(title="Capture run folder",
@@ -990,7 +1012,9 @@ class TabOSC(guic.ThemedFrame):
             result = self.cc.osc_service.capture(
                 run_dir, template, fields,
                 save_image=save_image, save_measurements=save_meas,
-                save_waveform=save_wave, waveform_format=wave_fmt)
+                save_waveform=save_wave, waveform_format=wave_fmt,
+                # Tk isn't thread-safe: hop to the GUI thread to print.
+                progress=lambda msg: self.after(0, lambda m=msg: self.prompt.print(f"  {m}")))
         except Exception as e:
             logger.exception("Unhandled error during OSC capture")
             self.after(0, lambda err=e: self._capture_failed(str(err)))

@@ -29,11 +29,16 @@ TOKEN_HELP = (
     "  {time}      14_32_05\n"
     "  {datetime}  2026-09-07_14_32_05\n"
     "  {n}         capture number, {n:03d} zero-pads to 007\n"
-    "  {model}     connected scope model\n\n"
+    "  {model}     connected scope model\n"
+    "  {fields}    values of every field not named elsewhere in the\n"
+    "              template, in table order, joined by _ (e.g. 5P0_25C)\n\n"
     "Plus one token per field defined below, e.g. {Vin}."
 )
 
-DEFAULT_TEMPLATE = "{prefix}_{n:03d}"
+DEFAULT_TEMPLATE = "{prefix}_{fields}_{n:03d}"
+
+# Expands to the values of all fields the template doesn't name explicitly.
+FIELDS_TOKEN = "fields"
 
 # Anything that is awkward in a filename on either Linux or Windows.
 _ILLEGAL = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -85,6 +90,8 @@ def render(template, fields, n, model="", when=None):
     tab can show the problem before anything is written to disk.
     """
     values = build_token_values(fields, n, model, when)
+    if FIELDS_TOKEN not in (fields or {}):
+        values[FIELDS_TOKEN] = _fields_value(template, fields)
     try:
         name = string.Formatter().vformat(template, (), _StrictTokens(values))
     except KeyError as e:
@@ -94,10 +101,26 @@ def render(template, fields, n, model="", when=None):
     except (ValueError, IndexError) as e:
         raise TemplateError(f"Malformed template: {e}") from e
 
-    name = sanitize_component(name)
+    # A blank field (or an empty {fields}) would otherwise leave "a__b".
+    name = re.sub(r"_{2,}", "_", sanitize_component(name)).strip("_")
     if not name:
         raise TemplateError("Template rendered to an empty filename")
     return name
+
+
+def _fields_value(template, fields):
+    """Values for {fields}: every non-blank field the template doesn't name.
+
+    Fields named explicitly (e.g. {prefix}) are left out so they don't
+    appear twice. Order is the order the fields were defined in.
+    """
+    try:
+        named = {f for _, f, _, _ in string.Formatter().parse(template) if f}
+    except ValueError:
+        named = set()   # malformed; render() reports it
+    parts = [sanitize_component(v) for k, v in (fields or {}).items()
+             if k not in named]
+    return "_".join(p for p in parts if p)
 
 
 class _StrictTokens(dict):

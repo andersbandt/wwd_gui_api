@@ -24,6 +24,28 @@ def test_render_sanitizes_values_that_would_break_a_path():
     assert name == "load_step_50%_1"
 
 
+def test_fields_token_is_values_only_in_table_order():
+    fields = {"prefix": "buck", "Vin": "5P0", "Temp": "25C"}
+    name = capture_naming.render(capture_naming.DEFAULT_TEMPLATE, fields, 3)
+    assert name == "buck_5P0_25C_003"
+
+
+def test_fields_token_skips_fields_named_elsewhere_and_blanks():
+    fields = {"prefix": "buck", "Vin": "5P0", "Load": "", "Temp": "25C"}
+    name = capture_naming.render("{prefix}_{fields}_T{Temp}_{n}", fields, 1)
+    assert name == "buck_5P0_T25C_1"
+
+
+def test_fields_token_with_no_extra_fields_leaves_no_double_underscore():
+    name = capture_naming.render("{prefix}_{fields}_{n:03d}", {"prefix": "buck"}, 2)
+    assert name == "buck_002"
+
+
+def test_a_user_field_called_fields_wins():
+    name = capture_naming.render("{fields}_{n}", {"fields": "mine", "Vin": "5"}, 1)
+    assert name == "mine_1"
+
+
 def test_render_rejects_unknown_token():
     with pytest.raises(capture_naming.TemplateError) as e:
         capture_naming.render("{Vout}_{n}", {"Vin": "12"}, 1)

@@ -161,7 +161,9 @@ All log files are written to the `data/` directory with timestamped filenames.
 - `path_helper.py` — Centralized path management (`get_project_root()`, `resolve_path()`, `get_config_path()`, `get_data_dir()`, `get_full_data_path()`). All bundled resources (`config/`, `data/`, `EEequipment/`) resolve against the project root — derived from `__file__`, never `os.getcwd()` — so the app can be launched from any working directory. Never hardcode a relative path like `"config/master.ini"`; use `resolve_path()`.
 - `capture_naming.py` — filename templating for OSC captures. `render()` expands
   a template like `{prefix}_Vin{Vin}_{n:03d}` from built-in tokens (`date`,
-  `time`, `datetime`, `n`, `model`) plus user-defined fields, sanitizing each
+  `time`, `datetime`, `n`, `model`, and `fields` -- the values of every field the template
+  doesn't name, joined by `_`; default template `{prefix}_{fields}_{n:03d}`) plus
+  user-defined fields, sanitizing each
   value for the filesystem; `next_index()` derives the capture counter from the
   run CSV's row count so it survives a restart. A bad token raises
   `TemplateError` rather than producing a surprising filename.

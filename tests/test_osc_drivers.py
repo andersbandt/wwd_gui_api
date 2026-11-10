@@ -254,15 +254,59 @@ def test_mso64_waveform_scaling_uses_signed_codes():
     assert conn.sent("DATa:SOUrce CH1")
 
 
+class TekFileConn(RecordingConn):
+    """A fake 6 Series disk: SAVe:IMAGe creates the file, LDIR? lists the CWD."""
+
+    def __init__(self, png, files=None, save_creates=True, **kw):
+        super().__init__(raw=png, **kw)
+        self.files = dict(files or {})
+        self.save_creates = save_creates
+        self.cwd = "C:/Users/Public/Tektronix/TekScope"
+        self.byte_reads = []
+
+    def write(self, cmd):
+        super().write(cmd)
+        if m := re.match(r'SAVe:IMAGe "(.+)"', cmd):
+            if self.save_creates:
+                self.files[m.group(1)] = len(self.raw)
+        elif m := re.match(r'FILESystem:DELEte "(.+)"', cmd):
+            self.files.pop(m.group(1), None)
+        elif m := re.match(r'FILESystem:CWD "(.+)"', cmd):
+            self.cwd = m.group(1)
+
+    def query(self, cmd):
+        if cmd == "FILESystem:CWD?":
+            self.queries.append(cmd)
+            return f'"{self.cwd}"'
+        if cmd == "FILESystem:LDIR?":
+            self.queries.append(cmd)
+            here = self.cwd.rstrip("/")
+            entries = [f'"{path.rsplit("/", 1)[1]};FILE;{size};2026-11-09;10:00:00"'
+                       for path, size in self.files.items()
+                       if path.rsplit("/", 1)[0] == here]
+            return ",".join(entries) or '""'
+        return super().query(cmd)
+
+    def query_bytes(self, cmd, count):
+        self.queries.append(cmd)
+        self.byte_reads.append(count)
+        return self.raw[:count]
+
+
+PNG_SHOT = b"\x89PNG\r\n\x1a\n" + b"payload\n with a newline"
+
+
 def test_mso64_screenshot_saves_reads_and_cleans_up():
-    png = b"\x89PNG\r\n\x1a\n" + b"payload"
-    conn = RecordingConn(raw=png)
+    conn = TekFileConn(PNG_SHOT)
     scope = make_scope(MSO64, conn)
 
-    assert scope.get_screenshot() == png
+    assert scope.get_screenshot() == PNG_SHOT
     assert conn.sent('SAVe:IMAGe "C:/Temp.png"')
-    assert conn.sent('FILESystem:DELEte "C:/Temp.png"')
+    # Read exactly the listed size rather than waiting for an end flag.
+    assert conn.byte_reads == [len(PNG_SHOT)]
     assert any("READFile" in q for q in conn.queries)
+    assert conn.files == {}                       # deleted afterwards
+    assert conn.cwd == "C:/Users/Public/Tektronix/TekScope"   # CWD restored
 
 
 def test_keysight_screenshot_unwraps_the_ieee_block():
@@ -338,23 +382,54 @@ def test_mso64_measurement_waits_for_opc_when_idle():
     assert "*OPC?" in conn.queries
 
 
-def test_mso64_screenshot_while_busy_waits_instead_of_opc(monkeypatch):
-    png = b"\x89PNG\r\n\x1a\n" + b"payload"
-    conn = RecordingConn(responses={r"BUSY\?": "1"}, raw=png)
+def test_mso64_screenshot_while_busy_skips_opc():
+    conn = TekFileConn(PNG_SHOT, responses={r"BUSY\?": "1"})
     scope = make_scope(MSO64, conn)
-    monkeypatch.setattr(MSO64, "SCREENSHOT_SAVE_WAIT_S", 0)
-    assert scope.get_screenshot() == png
+    assert scope.get_screenshot() == PNG_SHOT
     assert "*OPC?" not in conn.queries
+
+
+def test_mso64_screenshot_deletes_a_stale_copy_before_saving():
+    """A leftover Temp.png would look like a finished save."""
+    conn = TekFileConn(PNG_SHOT, files={"C:/Temp.png": 5})
+    scope = make_scope(MSO64, conn)
+    assert scope.get_screenshot() == PNG_SHOT
+    delete = conn.writes.index('FILESystem:DELEte "C:/Temp.png"')
+    save = conn.writes.index('SAVe:IMAGe "C:/Temp.png"')
+    assert delete < save
+    assert conn.byte_reads == [len(PNG_SHOT)]
+
+
+def test_mso64_screenshot_falls_back_when_the_scope_cannot_list_files():
+    class NoListConn(RecordingConn):
+        def query(self, cmd):
+            if "LDIR" in cmd or "CWD" in cmd:
+                raise TimeoutError("VI_ERROR_TMO")
+            return super().query(cmd)
+
+    conn = NoListConn(raw=PNG_SHOT)
+    scope = make_scope(MSO64, conn)
+    assert scope.get_screenshot() == PNG_SHOT
+
+
+def test_mso64_screenshot_fails_fast_when_the_file_never_appears(monkeypatch):
+    from EEequipment.MSO64.MSO64 import ScreenshotError
+    monkeypatch.setattr(MSO64, "SCREENSHOT_SAVE_TIMEOUT_S", 0)
+    conn = TekFileConn(PNG_SHOT, save_creates=False)
+    scope = make_scope(MSO64, conn)
+    with pytest.raises(ScreenshotError, match="never appeared"):
+        scope.get_screenshot()
+    assert conn.byte_reads == []
 
 
 def test_mso64_screenshot_failure_names_the_step_and_scope_message():
     from EEequipment.MSO64.MSO64 import ScreenshotError
 
-    class NoFileConn(RecordingConn):
-        def query_raw(self, cmd):
+    class FailingReadConn(TekFileConn):
+        def query_bytes(self, cmd, count):
             raise TimeoutError("VI_ERROR_TMO")
 
-    conn = NoFileConn(responses={
+    conn = FailingReadConn(PNG_SHOT, responses={
         r"BUSY\?": "0",
         r"ALLEv\?": '-200,"Execution error; File not found"'})
     scope = make_scope(MSO64, conn)
@@ -366,3 +441,23 @@ def test_mso64_screenshot_failure_names_the_step_and_scope_message():
     assert "File not found" in msg
     # An OSError, so the tab's Screenshot button and capture() both catch it.
     assert isinstance(e.value, OSError)
+
+
+def test_visa_query_bytes_reads_a_fixed_count_with_no_term_char():
+    from unittest.mock import MagicMock
+    from EEequipment.TestEquipment import PyVISAHandler
+
+    h = PyVISAHandler("FAKE")
+    h.status = True
+    h.inst = MagicMock()
+    h.inst.read_termination = "\n"
+    seen = {}
+
+    def read_bytes(count):
+        seen["term"] = h.inst.read_termination
+        return b"x" * count
+
+    h.inst.read_bytes.side_effect = read_bytes
+    assert h.query_bytes('FILESystem:READFile "C:/Temp.png"', 7) == b"x" * 7
+    assert seen["term"] is None                 # 0x0A in a PNG must not end it
+    assert h.inst.read_termination == "\n"      # restored

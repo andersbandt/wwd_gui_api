@@ -1,6 +1,75 @@
 #!/usr/bin/env python3
 """Step-by-step VISA / oscilloscope connection debugger.
 
+==============================================================================
+ LAB CHECKLIST -- MSO64 screenshot / measurement problems
+==============================================================================
+
+ 0. Prep
+    - Close the GUI, TekScope utilities and NI MAX test panels. Only one
+      program can hold the USB session; a second one makes everything below
+      fail or time out.
+    - Pull the latest code, including the driver submodule:
+          git pull --recurse-submodules
+      (or: git pull  then  git submodule update)
+
+ 1. Find the address
+          python scope_debug.py
+    Step 2 lists every instrument; the Tektronix one is marked
+    "<- Tektronix". Copy that whole string, e.g.
+          USB0::0x0699::0x0530::C012345::INSTR
+    Not listed? Fix that first (USB cable on the scope's rear USB-B port,
+    TekVISA/NI-VISA installed, [VISA] backend in config/master.ini blank).
+
+ 2. Trace the raw commands (most useful run -- do this one first)
+          python scope_debug.py --address <addr> --trace > trace.txt
+    Open trace.txt and look at the trace section:
+    - Every line is one command: [ OK ] or [FAIL], how long it took, and
+      the scope's reply. The FIRST [FAIL] is the culprit.
+    - "-- measurement --": if *OPC? fails right after BUSY? shows 1, a
+      Single acquisition is pending and *OPC? waits for its trigger. Press
+      Run (or Stop) on the scope and re-run.
+    - "-- screenshot --":
+        "Temp.png on scope: N bytes"  -> the scope saved the image.
+        "NOT LISTED"                  -> the save failed; check ALLEv? below
+                                         it for the scope's own error.
+        "(read N bytes)" [ OK ] then "(read until end flag)" [FAIL]
+            -> expected. Confirms the old read was the timeout; the app
+               now uses the sized read, so screenshots should work.
+        "(read N bytes)" [FAIL] -> a new problem. Send me trace.txt.
+    - The last ALLEv? line is the scope's error queue. Anything other than
+      '0,"No events..."' is the scope telling you what it rejected.
+
+ 3. Run the app's own code path (driver + capture)
+          python scope_debug.py --address <addr> --capture
+    Step 6 should print [ OK ] for the measurement, the screenshot and the
+    Capture, and the paths it wrote (under data/osc_data/debug_<time>/).
+    A failure names the step that failed, e.g.
+          screenshot failed at FILESystem:READFile: ...; scope reports: ...
+    Add --waveform to also test the waveform-data download (this leaves
+    the scope stopped -- press Run afterwards).
+
+ 4. Try the GUI
+          python main.py
+    OSC tab: connect, then the Screenshot button. The console prints
+    "Screenshot saved: <path>" (default data/osc_data/<date>_run/).
+    Nothing is written on the PC unless the whole image arrived, so no
+    file + an error means the read failed -- the error says at which step.
+    Then CAPTURE: the console shows "Measuring CH1...", "Saving
+    screenshot..." as it goes.
+
+ 5. Still broken? Bring back:
+    - trace.txt from step 2
+    - the full output of step 3
+    - what the scope was doing (Run / Stop / Single, waiting for trigger?)
+
+ Useful extras:
+    --trace-timeout 15000   longer per-command timeout for the trace (ms)
+    --backend @py           try pyvisa-py instead of NI-VISA/TekVISA
+    --timeout 10000         longer timeout for the raw *IDN? check (ms)
+
+==============================================================================
+
 Walks the same layers the OSC tab depends on, bottom-up, and stops at the first
 one that fails with a hint about what to fix:
 
@@ -352,14 +421,14 @@ class _Tracer:
         self.inst = inst
         self.first_failure = None
 
-    def _run(self, label, fn):
+    def _run(self, label, fn, counts=True):
         t0 = time.monotonic()
         try:
             result = fn()
         except Exception as e:
             ms = (time.monotonic() - t0) * 1000
             print(f"  [FAIL] {label:52s} {ms:6.0f} ms  {type(e).__name__}: {e}")
-            if self.first_failure is None:
+            if counts and self.first_failure is None:
                 self.first_failure = label
             try:
                 self.inst.clear()        # drop any half-sent reply
@@ -368,6 +437,8 @@ class _Tracer:
             return None
         ms = (time.monotonic() - t0) * 1000
         shown = result if isinstance(result, str) else ""
+        if len(shown) > 100:
+            shown = shown[:100] + f"... ({len(result)} chars)"
         print(f"  [ OK ] {label:52s} {ms:6.0f} ms  {shown}")
         return result
 
@@ -378,16 +449,20 @@ class _Tracer:
         r = self._run(cmd, lambda: self.inst.query(cmd).strip())
         return r
 
-    def query_raw(self, cmd):
+    def query_raw(self, cmd, count=None, counts=True):
+        """Binary read: until the end flag, or exactly `count` bytes."""
         def go():
             saved = self.inst.read_termination
             self.inst.read_termination = None
             try:
                 self.inst.write(cmd)
+                if count:
+                    return self.inst.read_bytes(count)
                 return self.inst.read_raw()
             finally:
                 self.inst.read_termination = saved
-        data = self._run(cmd + "  (binary read)", go)
+        how = f"read {count} bytes" if count else "read until end flag"
+        data = self._run(f"{cmd}  ({how})", go, counts=counts)
         if data is not None:
             kind = "PNG" if data.startswith(b"\x89PNG") else f"unknown, starts {data[:8]!r}"
             info(f"         got {len(data)} bytes, {kind}")
@@ -447,7 +522,27 @@ def step_trace(rm, address, timeout_ms, screenshot_path):
         t.write(f'SAVe:IMAGe "{screenshot_path}"')
         t.query("BUSY?")
         t.query("*OPC?")
-        t.query_raw(f'FILESystem:READFile "{screenshot_path}"')
+        # How big is the file the scope wrote? (LDIR? lists the CWD only.)
+        from EEequipment.MSO64.MSO64 import parse_ldir_size
+        folder, _, name = screenshot_path.replace("\\", "/").rpartition("/")
+        original = (t.query("FILESystem:CWD?") or "").strip('"')
+        t.write(f'FILESystem:CWD "{(folder or ".")}/"')
+        size = parse_ldir_size(t.query("FILESystem:LDIR?"), name)
+        if original:
+            t.write(f'FILESystem:CWD "{original}"')
+        info(f"         {name} on scope: "
+             + (f"{size} bytes" if size else "NOT LISTED (save failed or wrong path?)"))
+        read_cmd = f'FILESystem:READFile "{screenshot_path}"'
+        if size:
+            # What the driver does: read exactly the listed size.
+            t.query_raw(read_cmd, count=size)
+            # The old way, for comparison only. If this one times out but the
+            # sized read above worked, the scope sends no end flag after the
+            # file -- that was the screenshot timeout.
+            info("         comparison: the old read (waits for an end flag) --")
+            t.query_raw(read_cmd, counts=False)
+        else:
+            t.query_raw(read_cmd)
         t.write(f'FILESystem:DELEte "{screenshot_path}"')
         t.events()
     finally:
